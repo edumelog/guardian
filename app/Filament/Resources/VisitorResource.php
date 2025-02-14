@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\FileUpload;
+use App\Filament\Forms\Components\WebcamCapture;
 
 class VisitorResource extends Resource
 {
@@ -52,12 +53,8 @@ class VisitorResource extends Resource
                             ->required()
                             ->maxLength(255),
                             
-                        FileUpload::make('photo')
-                            ->label('Foto')
-                            ->image()
-                            ->imageEditor()
-                            ->directory('visitors-photos')
-                            ->visibility('private'),
+                        WebcamCapture::make('photo')
+                            ->label('Foto'),
                             
                         Forms\Components\Select::make('destination_id')
                             ->label('Destino')
