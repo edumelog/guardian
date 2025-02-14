@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0cefc8f8c8f7320e732db22110e017ed",
+    "content-hash": "fa03a21e95f19f5f204f0583ff1fd58a",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -1546,6 +1546,64 @@
                 }
             ],
             "time": "2024-07-20T21:45:45+00:00"
+        },
+        {
+            "name": "guava/filament-icon-picker",
+            "version": "2.2.4",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/lukas-frey/filament-icon-picker.git",
+                "reference": "ed309fee35e9566356d67635176af2f312fa687b"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/lukas-frey/filament-icon-picker/zipball/ed309fee35e9566356d67635176af2f312fa687b",
+                "reference": "ed309fee35e9566356d67635176af2f312fa687b",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^3.0@stable",
+                "illuminate/contracts": "^9.0|^10.0|^11.0",
+                "php": "^8.0"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^7.0|^8.0|^9.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Guava\\FilamentIconPicker\\FilamentIconPickerServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Guava\\FilamentIconPicker\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Lukas Frey",
+                    "email": "mail@lukasfrey.cz"
+                }
+            ],
+            "description": "A filament plugin that adds an icon picker field.",
+            "support": {
+                "issues": "https://github.com/lukas-frey/filament-icon-picker/issues",
+                "source": "https://github.com/lukas-frey/filament-icon-picker/tree/2.2.4"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/LukasFreyCZ",
+                    "type": "github"
+                }
+            ],
+            "time": "2024-06-27T07:07:31+00:00"
         },
         {
             "name": "guzzlehttp/guzzle",
@@ -4717,6 +4775,156 @@
             "time": "2024-02-26T18:08:49+00:00"
         },
         {
+            "name": "solution-forest/filament-access-management",
+            "version": "2.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/solutionforest/filament-access-management.git",
+                "reference": "737f0d6440597f9d266df2fa3deee8e25968edc1"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/solutionforest/filament-access-management/zipball/737f0d6440597f9d266df2fa3deee8e25968edc1",
+                "reference": "737f0d6440597f9d266df2fa3deee8e25968edc1",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^3.0",
+                "guava/filament-icon-picker": "^2.0",
+                "php": "^8.1",
+                "solution-forest/filament-tree": "^2.1.0",
+                "spatie/laravel-package-tools": "^1.15.0",
+                "spatie/laravel-permission": "^5.5|^6.0"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.0",
+                "nunomaduro/collision": "^7.9",
+                "nunomaduro/larastan": "^2.0.1",
+                "orchestra/testbench": "^8.0",
+                "pestphp/pest": "^2.0",
+                "pestphp/pest-plugin-arch": "^2.0",
+                "pestphp/pest-plugin-laravel": "^2.0",
+                "phpstan/extension-installer": "^1.1",
+                "phpstan/phpstan-deprecation-rules": "^1.0",
+                "phpstan/phpstan-phpunit": "^1.0",
+                "spatie/laravel-ray": "^1.26"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "FilamentAccessManagement": "SolutionForest\\FilamentAccessManagement\\Facades\\FilamentAccessManagement"
+                    },
+                    "providers": [
+                        "SolutionForest\\FilamentAccessManagement\\FilamentAccessManagementServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/helpers.php"
+                ],
+                "psr-4": {
+                    "SolutionForest\\FilamentAccessManagement\\": "src",
+                    "SolutionForest\\FilamentAccessManagement\\Database\\Seeders\\": "database/seeders",
+                    "SolutionForest\\FilamentAccessManagement\\Database\\Factories\\": "database/factories"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Carly",
+                    "email": "info@solutionforest.net",
+                    "role": "Developer"
+                }
+            ],
+            "description": "filament-access-management",
+            "homepage": "https://github.com/solutionforest/filament-access-management",
+            "keywords": [
+                "Solution Forest",
+                "filament-access-management",
+                "laravel"
+            ],
+            "support": {
+                "issues": "https://github.com/solutionforest/filament-access-management/issues",
+                "source": "https://github.com/solutionforest/filament-access-management"
+            },
+            "time": "2024-08-12T07:23:25+00:00"
+        },
+        {
+            "name": "solution-forest/filament-tree",
+            "version": "2.1.4",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/solutionforest/filament-tree.git",
+                "reference": "325fc5fc59eafaa58bd31fb8be65bc1f609f50a2"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/solutionforest/filament-tree/zipball/325fc5fc59eafaa58bd31fb8be65bc1f609f50a2",
+                "reference": "325fc5fc59eafaa58bd31fb8be65bc1f609f50a2",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^3.0",
+                "filament/support": "^3.0",
+                "php": "^8.1",
+                "spatie/laravel-package-tools": "^1.15.0"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.0",
+                "nunomaduro/collision": "^7.9",
+                "nunomaduro/larastan": "^2.0.1",
+                "orchestra/testbench": "^8.0",
+                "pestphp/pest": "^2.0",
+                "pestphp/pest-plugin-arch": "^2.0",
+                "pestphp/pest-plugin-laravel": "^2.0",
+                "phpstan/extension-installer": "^1.1",
+                "phpstan/phpstan-deprecation-rules": "^1.0",
+                "phpstan/phpstan-phpunit": "^1.0",
+                "spatie/laravel-ray": "^1.26"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "SolutionForest\\FilamentTree\\FilamentTreeServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "SolutionForest\\FilamentTree\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Carly",
+                    "email": "info@solutionforest.net",
+                    "role": "Developer"
+                }
+            ],
+            "description": "This is a tree layout plugin for Filament Admin",
+            "homepage": "https://github.com/solution-forest/filament-tree",
+            "keywords": [
+                "Solution Forest",
+                "filament-tree",
+                "laravel"
+            ],
+            "support": {
+                "issues": "https://github.com/solution-forest/filament-tree/issues",
+                "source": "https://github.com/solution-forest/filament-tree"
+            },
+            "time": "2025-01-23T16:57:43+00:00"
+        },
+        {
             "name": "spatie/color",
             "version": "1.8.0",
             "source": {
@@ -4893,6 +5101,89 @@
                 }
             ],
             "time": "2025-02-06T14:58:20+00:00"
+        },
+        {
+            "name": "spatie/laravel-permission",
+            "version": "6.14.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/spatie/laravel-permission.git",
+                "reference": "addf63f14c037afc16298724f2fa69bc010cd00d"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/spatie/laravel-permission/zipball/addf63f14c037afc16298724f2fa69bc010cd00d",
+                "reference": "addf63f14c037afc16298724f2fa69bc010cd00d",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/auth": "^8.12|^9.0|^10.0|^11.0|^12.0",
+                "illuminate/container": "^8.12|^9.0|^10.0|^11.0|^12.0",
+                "illuminate/contracts": "^8.12|^9.0|^10.0|^11.0|^12.0",
+                "illuminate/database": "^8.12|^9.0|^10.0|^11.0|^12.0",
+                "php": "^8.0"
+            },
+            "require-dev": {
+                "laravel/passport": "^11.0|^12.0",
+                "laravel/pint": "^1.0",
+                "orchestra/testbench": "^6.23|^7.0|^8.0|^9.0|^10.0",
+                "phpunit/phpunit": "^9.4|^10.1|^11.5"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Spatie\\Permission\\PermissionServiceProvider"
+                    ]
+                },
+                "branch-alias": {
+                    "dev-main": "6.x-dev",
+                    "dev-master": "6.x-dev"
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/helpers.php"
+                ],
+                "psr-4": {
+                    "Spatie\\Permission\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Freek Van der Herten",
+                    "email": "freek@spatie.be",
+                    "homepage": "https://spatie.be",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Permission handling for Laravel 8.0 and up",
+            "homepage": "https://github.com/spatie/laravel-permission",
+            "keywords": [
+                "acl",
+                "laravel",
+                "permission",
+                "permissions",
+                "rbac",
+                "roles",
+                "security",
+                "spatie"
+            ],
+            "support": {
+                "issues": "https://github.com/spatie/laravel-permission/issues",
+                "source": "https://github.com/spatie/laravel-permission/tree/6.14.0"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/spatie",
+                    "type": "github"
+                }
+            ],
+            "time": "2025-02-13T19:57:18+00:00"
         },
         {
             "name": "symfony/clock",
