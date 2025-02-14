@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use SolutionForest\FilamentAccessManagement\Concerns\FilamentUserHelpers;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable
 {
@@ -45,5 +46,16 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function printers(): BelongsToMany
+    {
+        return $this->belongsToMany(Printer::class, 'printer_operator', 'operator_id', 'printer_id')
+            ->withTimestamps();
+    }
+
+    public function activityLogs()
+    {
+        return $this->hasMany(ActivityLog::class, 'operator_id');
     }
 }
