@@ -26,6 +26,10 @@ class VisitorResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
+    protected static ?string $modelLabel = 'Visitante';
+    
+    protected static ?string $pluralModelLabel = 'Visitantes';
+
     public static function form(Form $form): Form
     {
         return $form

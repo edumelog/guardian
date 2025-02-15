@@ -20,7 +20,7 @@
         @if($destination->children->isNotEmpty())
             <button 
                 type="button" 
-                class="toggle-children" 
+                class="toggle-children text-primary-500" 
                 @click="expanded = !expanded"
             >
                 <svg 
@@ -41,7 +41,12 @@
             <span class="w-4"></span>
         @endif
         
-        <span class="font-medium text-gray-600">{{ $destination->name }}</span>
+        <a 
+            href="{{ route('filament.admin.resources.destinations.edit', ['record' => $destination->id]) }}" 
+            class="text-sm font-medium text-gray-600 hover:text-primary-500 transition-colors duration-200"
+        >
+            {{ $destination->name }}
+        </a>
     </div>
     
     @if($destination->children->isNotEmpty())
@@ -71,10 +76,10 @@
         cursor: pointer;
         padding: 2px;
         border-radius: 4px;
-        transition: background-color 0.2s;
+        transition: all 0.2s;
     }
     .toggle-children:hover {
-        background-color: rgb(243 244 246);
+        background-color: rgb(254 243 199);
     }
     .hierarchy-item {
         margin-top: 0.5rem;

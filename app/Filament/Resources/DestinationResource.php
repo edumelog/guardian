@@ -24,6 +24,10 @@ class DestinationResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
+    protected static ?string $modelLabel = 'Destino';
+    
+    protected static ?string $pluralModelLabel = 'Destinos';
+
     public static function form(Form $form): Form
     {
         return $form
@@ -65,24 +69,7 @@ class DestinationResource extends Resource
                             )
                             ->searchable()
                             ->preload()
-                            ->placeholder('Selecione o destino pai (opcional)')
-                            ->createOptionForm([
-                                TextInput::make('name')
-                                    ->label('Nome')
-                                    ->required()
-                                    ->maxLength(255),
-                                TextInput::make('address')
-                                    ->label('Endereço')
-                                    ->maxLength(255),
-                                TextInput::make('phone')
-                                    ->label('Telefone')
-                                    ->maxLength(255),
-                                TextInput::make('max_visitors')
-                                    ->label('Máximo de Visitantes')
-                                    ->numeric()
-                                    ->minValue(0)
-                                    ->default(0),
-                            ]),
+                            ->placeholder('Selecione o destino pai (opcional)'),
                     ])->columns(2)
             ]);
     }
