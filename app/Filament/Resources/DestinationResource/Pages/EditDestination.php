@@ -14,6 +14,11 @@ class EditDestination extends EditRecord
 {
     protected static string $resource = DestinationResource::class;
 
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
+
     protected function getHeaderActions(): array
     {
         return [

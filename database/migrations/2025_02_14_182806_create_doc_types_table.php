@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('doc_types', function (Blueprint $table) {
             $table->id();
             $table->string('type');
+            $table->boolean('is_default')->default(false);
             $table->timestamps();
         });
     }

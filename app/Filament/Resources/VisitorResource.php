@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\FileUpload;
 use App\Filament\Forms\Components\WebcamCapture;
+use App\Filament\Forms\Components\DestinationTreeSelect;
+use Filament\Forms\Components\Grid;
 
 class VisitorResource extends Resource
 {
@@ -45,12 +47,9 @@ class VisitorResource extends Resource
                             ->label('Tipo de Documento')
                             ->relationship('docType', 'type')
                             ->required()
-                            ->createOptionForm([
-                                Forms\Components\TextInput::make('type')
-                                    ->label('Tipo')
-                                    ->required()
-                                    ->maxLength(255),
-                            ]),
+                            ->default(function () {
+                                return \App\Models\DocType::where('is_default', true)->first()?->id;
+                            }),
                             
                         Forms\Components\TextInput::make('doc')
                             ->label('Número do Documento')
@@ -60,12 +59,10 @@ class VisitorResource extends Resource
                         WebcamCapture::make('photo')
                             ->label('Foto'),
                             
-                        Forms\Components\Select::make('destination_id')
+                        DestinationTreeSelect::make('destination_id')
                             ->label('Destino')
-                            ->relationship('destination', 'name')
                             ->required()
-                            ->searchable()
-                            ->preload(),
+                            ->columnSpan(2),
                             
                         Forms\Components\Textarea::make('other')
                             ->label('Informações Adicionais')
