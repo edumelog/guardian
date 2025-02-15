@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::create('destinations', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('address');
-            $table->string('phone');
-            $table->integer('max_visitors');
+            $table->string('address')->nullable();
+            $table->string('phone')->nullable();
+            $table->integer('max_visitors')->nullable()->default(0);
             $table->foreignId('parent_id')->nullable()->constrained('destinations')->onDelete('cascade');
             $table->timestamps();
         });

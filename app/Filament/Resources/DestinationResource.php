@@ -10,6 +10,9 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
 
 class DestinationResource extends Resource
 {
@@ -25,54 +28,60 @@ class DestinationResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Informações do Destino')
+                Section::make('Informações do Destino')
                     ->schema([
-                        Forms\Components\TextInput::make('name')
+                        TextInput::make('name')
                             ->label('Nome')
                             ->required()
                             ->maxLength(255),
                             
-                        Forms\Components\TextInput::make('address')
+                        TextInput::make('address')
                             ->label('Endereço')
-                            ->required()
                             ->maxLength(255),
                             
-                        Forms\Components\TextInput::make('phone')
+                        TextInput::make('phone')
                             ->label('Telefone')
-                            ->required()
                             ->maxLength(255)
                             ->tel(),
                             
-                        Forms\Components\TextInput::make('max_visitors')
+                        TextInput::make('max_visitors')
                             ->label('Máximo de Visitantes')
-                            ->required()
                             ->numeric()
-                            ->minValue(0),
+                            ->minValue(0)
+                            ->default(0),
                             
-                        Forms\Components\Select::make('parent_id')
+                        Select::make('parent_id')
                             ->label('Destino Pai')
-                            ->relationship('parent', 'name')
+                            ->relationship(
+                                'parent',
+                                'name',
+                                function (Builder $query, $record) {
+                                    if ($record) {
+                                        $childrenIds = $record->getAllChildrenIds();
+                                        $query->whereNotIn('id', [...$childrenIds, $record->id]);
+                                    }
+                                    return $query;
+                                }
+                            )
                             ->searchable()
                             ->preload()
                             ->placeholder('Selecione o destino pai (opcional)')
                             ->createOptionForm([
-                                Forms\Components\TextInput::make('name')
+                                TextInput::make('name')
                                     ->label('Nome')
                                     ->required()
                                     ->maxLength(255),
-                                Forms\Components\TextInput::make('address')
+                                TextInput::make('address')
                                     ->label('Endereço')
-                                    ->required()
                                     ->maxLength(255),
-                                Forms\Components\TextInput::make('phone')
+                                TextInput::make('phone')
                                     ->label('Telefone')
-                                    ->required()
                                     ->maxLength(255),
-                                Forms\Components\TextInput::make('max_visitors')
+                                TextInput::make('max_visitors')
                                     ->label('Máximo de Visitantes')
-                                    ->required()
                                     ->numeric()
-                                    ->minValue(0),
+                                    ->minValue(0)
+                                    ->default(0),
                             ]),
                     ])->columns(2)
             ]);
@@ -115,11 +124,39 @@ class DestinationResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\DeleteAction::make()
+                    ->requiresConfirmation()
+                    ->modalHeading(fn(): string => 'Deletar Destino')
+                    ->modalDescription(function (Destination $record): string {
+                        $childrenCount = $record->children()->count();
+                        if ($childrenCount > 0) {
+                            return "O destino \"{$record->name}\" possui {$childrenCount} subdestino(s) associado(s). Ao deletar este destino, todos os subdestinos também serão removidos. Deseja continuar?";
+                        }
+                        return "Tem certeza que deseja deletar o destino \"{$record->name}\"?";
+                    })
+                    ->modalSubmitActionLabel('Sim, deletar')
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->requiresConfirmation()
+                        ->modalHeading('Deletar Destinos')
+                        ->modalDescription(function ($action): string {
+                            $destinationsWithChildren = [];
+                            foreach ($action->getRecords() as $record) {
+                                if ($record->children()->count() > 0) {
+                                    $destinationsWithChildren[] = $record->name;
+                                }
+                            }
+                            
+                            if (!empty($destinationsWithChildren)) {
+                                $destinationsList = implode('", "', $destinationsWithChildren);
+                                return "ATENÇÃO: Os seguintes destinos possuem subdestinos associados:\n\n\"{$destinationsList}\"\n\nAo deletar estes destinos, todos os seus subdestinos também serão removidos. Deseja continuar?";
+                            }
+                            
+                            return 'Tem certeza que deseja deletar os destinos selecionados?';
+                        })
+                        ->modalSubmitActionLabel('Sim, deletar tudo')
                 ]),
             ]);
     }
@@ -137,6 +174,13 @@ class DestinationResource extends Resource
             'index' => Pages\ListDestinations::route('/'),
             'create' => Pages\CreateDestination::route('/create'),
             'edit' => Pages\EditDestination::route('/{record}/edit'),
+        ];
+    }
+
+    public static function getWidgets(): array
+    {
+        return [
+            // Registra os widgets aqui
         ];
     }    
 } 

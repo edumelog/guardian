@@ -19,6 +19,12 @@ class Destination extends Model
         'parent_id'
     ];
 
+    protected $attributes = [
+        'max_visitors' => 0,
+        'address' => '',
+        'phone' => ''
+    ];
+
     public function parent(): BelongsTo
     {
         return $this->belongsTo(Destination::class, 'parent_id');
@@ -37,5 +43,20 @@ class Destination extends Model
     public function activityLogs(): HasMany
     {
         return $this->hasMany(ActivityLog::class);
+    }
+
+    public function getAllChildrenIds(): array
+    {
+        $ids = [];
+        $this->appendChildrenIds($this, $ids);
+        return $ids;
+    }
+
+    private function appendChildrenIds(Destination $destination, array &$ids): void
+    {
+        foreach ($destination->children as $child) {
+            $ids[] = $child->id;
+            $this->appendChildrenIds($child, $ids);
+        }
     }
 }
