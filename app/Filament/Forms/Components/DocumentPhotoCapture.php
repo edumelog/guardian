@@ -61,4 +61,21 @@ class DocumentPhotoCapture extends Field
     {
         return parent::make($name);
     }
+
+    public function isDisabled(): bool
+    {
+        // Verifica se o campo está desabilitado
+        if (parent::isDisabled()) {
+            return true;
+        }
+
+        // Verifica se o visitante tem data de saída
+        $record = $this->getRecord();
+        if ($record) {
+            $lastLog = $record->visitorLogs()->latest('in_date')->first();
+            return $lastLog && $lastLog->out_date !== null;
+        }
+
+        return false;
+    }
 } 

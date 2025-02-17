@@ -320,10 +320,10 @@ class VisitorResource extends Resource
                         return $record->visitorLogs()->latest('in_date')->first()?->out_date;
                     }),
                     
-                Tables\Columns\TextColumn::make('created_at')
-                    ->label('Criado em')
-                    ->dateTime('d/m/Y H:i')
-                    ->sortable(),
+                // Tables\Columns\TextColumn::make('created_at')
+                //     ->label('Criado em')
+                //     ->dateTime('d/m/Y H:i')
+                //     ->sortable(),
             ])
             ->filters([
                 //

@@ -7,6 +7,7 @@
         stream: null,
         capturing: false,
         previewUrl: null,
+        isDisabled: {{ $field->isDisabled() ? 'true' : 'false' }},
         init() {
             // Se já existe uma foto, carrega ela como preview
             if (this.state && !this.state.startsWith('data:image')) {
@@ -32,6 +33,8 @@
             });
         },
         async startCapture() {
+            if (this.isDisabled) return;
+
             try {
                 this.stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
@@ -49,6 +52,8 @@
             }
         },
         capturePhoto() {
+            if (this.isDisabled) return;
+
             const video = this.$refs.video;
             const canvas = this.$refs.canvas;
             const context = canvas.getContext('2d');
@@ -119,6 +124,8 @@
                     <button
                         type="button"
                         @click="startCapture"
+                        :disabled="isDisabled"
+                        :class="{ 'opacity-50 cursor-not-allowed': isDisabled }"
                         class="fi-btn fi-btn-size-md inline-flex items-center justify-center gap-1 font-medium rounded-lg bg-primary-600 px-4 py-2 text-white shadow-sm hover:bg-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-70 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus:ring-offset-gray-800"
                     >
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -133,6 +140,8 @@
                     <button
                         type="button"
                         @click="capturePhoto"
+                        :disabled="isDisabled"
+                        :class="{ 'opacity-50 cursor-not-allowed': isDisabled }"
                         class="fi-btn fi-btn-size-md inline-flex items-center justify-center gap-1 font-medium rounded-lg bg-primary-600 px-4 py-2 text-white shadow-sm hover:bg-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-70 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus:ring-offset-gray-800"
                     >
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
