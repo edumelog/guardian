@@ -10,6 +10,13 @@ class DestinationHierarchyWidget extends Widget
 {
     protected static string $view = 'filament.widgets.destination-hierarchy-widget';
 
+    protected static bool $isLazy = false;
+
+    public static function canView(): bool
+    {
+        return request()->routeIs('filament.admin.resources.destinations.index');
+    }
+
     protected function getViewData(): array
     {
         return [
