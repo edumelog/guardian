@@ -16,6 +16,8 @@ class Visitor extends Model
         'name',
         'doc',
         'photo',
+        'doc_photo_front',
+        'doc_photo_back',
         'other',
         'destination_id',
         'doc_type_id'
@@ -34,6 +36,8 @@ class Visitor extends Model
                     ->ignore($record)
             ],
             'photo' => ['required', 'string'],
+            'doc_photo_front' => ['required', 'string'],
+            'doc_photo_back' => ['required', 'string'],
             'other' => ['nullable', 'string', 'max:255'],
             'destination_id' => ['required', 'exists:destinations,id'],
             'doc_type_id' => ['required', 'exists:doc_types,id'],

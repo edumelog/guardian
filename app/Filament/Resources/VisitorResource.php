@@ -19,6 +19,7 @@ use App\Filament\Forms\Components\DestinationTreeSelect;
 use Filament\Forms\Components\Grid;
 use Illuminate\Support\Facades\Storage;
 use Filament\Forms\Components\Placeholder;
+use App\Filament\Forms\Components\DocumentPhotoCapture;
 
 class VisitorResource extends Resource
 {
@@ -80,6 +81,22 @@ class VisitorResource extends Resource
                             ->required()
                             ->validationMessages([
                                 'required' => 'A foto é obrigatória para o cadastro do visitante.'
+                            ]),
+
+                        DocumentPhotoCapture::make('doc_photo_front')
+                            ->label('Documento - Frente')
+                            ->required()
+                            ->side('front')
+                            ->validationMessages([
+                                'required' => 'A foto da frente do documento é obrigatória.'
+                            ]),
+
+                        DocumentPhotoCapture::make('doc_photo_back')
+                            ->label('Documento - Verso')
+                            ->required()
+                            ->side('back')
+                            ->validationMessages([
+                                'required' => 'A foto do verso do documento é obrigatória.'
                             ]),
                             
                         Forms\Components\Select::make('destination_id')
@@ -156,6 +173,20 @@ class VisitorResource extends Resource
                         $record->photo ? "visitors-photos/{$record->photo}" : null
                     )
                     ->disk('public'),
+
+                // Tables\Columns\ImageColumn::make('doc_photo_front')
+                //     ->label('Doc. Frente')
+                //     ->getStateUsing(fn (Visitor $record): ?string => 
+                //         $record->doc_photo_front ? "visitors-photos/{$record->doc_photo_front}" : null
+                //     )
+                //     ->disk('public'),
+
+                // Tables\Columns\ImageColumn::make('doc_photo_back')
+                //     ->label('Doc. Verso')
+                //     ->getStateUsing(fn (Visitor $record): ?string => 
+                //         $record->doc_photo_back ? "visitors-photos/{$record->doc_photo_back}" : null
+                //     )
+                //     ->disk('public'),
                     
                 Tables\Columns\TextColumn::make('destination.name')
                     ->label('Destino')
