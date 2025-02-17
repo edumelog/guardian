@@ -20,6 +20,9 @@ return new class extends Migration
             $table->foreignId('destination_id')->constrained()->onDelete('cascade');
             $table->foreignId('doc_type_id')->constrained()->onDelete('cascade');
             $table->timestamps();
+
+            // Índice único composto para doc + doc_type_id
+            $table->unique(['doc', 'doc_type_id']);
         });
     }
 

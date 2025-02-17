@@ -2,7 +2,72 @@
     :component="$getFieldWrapperView()"
     :field="$field"
 >
-    <div x-data="webcamCapture">
+    <div x-data="{
+        state: $wire.entangle('{{ $getStatePath() }}'),
+        stream: null,
+        capturing: false,
+        previewUrl: null,
+        init() {
+            // Se já existe uma foto, carrega ela como preview
+            if (this.state && !this.state.startsWith('data:image')) {
+                this.previewUrl = '/storage/visitors-photos/' + this.state;
+            } else if (this.state && this.state.startsWith('data:image')) {
+                this.previewUrl = this.state;
+            }
+        },
+        async startCapture() {
+            try {
+                this.stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 640 },
+                        height: { ideal: 640 },
+                        facingMode: 'user',
+                        aspectRatio: 1
+                    } 
+                });
+                
+                this.capturing = true;
+                this.$refs.video.srcObject = this.stream;
+            } catch (error) {
+                console.error('Erro ao acessar webcam:', error);
+                alert('Não foi possível acessar a câmera. Verifique as permissões.');
+            }
+        },
+        capturePhoto() {
+            const video = this.$refs.video;
+            const canvas = this.$refs.canvas;
+            const context = canvas.getContext('2d');
+            
+            // Configura o canvas como quadrado
+            const size = Math.min(video.videoWidth, video.videoHeight);
+            canvas.width = size;
+            canvas.height = size;
+            
+            // Calcula o recorte central quadrado
+            const xOffset = (video.videoWidth - size) / 2;
+            const yOffset = (video.videoHeight - size) / 2;
+            
+            // Desenha o frame atual do vídeo no canvas (recorte quadrado)
+            context.drawImage(video, xOffset, yOffset, size, size, 0, 0, size, size);
+            
+            // Converte para base64
+            const imageData = canvas.toDataURL('image/jpeg', 0.9);
+            
+            // Atualiza preview e input
+            this.previewUrl = imageData;
+            this.state = imageData;
+            
+            // Para a câmera
+            this.stopCapture();
+        },
+        stopCapture() {
+            if (this.stream) {
+                this.stream.getTracks().forEach(track => track.stop());
+                this.stream = null;
+            }
+            this.capturing = false;
+        }
+    }">
         <div class="space-y-2">
             <div class="relative w-48 h-48 mx-auto">
                 <!-- Preview da foto ou vídeo ao vivo -->
@@ -78,70 +143,4 @@
             />
         </div>
     </div>
-
-    <script>
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('webcamCapture', () => ({
-                stream: null,
-                capturing: false,
-                previewUrl: null,
-
-                async startCapture() {
-                    try {
-                        this.stream = await navigator.mediaDevices.getUserMedia({ 
-                            video: { 
-                                width: { ideal: 640 },
-                                height: { ideal: 640 },
-                                facingMode: 'user',
-                                aspectRatio: 1
-                            } 
-                        });
-                        
-                        this.capturing = true;
-                        this.$refs.video.srcObject = this.stream;
-                    } catch (error) {
-                        console.error('Erro ao acessar webcam:', error);
-                        alert('Não foi possível acessar a câmera. Verifique as permissões.');
-                    }
-                },
-
-                capturePhoto() {
-                    const video = this.$refs.video;
-                    const canvas = this.$refs.canvas;
-                    const context = canvas.getContext('2d');
-                    
-                    // Configura o canvas como quadrado
-                    const size = Math.min(video.videoWidth, video.videoHeight);
-                    canvas.width = size;
-                    canvas.height = size;
-                    
-                    // Calcula o recorte central quadrado
-                    const xOffset = (video.videoWidth - size) / 2;
-                    const yOffset = (video.videoHeight - size) / 2;
-                    
-                    // Desenha o frame atual do vídeo no canvas (recorte quadrado)
-                    context.drawImage(video, xOffset, yOffset, size, size, 0, 0, size, size);
-                    
-                    // Converte para base64
-                    const imageData = canvas.toDataURL('image/jpeg', 0.9);
-                    
-                    // Atualiza preview e input
-                    this.previewUrl = imageData;
-                    this.$refs.input.value = imageData;
-                    this.$refs.input.dispatchEvent(new Event('input'));
-                    
-                    // Para a câmera
-                    this.stopCapture();
-                },
-
-                stopCapture() {
-                    if (this.stream) {
-                        this.stream.getTracks().forEach(track => track.stop());
-                        this.stream = null;
-                    }
-                    this.capturing = false;
-                }
-            }));
-        });
-    </script>
 </x-dynamic-component> 

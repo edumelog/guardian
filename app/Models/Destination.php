@@ -59,4 +59,17 @@ class Destination extends Model
             $this->appendChildrenIds($child, $ids);
         }
     }
+
+    public function getAllAncestors(): array
+    {
+        $ancestors = [];
+        $current = $this->parent;
+        
+        while ($current) {
+            $ancestors[] = $current->id;
+            $current = $current->parent;
+        }
+        
+        return $ancestors;
+    }
 }

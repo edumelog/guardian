@@ -17,6 +17,7 @@ use Filament\Forms\Components\FileUpload;
 use App\Filament\Forms\Components\WebcamCapture;
 use App\Filament\Forms\Components\DestinationTreeSelect;
 use Filament\Forms\Components\Grid;
+use Illuminate\Support\Facades\Storage;
 
 class VisitorResource extends Resource
 {
@@ -49,26 +50,64 @@ class VisitorResource extends Resource
                             ->required()
                             ->default(function () {
                                 return \App\Models\DocType::where('is_default', true)->first()?->id;
-                            }),
+                            })
+                            ->live(),
                             
                         Forms\Components\TextInput::make('doc')
                             ->label('Número do Documento')
                             ->required()
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->unique(
+                                table: 'visitors',
+                                column: 'doc',
+                                ignorable: fn ($record) => $record,
+                                modifyRuleUsing: function (Forms\Components\TextInput $component, \Illuminate\Validation\Rules\Unique $rule) {
+                                    return $rule->where('doc_type_id', $component->getContainer()->getParentComponent()->getState()['doc_type_id']);
+                                }
+                            )
+                            ->validationMessages([
+                                'unique' => 'Já existe um visitante cadastrado com este número de documento para o tipo selecionado.'
+                            ]),
                             
                         WebcamCapture::make('photo')
                             ->label('Foto'),
                             
-                        DestinationTreeSelect::make('destination_id')
+                        Forms\Components\Select::make('destination_id')
                             ->label('Destino')
                             ->required()
-                            ->columnSpan(2),
+                            ->searchable()
+                            ->getSearchResultsUsing(function (string $search) {
+                                return \App\Models\Destination::where('name', 'like', "%{$search}%")
+                                    ->orWhere('address', 'like', "%{$search}%")
+                                    ->limit(50)
+                                    ->get()
+                                    ->mapWithKeys(fn ($destination) => [
+                                        $destination->id => $destination->address 
+                                            ? "{$destination->name} - {$destination->address}"
+                                            : $destination->name
+                                    ])
+                                    ->toArray();
+                            })
+                            ->getOptionLabelUsing(fn ($value): ?string => 
+                                \App\Models\Destination::find($value)?->address 
+                                    ? \App\Models\Destination::find($value)->name . ' - ' . \App\Models\Destination::find($value)->address
+                                    : \App\Models\Destination::find($value)?->name
+                            )
+                            ->placeholder('Digite o nome ou endereço do destino')
+                            ->columnSpanFull(),
                             
                         Forms\Components\Textarea::make('other')
                             ->label('Informações Adicionais')
                             ->maxLength(255)
                             ->columnSpanFull(),
-                    ])->columns(2)
+                    ])->columns(2),
+
+                Section::make()
+                    ->schema([
+                        Forms\Components\View::make('filament.forms.components.destination-hierarchy-view')
+                            ->columnSpanFull(),
+                    ])
+                    ->hiddenOn('edit'),
             ]);
     }
 
@@ -90,7 +129,11 @@ class VisitorResource extends Resource
                     
                 Tables\Columns\ImageColumn::make('photo')
                     ->label('Foto')
-                    ->circular(),
+                    ->circular()
+                    ->getStateUsing(fn (Visitor $record): ?string => 
+                        $record->photo ? "visitors-photos/{$record->photo}" : null
+                    )
+                    ->disk('public'),
                     
                 Tables\Columns\TextColumn::make('destination.name')
                     ->label('Destino')
