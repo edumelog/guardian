@@ -33,7 +33,7 @@ class Visitor extends Model
                     ->where('doc_type_id', request('doc_type_id'))
                     ->ignore($record)
             ],
-            'photo' => ['nullable', 'string'],
+            'photo' => ['required', 'string'],
             'other' => ['nullable', 'string', 'max:255'],
             'destination_id' => ['required', 'exists:destinations,id'],
             'doc_type_id' => ['required', 'exists:doc_types,id'],

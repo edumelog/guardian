@@ -18,6 +18,7 @@ use App\Filament\Forms\Components\WebcamCapture;
 use App\Filament\Forms\Components\DestinationTreeSelect;
 use Filament\Forms\Components\Grid;
 use Illuminate\Support\Facades\Storage;
+use Filament\Forms\Components\Placeholder;
 
 class VisitorResource extends Resource
 {
@@ -57,6 +58,10 @@ class VisitorResource extends Resource
                             ->label('Número do Documento')
                             ->required()
                             ->maxLength(255)
+                            ->numeric()
+                            ->inputMode('numeric')
+                            ->step(1)
+                            ->extraInputAttributes(['step' => '1', 'class' => '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none'])
                             ->unique(
                                 table: 'visitors',
                                 column: 'doc',
@@ -66,16 +71,22 @@ class VisitorResource extends Resource
                                 }
                             )
                             ->validationMessages([
-                                'unique' => 'Já existe um visitante cadastrado com este número de documento para o tipo selecionado.'
+                                'unique' => 'Já existe um visitante cadastrado com este número de documento para o tipo selecionado.',
+                                'numeric' => 'O número do documento deve conter apenas números.'
                             ]),
                             
                         WebcamCapture::make('photo')
-                            ->label('Foto'),
+                            ->label('Foto')
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'A foto é obrigatória para o cadastro do visitante.'
+                            ]),
                             
                         Forms\Components\Select::make('destination_id')
                             ->label('Destino')
                             ->required()
                             ->searchable()
+                            ->live()
                             ->getSearchResultsUsing(function (string $search) {
                                 return \App\Models\Destination::where('name', 'like', "%{$search}%")
                                     ->orWhere('address', 'like', "%{$search}%")
@@ -94,6 +105,17 @@ class VisitorResource extends Resource
                                     : \App\Models\Destination::find($value)?->name
                             )
                             ->placeholder('Digite o nome ou endereço do destino')
+                            ->columnSpanFull(),
+
+                        Forms\Components\Placeholder::make('destination_phone')
+                            ->label('Telefone do Destino')
+                            ->content(function ($get) {
+                                $destinationId = $get('destination_id');
+                                if (!$destinationId) return '-';
+                                
+                                $destination = \App\Models\Destination::find($destinationId);
+                                return $destination?->phone ?: 'Não cadastrado';
+                            })
                             ->columnSpanFull(),
                             
                         Forms\Components\Textarea::make('other')
