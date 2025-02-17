@@ -14,6 +14,22 @@
             } else if (this.state && this.state.startsWith('data:image')) {
                 this.previewUrl = this.state;
             }
+
+            // Escuta o evento photo-found
+            Livewire.on('photo-found', ({ photoData }) => {
+                const side = '{{ $field->getSide() }}';
+                console.log('DocumentPhotoCapture recebeu evento photo-found:', {
+                    side: side,
+                    data: photoData,
+                    fieldName: '{{ $getStatePath() }}'
+                });
+                
+                if (photoData[`doc_photo_${side}`]) {
+                    console.log(`Atualizando preview da foto do documento (${side}):`, photoData[`doc_photo_${side}`]);
+                    this.previewUrl = photoData[`doc_photo_${side}`];
+                    this.state = photoData[`doc_photo_${side}`];
+                }
+            });
         },
         async startCapture() {
             try {

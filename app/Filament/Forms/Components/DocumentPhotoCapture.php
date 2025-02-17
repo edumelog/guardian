@@ -16,6 +16,11 @@ class DocumentPhotoCapture extends Field
         return $this;
     }
 
+    public function getSide(): string
+    {
+        return $this->side;
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

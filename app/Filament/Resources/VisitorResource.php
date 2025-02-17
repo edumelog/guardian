@@ -62,6 +62,67 @@ class VisitorResource extends Resource
                             ->numeric()
                             ->inputMode('numeric')
                             ->step(1)
+                            ->suffixAction(
+                                Forms\Components\Actions\Action::make('search')
+                                    ->icon('heroicon-m-magnifying-glass')
+                                    ->tooltip('Buscar visitante por documento')
+                                    ->action(function ($state, $component) {
+                                        // Se não houver número de documento ou tipo de documento, retorna
+                                        if (!$state || !$component->getContainer()->getParentComponent()->getState()['doc_type_id']) {
+                                            return;
+                                        }
+
+                                        // Busca o visitante pelo documento e tipo
+                                        $visitor = \App\Models\Visitor::where('doc', $state)
+                                            ->where('doc_type_id', $component->getContainer()->getParentComponent()->getState()['doc_type_id'])
+                                            ->first();
+                                            
+                                        
+                                        if (!$visitor) {
+                                            \Filament\Notifications\Notification::make()
+                                                ->warning()
+                                                ->title('Visitante não encontrado')
+                                                ->body('Nenhum visitante encontrado com este documento.')
+                                                ->send();
+                                            return;
+                                        }
+
+                                        // Preenche os campos com os dados encontrados
+                                        $livewire = $component->getLivewire();
+                                        $livewire->data['name'] = $visitor->name;
+                                        $livewire->data['photo'] = $visitor->photo;
+                                        $livewire->data['doc_photo_front'] = $visitor->doc_photo_front;
+                                        $livewire->data['doc_photo_back'] = $visitor->doc_photo_back;
+                                        $livewire->data['other'] = $visitor->other;
+
+                                        // Log para debug
+                                        $photoData = [
+                                            'photo' => $visitor->photo ? '/storage/visitors-photos/' . $visitor->photo : null,
+                                            'doc_photo_front' => $visitor->doc_photo_front ? '/storage/visitors-photos/' . $visitor->doc_photo_front : null,
+                                            'doc_photo_back' => $visitor->doc_photo_back ? '/storage/visitors-photos/' . $visitor->doc_photo_back : null,
+                                        ];
+                                        
+                                        // Dispara eventos para atualizar os previews das fotos
+                                        $component->getLivewire()->dispatch('photo-found', photoData: $photoData);
+
+                                        // Log para debug
+                                        $component->getLivewire()->js("
+                                            console.log('Dados do visitante encontrado:', " . json_encode([
+                                                'nome' => $visitor->name,
+                                                'photo' => $visitor->photo,
+                                                'doc_photo_front' => $visitor->doc_photo_front,
+                                                'doc_photo_back' => $visitor->doc_photo_back,
+                                                'photoData' => $photoData
+                                            ]) . ");
+                                        ");
+
+                                        \Filament\Notifications\Notification::make()
+                                            ->success()
+                                            ->title('Visitante encontrado')
+                                            ->body('Os dados do visitante foram preenchidos automaticamente.')
+                                            ->send();
+                                    })
+                            )
                             ->extraInputAttributes(['step' => '1', 'class' => '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none'])
                             ->unique(
                                 table: 'visitors',

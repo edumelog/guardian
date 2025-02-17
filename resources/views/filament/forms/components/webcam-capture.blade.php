@@ -14,6 +14,16 @@
             } else if (this.state && this.state.startsWith('data:image')) {
                 this.previewUrl = this.state;
             }
+
+            // Escuta o evento photo-found
+            Livewire.on('photo-found', ({ photoData }) => {
+                console.log('WebcamCapture recebeu evento photo-found:', photoData);
+                if (photoData.photo) {
+                    console.log('Atualizando preview da foto do visitante:', photoData.photo);
+                    this.previewUrl = photoData.photo;
+                    this.state = photoData.photo;
+                }
+            });
         },
         async startCapture() {
             try {
