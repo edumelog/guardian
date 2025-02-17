@@ -29,8 +29,8 @@ class WebcamCapture extends Field
                 // Remove caracteres especiais do número do documento
                 $safeDocNumber = preg_replace('/[^a-zA-Z0-9]/', '', $docNumber);
                 
-                // Cria o nome do arquivo: tipo_numero.jpg
-                $filename = strtolower($docType->type) . '_' . $safeDocNumber . '.jpg';
+                // Cria o nome do arquivo: photo_tipo_numero.jpg
+                $filename = 'photo_' . strtolower($docType->type) . '_' . $safeDocNumber . '.jpg';
                 
                 // Converte base64 para arquivo
                 $image = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $state));

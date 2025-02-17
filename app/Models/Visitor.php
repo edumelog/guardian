@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Storage;
 
 class Visitor extends Model
 {
@@ -54,8 +55,40 @@ class Visitor extends Model
         return $this->belongsTo(DocType::class);
     }
 
-    public function activityLogs(): HasMany
+    public function visitorLogs(): HasMany
     {
-        return $this->hasMany(ActivityLog::class);
+        return $this->hasMany(VisitorLog::class);
+    }
+
+    public function latestLog(): BelongsTo
+    {
+        return $this->belongsTo(VisitorLog::class)->latestOfMany();
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::created(function ($visitor) {
+            // Cria um novo log de visita quando o visitante é cadastrado
+            $visitor->visitorLogs()->create([
+                'in_date' => now(),
+                'destination_id' => $visitor->destination_id,
+                'operator_id' => auth()->id()
+            ]);
+        });
+
+        static::deleting(function ($visitor) {
+            // Remove os arquivos de foto quando o visitante é excluído
+            if ($visitor->photo) {
+                Storage::disk('public')->delete('visitors-photos/' . $visitor->photo);
+            }
+            if ($visitor->doc_photo_front) {
+                Storage::disk('public')->delete('visitors-photos/' . $visitor->doc_photo_front);
+            }
+            if ($visitor->doc_photo_back) {
+                Storage::disk('public')->delete('visitors-photos/' . $visitor->doc_photo_back);
+            }
+        });
     }
 }

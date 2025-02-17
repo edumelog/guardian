@@ -54,8 +54,8 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
-    public function activityLogs()
+    public function visitorLogs()
     {
-        return $this->hasMany(ActivityLog::class, 'operator_id');
+        return $this->hasMany(VisitorLog::class, 'operator_id');
     }
 }

@@ -139,6 +139,28 @@ class VisitorResource extends Resource
                             ->label('Informações Adicionais')
                             ->maxLength(255)
                             ->columnSpanFull(),
+
+                        Forms\Components\Placeholder::make('current_entry')
+                            ->label('Data de Entrada')
+                            ->content(now()->format('d/m/Y H:i')),
+
+                        Forms\Components\Placeholder::make('last_visit')
+                            ->label('Última Visita')
+                            ->content(function ($record) {
+                                if (!$record) return 'Primeira visita';
+                                
+                                $lastLog = $record->visitorLogs()
+                                    ->orderBy('in_date', 'desc')
+                                    ->first();
+
+                                if (!$lastLog) return 'Primeira visita';
+
+                                return sprintf(
+                                    'Local: %s - Data: %s',
+                                    $lastLog->destination->name,
+                                    $lastLog->in_date->format('d/m/Y H:i')
+                                );
+                            }),
                     ])->columns(2),
 
                 Section::make()
@@ -147,6 +169,35 @@ class VisitorResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->hiddenOn('edit'),
+
+                Section::make('Histórico de Visitas')
+                    ->schema([
+                        Forms\Components\Placeholder::make('visit_history')
+                            ->content(function ($record) {
+                                if (!$record) return 'Nenhuma visita registrada';
+
+                                $logs = $record->visitorLogs()
+                                    ->with('destination')
+                                    ->orderBy('in_date', 'desc')
+                                    ->get();
+
+                                if ($logs->isEmpty()) return 'Nenhuma visita registrada';
+
+                                $html = '<div class="space-y-4">';
+                                foreach ($logs as $log) {
+                                    $html .= '<div class="p-4 bg-gray-50 rounded-lg space-y-2">';
+                                    $html .= '<div class="font-medium text-gray-900">Local: ' . e($log->destination->name) . '</div>';
+                                    $html .= '<div class="text-sm text-gray-600">Entrada: ' . $log->in_date->format('d/m/Y H:i') . '</div>';
+                                    $html .= '<div class="text-sm text-gray-600">Saída: ' . ($log->out_date ? $log->out_date->format('d/m/Y H:i') : 'Não registrada') . '</div>';
+                                    $html .= '</div>';
+                                }
+                                $html .= '</div>';
+
+                                return new \Illuminate\Support\HtmlString($html);
+                            })
+                            ->columnSpanFull(),
+                    ])
+                    ->visibleOn('edit'),
             ]);
     }
 
@@ -191,6 +242,22 @@ class VisitorResource extends Resource
                 Tables\Columns\TextColumn::make('destination.name')
                     ->label('Destino')
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('visitorLogs.in_date')
+                    ->label('Entrada')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable()
+                    ->getStateUsing(function (Visitor $record) {
+                        return $record->visitorLogs()->latest('in_date')->first()?->in_date;
+                    }),
+
+                Tables\Columns\TextColumn::make('visitorLogs.out_date')
+                    ->label('Saída')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable()
+                    ->getStateUsing(function (Visitor $record) {
+                        return $record->visitorLogs()->latest('in_date')->first()?->out_date;
+                    }),
                     
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Criado em')
@@ -201,6 +268,24 @@ class VisitorResource extends Resource
                 //
             ])
             ->actions([
+                Tables\Actions\Action::make('register_exit')
+                    ->label('Registrar Saída')
+                    ->icon('heroicon-o-arrow-right-circle')
+                    ->color('warning')
+                    ->action(function (Visitor $record) {
+                        $lastLog = $record->visitorLogs()->latest('in_date')->first();
+                        if ($lastLog && !$lastLog->out_date) {
+                            $lastLog->update(['out_date' => now()]);
+                        }
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Registrar Saída')
+                    ->modalDescription('Tem certeza que deseja registrar a saída deste visitante?')
+                    ->modalSubmitActionLabel('Sim, registrar saída')
+                    ->visible(function (Visitor $record): bool {
+                        $lastLog = $record->visitorLogs()->latest('in_date')->first();
+                        return $lastLog && !$lastLog->out_date;
+                    }),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])
