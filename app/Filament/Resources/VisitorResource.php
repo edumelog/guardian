@@ -281,6 +281,8 @@ class VisitorResource extends Resource
                 Tables\Columns\ImageColumn::make('photo')
                     ->label('Foto')
                     ->circular()
+                    ->width(40)
+                    ->height(40)
                     ->getStateUsing(fn (Visitor $record): ?string => 
                         $record->photo ? "visitors-photos/{$record->photo}" : null
                     )
