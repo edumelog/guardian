@@ -3,14 +3,10 @@
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
-
-// Force HTTPS
-URL::forceScheme('https');
-
 Route::get('/', function () {
     // return view('welcome');
-    // redirect to login
-    return redirect('/login');
+    // redirect para tea de login
+    return redirect()->route('login');
 });
 
 Route::get('/dashboard', function () {
@@ -24,3 +20,4 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
+URL::forceScheme('https');

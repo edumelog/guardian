@@ -11,6 +11,7 @@ export default defineConfig({
             clientPort: 443,
         }
     },
+    
     plugins: [
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.js'],
