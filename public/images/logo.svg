@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="120px" height="24px" viewBox="0 0 120 24" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <!-- Ícone -->
+        <g transform="translate(0,0)">
+            <path d="M12,3 L20,7 V13 C20,17.4183 16.4183,21 12,21 C7.58172,21 4,17.4183 4,13 V7 L12,3 Z" stroke="currentColor" stroke-width="2"/>
+            <path d="M12,8 L15,10 V14 C15,15.6569 13.6569,17 12,17 C10.3431,17 9,15.6569 9,14 V10 L12,8 Z" fill="currentColor"/>
+        </g>
+        <!-- Texto "Guardian" -->
+        <text x="28" y="17" font-family="Arial" font-size="16" font-weight="bold" fill="currentColor">
+            Guardian
+        </text>
+    </g>
+</svg> 

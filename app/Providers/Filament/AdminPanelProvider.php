@@ -28,6 +28,10 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->brandName('Guardian')
+            ->brandLogo(asset('images/logo.svg'))
+            ->sidebarCollapsibleOnDesktop()
+            ->sidebarFullyCollapsibleOnDesktop()
             ->login()
             ->colors([
                 'primary' => Color::Amber,
