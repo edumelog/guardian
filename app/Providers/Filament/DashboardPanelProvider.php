@@ -31,7 +31,6 @@ class DashboardPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop()
             ->sidebarFullyCollapsibleOnDesktop()
             ->login()
-            ->profile(\App\Filament\Pages\Profile::class)
             ->colors([
                 'primary' => Color::Amber,
             ])
