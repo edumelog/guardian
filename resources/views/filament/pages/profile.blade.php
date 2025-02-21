@@ -1,11 +1,12 @@
-<x-filament-panels::page>
-    <form wire:submit="submit" class="mt-8">
+<x-filament-panels::page class="space-y-4">
+    <form wire:submit="submit">
         {{ $this->form }}
 
-        <x-filament-panels::form.actions 
-            :actions="$this->getFooterActions()" 
-            alignment="right" 
-            class="mt-6"
-        />
+        <div class="mt-6 space-y-6">
+            <x-filament-panels::form.actions 
+                :actions="$this->getFooterActions()" 
+                alignment="right"
+            />
+        </div>
     </form>
 </x-filament-panels::page>

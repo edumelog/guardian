@@ -9,6 +9,7 @@ use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Navigation\MenuItem;
 use Filament\Widgets;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -38,6 +39,12 @@ class DashboardPanelProvider extends PanelProvider
                 'panels::head.start',
                 fn(): string => \Illuminate\Support\Facades\Vite::withEntryPoints(['resources/css/app.css'])->toHtml()
             )
+            ->userMenuItems([
+                MenuItem::make()
+                    ->label('Meu Perfil')
+                    ->url('/dashboard/profile')
+                    ->icon('heroicon-o-user')
+            ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([

@@ -12,12 +12,9 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rules\Password;
 use App\Models\User;
-use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 class Profile extends Page
 {
-    use HasPageShield;
-    
     protected static ?string $navigationIcon = 'heroicon-o-user';
     protected static ?string $navigationLabel = 'Meu Perfil';
     protected static ?string $title = 'Meu Perfil';
@@ -25,6 +22,7 @@ class Profile extends Page
     protected static ?string $navigationGroup = 'Configurações';
     protected static ?int $navigationSort = 1;
     protected static string $view = 'filament.pages.profile';
+    protected static bool $shouldRegisterNavigation = false;
 
     public ?array $data = [];
 
@@ -54,7 +52,7 @@ class Profile extends Page
                             ->required()
                             ->maxLength(255)
                             ->unique('users', 'email', ignorable: Auth::user()),
-                    ])->columns(1),
+                    ])->columns(2),
 
                 Section::make('Atualizar Senha')
                     ->description('Certifique-se de que sua conta esteja usando uma senha longa e aleatória para se manter segura.')
@@ -94,15 +92,19 @@ class Profile extends Page
     {
         $data = $this->form->getState();
 
+        /** @var User $user */
         $user = Auth::user();
-        $user->name = $data['name'];
-        $user->email = $data['email'];
+
+        $updateData = [
+            'name' => $data['name'],
+            'email' => $data['email'],
+        ];
 
         if (isset($data['new_password']) && $data['new_password']) {
-            $user->password = Hash::make($data['new_password']);
+            $updateData['password'] = Hash::make($data['new_password']);
         }
 
-        $user->save();
+        $user->update($updateData);
 
         Notification::make()
             ->title('Perfil atualizado')
