@@ -20,6 +20,8 @@ use Filament\Forms\Components\Grid;
 use Illuminate\Support\Facades\Storage;
 use Filament\Forms\Components\Placeholder;
 use App\Filament\Forms\Components\DocumentPhotoCapture;
+use Illuminate\Database\Eloquent\Collection;
+use Filament\Notifications\Notification;
 
 class VisitorResource extends Resource
 {
@@ -363,14 +365,49 @@ class VisitorResource extends Resource
                     ->visible(function (Visitor $record): bool {
                         return !$record->visitorLogs()->whereNull('out_date')->exists();
                     }),
-                Tables\Actions\DeleteAction::make()
-                    ->visible(function (Visitor $record): bool {
-                        return !$record->visitorLogs()->whereNull('out_date')->exists();
-                    }),
+                Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\BulkAction::make('register_exit')
+                        ->label('Registrar Saída')
+                        ->icon('heroicon-o-arrow-right-circle')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading('Registrar Saída em Massa')
+                        ->modalDescription('Tem certeza que deseja registrar a saída dos visitantes selecionados?')
+                        ->modalSubmitActionLabel('Sim, registrar saída')
+                        ->action(function (Collection $records) {
+                            $count = 0;
+                            
+                            foreach ($records as $visitor) {
+                                $lastLog = $visitor->visitorLogs()
+                                    ->whereNull('out_date')
+                                    ->latest('in_date')
+                                    ->first();
+
+                                if ($lastLog) {
+                                    $lastLog->update(['out_date' => now()]);
+                                    $count++;
+                                }
+                            }
+
+                            if ($count > 0) {
+                                Notification::make()
+                                    ->success()
+                                    ->title('Saídas registradas')
+                                    ->body("Foram registradas {$count} saídas com sucesso.")
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->warning()
+                                    ->title('Nenhuma saída registrada')
+                                    ->body('Nenhum dos visitantes selecionados possui visita em andamento.')
+                                    ->send();
+                            }
+                        })
+                        ->deselectRecordsAfterCompletion(),
                 ]),
             ]);
     }

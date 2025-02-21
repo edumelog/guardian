@@ -150,7 +150,7 @@ class CreateVisitor extends CreateRecord
             return [];
         }
 
-        // Sempre mostra o botão de criar com impressão
+        // Sempre mostra o botão de criar com impressão e o botão cancelar
         return [
             $this->getCreateFormAction()
                 ->label('Imprimir Credencial e Salvar')
@@ -165,11 +165,11 @@ class CreateVisitor extends CreateRecord
                         ->first();
 
                     if ($visitor) {
-                        $hasActiveVisit = $visitor->visitorLogs()
-                            ->whereNull('out_date')
-                            ->exists();
+                        $lastVisit = $visitor->visitorLogs()
+                            ->latest('in_date')
+                            ->first();
 
-                        if ($hasActiveVisit) {
+                        if ($lastVisit && $lastVisit->out_date === null) {
                             \Filament\Notifications\Notification::make()
                                 ->warning()
                                 ->title('Visita em Andamento')
@@ -182,6 +182,11 @@ class CreateVisitor extends CreateRecord
 
                     $this->create();
                 }),
+
+            Actions\Action::make('cancel')
+                ->label('Cancelar')
+                ->color('gray')
+                ->url(url()->previous()),
         ];
     }
 
@@ -209,16 +214,15 @@ class CreateVisitor extends CreateRecord
         }
 
         // Verifica se há uma visita em andamento
-        $activeVisit = $visitor->visitorLogs()
-            ->whereNull('out_date')
+        $lastVisit = $visitor->visitorLogs()
             ->latest('in_date')
             ->first();
 
-        if ($activeVisit) {
+        if ($lastVisit && $lastVisit->out_date === null) {
             \Filament\Notifications\Notification::make()
                 ->warning()
                 ->title('Visita em Andamento')
-                ->body("Este visitante já possui uma visita em andamento no local: {$activeVisit->destination->name}")
+                ->body("Este visitante já possui uma visita em andamento no local: {$lastVisit->destination->name}")
                 ->persistent()
                 ->actions([
                     \Filament\Notifications\Actions\Action::make('view')
@@ -230,6 +234,7 @@ class CreateVisitor extends CreateRecord
             return;
         }
 
+        // Se não tem visita em andamento, preenche os dados
         $this->form->fill([
             'doc' => $visitor->doc,
             'doc_type_id' => $visitor->doc_type_id,
@@ -240,7 +245,22 @@ class CreateVisitor extends CreateRecord
             'other' => $visitor->other,
         ]);
 
+        // Dispara eventos para atualizar os previews das fotos
+        $photoData = [
+            'photo' => $visitor->photo ? '/storage/visitors-photos/' . $visitor->photo : null,
+            'doc_photo_front' => $visitor->doc_photo_front ? '/storage/visitors-photos/' . $visitor->doc_photo_front : null,
+            'doc_photo_back' => $visitor->doc_photo_back ? '/storage/visitors-photos/' . $visitor->doc_photo_back : null,
+        ];
+        
+        $this->dispatch('photo-found', photoData: $photoData);
+
         $this->showAllFields = true;
+
+        \Filament\Notifications\Notification::make()
+            ->success()
+            ->title('Visitante encontrado')
+            ->body('Os dados do visitante foram preenchidos automaticamente.')
+            ->send();
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array
