@@ -90,12 +90,8 @@ class EditVisitor extends EditRecord
             ];
         }
 
-        // Caso contrário, mostra o botão padrão de salvar
+        // Caso contrário, mostra apenas os botões de cancelar e excluir
         return [
-            $this->getSaveFormAction()
-                ->label('Imprimir Credencial e Salvar')
-                ->color('success')
-                ->icon('heroicon-o-printer'),
             Actions\Action::make('cancel')
                 ->label('Cancelar')
                 ->color('gray')

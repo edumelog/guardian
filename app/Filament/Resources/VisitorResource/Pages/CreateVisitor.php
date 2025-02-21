@@ -182,7 +182,7 @@ class CreateVisitor extends CreateRecord
             ];
         }
 
-        // Caso contrário, mostra o botão padrão de criar
+        // Caso contrário, mostra o botão de criar com impressão
         return [
             $this->getCreateFormAction()
                 ->label('Imprimir Credencial e Salvar')

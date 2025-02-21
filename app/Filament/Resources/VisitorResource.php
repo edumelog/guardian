@@ -238,7 +238,10 @@ class VisitorResource extends Resource
                     ])
                     ->hiddenOn('edit'),
 
-                Section::make('Histórico de Visitas')
+                Forms\Components\Section::make('Histórico de Visitas')
+                    ->description('Clique para expandir/recolher o histórico')
+                    ->collapsible()
+                    ->collapsed()
                     ->schema([
                         Forms\Components\Placeholder::make('visit_history')
                             ->content(function ($record) {
