@@ -17,6 +17,7 @@ use Filament\Forms\Get;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\View;
+use Illuminate\Support\Facades\Auth;
 
 class CreateVisitor extends CreateRecord
 {
@@ -38,6 +39,7 @@ class CreateVisitor extends CreateRecord
                                 return \App\Models\DocType::where('is_default', true)->first()?->id;
                             })
                             ->live()
+                            ->dehydrated(true)
                             ->disabled(fn (Get $get): bool => $this->showAllFields),
                             
                         TextInput::make('doc')
@@ -47,6 +49,7 @@ class CreateVisitor extends CreateRecord
                             ->numeric()
                             ->inputMode('numeric')
                             ->step(1)
+                            ->dehydrated(true)
                             ->disabled(fn (Get $get): bool => $this->showAllFields)
                             ->suffixAction(
                                 Action::make('search')
@@ -142,19 +145,62 @@ class CreateVisitor extends CreateRecord
 
     protected function getFormActions(): array
     {
-        return $this->showAllFields 
-            ? parent::getFormActions()
-            : [];
+        // Se não estiver mostrando todos os campos, não mostra nenhuma ação
+        if (!$this->showAllFields) {
+            return [];
+        }
+
+        // Verifica se há visita em andamento
+        $formData = $this->form->getState();
+        
+        $visitor = \App\Models\Visitor::where('doc', $formData['doc'] ?? null)
+            ->where('doc_type_id', $formData['doc_type_id'] ?? null)
+            ->first();
+
+        $hasActiveVisit = false;
+        if ($visitor) {
+            $hasActiveVisit = $visitor->visitorLogs()
+                ->whereNull('out_date')
+                ->exists();
+        }
+
+        // Se houver visita em andamento, mostra apenas o botão de reimprimir
+        if ($hasActiveVisit) {
+            return [
+                \Filament\Actions\Action::make('reprint')
+                    ->label('Reimprimir Credencial')
+                    ->color('warning')
+                    ->icon('heroicon-o-printer')
+                    ->action(function () {
+                        // TODO: Implementar a lógica de impressão da credencial
+                        \Filament\Notifications\Notification::make()
+                            ->warning()
+                            ->title('Impressão de Credencial')
+                            ->body('Funcionalidade em desenvolvimento.')
+                            ->send();
+                    }),
+            ];
+        }
+
+        // Caso contrário, mostra o botão padrão de criar
+        return [
+            $this->getCreateFormAction()
+                ->label('Imprimir Credencial e Salvar')
+                ->color('success')
+                ->icon('heroicon-o-printer'),
+        ];
     }
 
     protected function searchVisitor(): void
     {
-        if (!$this->data['doc'] || !$this->data['doc_type_id']) {
+        $formData = $this->form->getState();
+        
+        if (!isset($formData['doc']) || !isset($formData['doc_type_id'])) {
             return;
         }
 
-        $visitor = \App\Models\Visitor::where('doc', $this->data['doc'])
-            ->where('doc_type_id', $this->data['doc_type_id'])
+        $visitor = \App\Models\Visitor::where('doc', $formData['doc'])
+            ->where('doc_type_id', $formData['doc_type_id'])
             ->first();
             
         if (!$visitor) {
@@ -168,6 +214,28 @@ class CreateVisitor extends CreateRecord
             return;
         }
 
+        // Verifica se há uma visita em andamento
+        $activeVisit = $visitor->visitorLogs()
+            ->whereNull('out_date')
+            ->latest('in_date')
+            ->first();
+
+        if ($activeVisit) {
+            \Filament\Notifications\Notification::make()
+                ->warning()
+                ->title('Visita em Andamento')
+                ->body("Este visitante já possui uma visita em andamento no local: {$activeVisit->destination->name}")
+                ->persistent()
+                ->actions([
+                    \Filament\Notifications\Actions\Action::make('view')
+                        ->label('Ver Detalhes')
+                        ->url(route('filament.dashboard.resources.visitors.edit', $visitor))
+                        ->button(),
+                ])
+                ->send();
+            return;
+        }
+
         $this->form->fill([
             'doc' => $visitor->doc,
             'doc_type_id' => $visitor->doc_type_id,
@@ -176,19 +244,68 @@ class CreateVisitor extends CreateRecord
             'doc_photo_front' => $visitor->doc_photo_front,
             'doc_photo_back' => $visitor->doc_photo_back,
             'other' => $visitor->other,
-            'destination_id' => $visitor->destination_id,
         ]);
+
+        $this->showAllFields = true;
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // Garante que o doc e doc_type_id estejam presentes nos dados do formulário
-        if (!isset($data['doc'])) {
-            $data['doc'] = $this->data['doc'];
+        // Verifica se o visitante já existe
+        $formData = $this->form->getRawState();
+        
+        $doc = $formData['doc'] ?? null;
+        $docTypeId = $formData['doc_type_id'] ?? null;
+
+        if (!$doc || !$docTypeId) {
+            $this->halt();
+            return $data;
         }
-        if (!isset($data['doc_type_id'])) {
-            $data['doc_type_id'] = $this->data['doc_type_id'];
+
+        $visitor = \App\Models\Visitor::where('doc', $doc)
+            ->where('doc_type_id', $docTypeId)
+            ->first();
+
+        if ($visitor) {
+            // Se o visitante existe, cria apenas um novo log de visita
+            $visitor->visitorLogs()->create([
+                'destination_id' => $data['destination_id'],
+                'in_date' => now(),
+                'operator_id' => Auth::id(),
+            ]);
+
+            // Notifica o usuário
+            \Filament\Notifications\Notification::make()
+                ->success()
+                ->title('Nova visita registrada')
+                ->body('Uma nova visita foi registrada para o visitante existente.')
+                ->send();
+
+            // Redireciona para a página de edição do visitante
+            $this->redirect($this->getResource()::getUrl('edit', ['record' => $visitor]));
+            
+            $this->halt();
         }
+
+        // Se o visitante não existe, inclui os dados do documento
+        $data['doc'] = $doc;
+        $data['doc_type_id'] = $docTypeId;
+
         return $data;
+    }
+
+    protected function afterCreate(): void
+    {
+        // Cria o log de visita para o novo visitante
+        $formData = $this->form->getRawState();
+        
+        $this->record->visitorLogs()->create([
+            'destination_id' => $formData['destination_id'],
+            'in_date' => now(),
+            'operator_id' => Auth::id(),
+        ]);
+
+        // Redireciona para a página de edição
+        $this->redirect($this->getResource()::getUrl('edit', ['record' => $this->record]));
     }
 }

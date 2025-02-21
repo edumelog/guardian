@@ -45,84 +45,63 @@ class EditVisitor extends EditRecord
 
     protected function getFormActions(): array
     {
-        return [
-            Actions\Action::make('print_badge')
-                ->label('Imprimir Credencial e Salvar')
-                ->icon('heroicon-o-printer')
-                ->color('success')
-                ->extraAttributes([
-                    'class' => 'order-1',
-                ])
-                ->disabled(function (): bool {
-                    $lastLog = $this->record->visitorLogs()->latest('in_date')->first();
-                    return $lastLog && $lastLog->out_date !== null;
-                })
-                ->tooltip(function (): string {
-                    $lastLog = $this->record->visitorLogs()->latest('in_date')->first();
-                    return $lastLog && $lastLog->out_date !== null 
-                        ? 'Não é possível imprimir a credencial de um visitante que já saiu'
-                        : 'Imprimir credencial do visitante';
-                })
-                ->action(function () {
-                    try {
-                        // Tenta salvar as alterações
-                        $this->saving = true; // Flag para suprimir notificação padrão
-                        $this->save();
-                        $this->saving = false;
+        $hasActiveVisit = $this->record->visitorLogs()
+            ->whereNull('out_date')
+            ->exists();
 
-                        // Se chegou aqui, não houve erros de validação
-                        Notification::make()
-                            ->title('Sucesso!')
-                            ->body('Credencial impressa e alterações salvas.')
-                            ->success()
+        // Se houver visita em andamento, mostra o botão de reimprimir e registrar saída
+        if ($hasActiveVisit) {
+            return [
+                Actions\Action::make('reprint')
+                    ->label('Reimprimir Credencial')
+                    ->color('warning')
+                    ->icon('heroicon-o-printer')
+                    ->action(function () {
+                        // TODO: Implementar a lógica de impressão da credencial
+                        \Filament\Notifications\Notification::make()
+                            ->warning()
+                            ->title('Impressão de Credencial')
+                            ->body('Funcionalidade em desenvolvimento.')
                             ->send();
-                    } catch (\Exception $e) {
-                        $this->saving = false;
-                        // Se houver qualquer erro, não prossegue com a impressão
-                        Notification::make()
-                            ->title('Erro ao salvar alterações')
-                            ->body('Corrija os erros antes de imprimir a credencial.')
-                            ->danger()
-                            ->send();
-                    }
-                }),
-            Actions\Action::make('register_exit')
-                ->label('Registrar Saída')
-                ->icon('heroicon-o-arrow-right-circle')
-                ->color('warning')
-                ->extraAttributes([
-                    'class' => 'order-2',
-                ])
-                ->action(function () {
-                    $lastLog = $this->record->visitorLogs()->latest('in_date')->first();
-                    if ($lastLog && !$lastLog->out_date) {
-                        $lastLog->update(['out_date' => now()]);
-                        $this->refreshFormData(['visit_history']);
-                        
-                        // Recarrega a página para atualizar o estado dos campos
-                        $this->redirect($this->getResource()::getUrl('edit', ['record' => $this->record]));
-                    }
-                })
-                ->requiresConfirmation()
-                ->modalHeading('Registrar Saída')
-                ->modalDescription('Tem certeza que deseja registrar a saída deste visitante?')
-                ->modalSubmitActionLabel('Sim, registrar saída')
-                ->visible(function (): bool {
-                    $lastLog = $this->record->visitorLogs()->latest('in_date')->first();
-                    return $lastLog && !$lastLog->out_date;
-                }),
+                    }),
+                Actions\Action::make('register_exit')
+                    ->label('Registrar Saída')
+                    ->icon('heroicon-o-arrow-right-circle')
+                    ->color('warning')
+                    ->action(function () {
+                        $lastLog = $this->record->visitorLogs()->latest('in_date')->first();
+                        if ($lastLog && !$lastLog->out_date) {
+                            $lastLog->update(['out_date' => now()]);
+                            
+                            // Notifica o usuário
+                            Notification::make()
+                                ->success()
+                                ->title('Saída registrada com sucesso!')
+                                ->send();
+
+                            // Redireciona para a lista de visitantes
+                            $this->redirect($this->getResource()::getUrl('index'));
+                        }
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Registrar Saída')
+                    ->modalDescription('Tem certeza que deseja registrar a saída deste visitante?')
+                    ->modalSubmitActionLabel('Sim, registrar saída'),
+            ];
+        }
+
+        // Caso contrário, mostra o botão padrão de salvar
+        return [
+            $this->getSaveFormAction()
+                ->label('Imprimir Credencial e Salvar')
+                ->color('success')
+                ->icon('heroicon-o-printer'),
             Actions\Action::make('cancel')
                 ->label('Cancelar')
                 ->color('gray')
-                ->extraAttributes([
-                    'class' => 'order-3',
-                ])
                 ->url($this->getResource()::getUrl('index')),
             Actions\DeleteAction::make()
-                ->label('Excluir')
-                ->extraAttributes([
-                    'class' => 'ms-auto order-last',
-                ]),
+                ->label('Excluir'),
         ];
     }
 

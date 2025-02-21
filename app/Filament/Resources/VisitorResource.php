@@ -37,6 +37,14 @@ class VisitorResource extends Resource
 
     public static function form(Form $form): Form
     {
+        $hasActiveVisit = false;
+        if ($form->getRecord()) {
+            $hasActiveVisit = $form->getRecord()
+                ->visitorLogs()
+                ->whereNull('out_date')
+                ->exists();
+        }
+
         return $form
             ->schema([
                 Section::make('Informações do Visitante')
@@ -44,7 +52,8 @@ class VisitorResource extends Resource
                         Forms\Components\TextInput::make('name')
                             ->label('Nome')
                             ->required()
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->disabled($hasActiveVisit),
                             
                         Forms\Components\Select::make('doc_type_id')
                             ->label('Tipo de Documento')
@@ -53,7 +62,8 @@ class VisitorResource extends Resource
                             ->default(function () {
                                 return \App\Models\DocType::where('is_default', true)->first()?->id;
                             })
-                            ->live(),
+                            ->live()
+                            ->disabled($hasActiveVisit),
                             
                         Forms\Components\TextInput::make('doc')
                             ->label('Número do Documento')
@@ -62,6 +72,7 @@ class VisitorResource extends Resource
                             ->numeric()
                             ->inputMode('numeric')
                             ->step(1)
+                            ->disabled($hasActiveVisit)
                             ->suffixAction(
                                 Forms\Components\Actions\Action::make('search')
                                     ->icon('heroicon-m-magnifying-glass')
@@ -140,31 +151,26 @@ class VisitorResource extends Resource
                         WebcamCapture::make('photo')
                             ->label('Foto')
                             ->required()
-                            ->validationMessages([
-                                'required' => 'A foto é obrigatória para o cadastro do visitante.'
-                            ]),
+                            ->disabled($hasActiveVisit),
 
                         DocumentPhotoCapture::make('doc_photo_front')
                             ->label('Documento - Frente')
                             ->required()
                             ->side('front')
-                            ->validationMessages([
-                                'required' => 'A foto da frente do documento é obrigatória.'
-                            ]),
+                            ->disabled($hasActiveVisit),
 
                         DocumentPhotoCapture::make('doc_photo_back')
                             ->label('Documento - Verso')
                             ->required()
                             ->side('back')
-                            ->validationMessages([
-                                'required' => 'A foto do verso do documento é obrigatória.'
-                            ]),
+                            ->disabled($hasActiveVisit),
                             
                         Forms\Components\Select::make('destination_id')
                             ->label('Destino')
                             ->required()
                             ->searchable()
                             ->live()
+                            ->disabled($hasActiveVisit)
                             ->getSearchResultsUsing(function (string $search) {
                                 return \App\Models\Destination::where('name', 'like', "%{$search}%")
                                     ->orWhere('address', 'like', "%{$search}%")
@@ -199,6 +205,7 @@ class VisitorResource extends Resource
                         Forms\Components\Textarea::make('other')
                             ->label('Informações Adicionais')
                             ->maxLength(255)
+                            ->disabled($hasActiveVisit)
                             ->columnSpanFull(),
 
                         Forms\Components\Placeholder::make('current_entry')
@@ -349,8 +356,14 @@ class VisitorResource extends Resource
                         $lastLog = $record->visitorLogs()->latest('in_date')->first();
                         return $lastLog && !$lastLog->out_date;
                     }),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->visible(function (Visitor $record): bool {
+                        return !$record->visitorLogs()->whereNull('out_date')->exists();
+                    }),
+                Tables\Actions\DeleteAction::make()
+                    ->visible(function (Visitor $record): bool {
+                        return !$record->visitorLogs()->whereNull('out_date')->exists();
+                    }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
