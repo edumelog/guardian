@@ -35,10 +35,20 @@ class DashboardPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Amber,
             ])
+            ->renderHook(
+                'panels::head.start',
+                fn(): string => \Illuminate\Support\Facades\Vite::withEntryPoints(['resources/css/app.css'])->toHtml()
+            )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
                 Pages\Dashboard::class,
+            ])
+            ->plugins([
+                \BezhanSalleh\FilamentShield\FilamentShieldPlugin::make()
+            ])
+            ->resources([
+                \App\Filament\Resources\UserResource::class,
             ])
             ->middleware([
                 EncryptCookies::class,
