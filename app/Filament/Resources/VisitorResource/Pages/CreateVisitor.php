@@ -150,44 +150,38 @@ class CreateVisitor extends CreateRecord
             return [];
         }
 
-        // Verifica se há visita em andamento
-        $formData = $this->form->getState();
-        
-        $visitor = \App\Models\Visitor::where('doc', $formData['doc'] ?? null)
-            ->where('doc_type_id', $formData['doc_type_id'] ?? null)
-            ->first();
-
-        $hasActiveVisit = false;
-        if ($visitor) {
-            $hasActiveVisit = $visitor->visitorLogs()
-                ->whereNull('out_date')
-                ->exists();
-        }
-
-        // Se houver visita em andamento, mostra apenas o botão de reimprimir
-        if ($hasActiveVisit) {
-            return [
-                \Filament\Actions\Action::make('reprint')
-                    ->label('Reimprimir Credencial')
-                    ->color('warning')
-                    ->icon('heroicon-o-printer')
-                    ->action(function () {
-                        // TODO: Implementar a lógica de impressão da credencial
-                        \Filament\Notifications\Notification::make()
-                            ->warning()
-                            ->title('Impressão de Credencial')
-                            ->body('Funcionalidade em desenvolvimento.')
-                            ->send();
-                    }),
-            ];
-        }
-
-        // Caso contrário, mostra o botão de criar com impressão
+        // Sempre mostra o botão de criar com impressão
         return [
             $this->getCreateFormAction()
                 ->label('Imprimir Credencial e Salvar')
                 ->color('success')
-                ->icon('heroicon-o-printer'),
+                ->icon('heroicon-o-printer')
+                ->action(function () {
+                    // Verifica se há visita em andamento
+                    $formData = $this->form->getState();
+                    
+                    $visitor = \App\Models\Visitor::where('doc', $formData['doc'] ?? null)
+                        ->where('doc_type_id', $formData['doc_type_id'] ?? null)
+                        ->first();
+
+                    if ($visitor) {
+                        $hasActiveVisit = $visitor->visitorLogs()
+                            ->whereNull('out_date')
+                            ->exists();
+
+                        if ($hasActiveVisit) {
+                            \Filament\Notifications\Notification::make()
+                                ->warning()
+                                ->title('Visita em Andamento')
+                                ->body("Este visitante já possui uma visita em andamento.")
+                                ->persistent()
+                                ->send();
+                            return;
+                        }
+                    }
+
+                    $this->create();
+                }),
         ];
     }
 

@@ -45,59 +45,110 @@ class EditVisitor extends EditRecord
 
     protected function getFormActions(): array
     {
-        $hasActiveVisit = $this->record->visitorLogs()
-            ->whereNull('out_date')
-            ->exists();
+        $lastLog = $this->record->visitorLogs()->latest('in_date')->first();
+        $hasGivenExit = $lastLog && $lastLog->out_date !== null;
 
-        // Se houver visita em andamento, mostra o botão de reimprimir e registrar saída
-        if ($hasActiveVisit) {
+        // Se já deu saída, mostra apenas os botões de cancelar e excluir
+        if ($hasGivenExit) {
             return [
-                Actions\Action::make('reprint')
-                    ->label('Reimprimir Credencial')
-                    ->color('warning')
-                    ->icon('heroicon-o-printer')
-                    ->action(function () {
-                        // TODO: Implementar a lógica de impressão da credencial
-                        \Filament\Notifications\Notification::make()
-                            ->warning()
-                            ->title('Impressão de Credencial')
-                            ->body('Funcionalidade em desenvolvimento.')
-                            ->send();
-                    }),
-                Actions\Action::make('register_exit')
-                    ->label('Registrar Saída')
-                    ->icon('heroicon-o-arrow-right-circle')
-                    ->color('warning')
-                    ->action(function () {
-                        $lastLog = $this->record->visitorLogs()->latest('in_date')->first();
-                        if ($lastLog && !$lastLog->out_date) {
-                            $lastLog->update(['out_date' => now()]);
-                            
-                            // Notifica o usuário
-                            Notification::make()
-                                ->success()
-                                ->title('Saída registrada com sucesso!')
-                                ->send();
+                Actions\Action::make('cancel')
+                    ->label('Cancelar')
+                    ->color('gray')
+                    ->url($this->getResource()::getUrl('index')),
 
-                            // Redireciona para a lista de visitantes
-                            $this->redirect($this->getResource()::getUrl('index'));
+                Actions\DeleteAction::make()
+                    ->label('Excluir')
+                    ->action(function () {
+                        $hasActiveVisit = $this->record->visitorLogs()
+                            ->whereNull('out_date')
+                            ->exists();
+
+                        if ($hasActiveVisit) {
+                            Notification::make()
+                                ->warning()
+                                ->title('Exclusão não permitida')
+                                ->body('Não é possível excluir um visitante com visita em andamento.')
+                                ->send();
+                            return;
                         }
-                    })
-                    ->requiresConfirmation()
-                    ->modalHeading('Registrar Saída')
-                    ->modalDescription('Tem certeza que deseja registrar a saída deste visitante?')
-                    ->modalSubmitActionLabel('Sim, registrar saída'),
+
+                        $this->record->delete();
+                        
+                        $this->redirect($this->getResource()::getUrl('index'));
+                    }),
             ];
         }
 
-        // Caso contrário, mostra apenas os botões de cancelar e excluir
+        // Se não deu saída, mostra todos os botões
         return [
+            Actions\Action::make('reprint')
+                ->label('Reimprimir Credencial')
+                ->color('warning')
+                ->icon('heroicon-o-printer')
+                ->action(function () {
+                    // TODO: Implementar a lógica de impressão da credencial
+                    Notification::make()
+                        ->warning()
+                        ->title('Impressão de Credencial')
+                        ->body('Funcionalidade em desenvolvimento.')
+                        ->send();
+                }),
+
+            Actions\Action::make('register_exit')
+                ->label('Registrar Saída')
+                ->icon('heroicon-o-arrow-right-circle')
+                ->color('warning')
+                ->action(function () {
+                    $lastLog = $this->record->visitorLogs()->latest('in_date')->first();
+                    
+                    if (!$lastLog || $lastLog->out_date) {
+                        Notification::make()
+                            ->warning()
+                            ->title('Sem visita em andamento')
+                            ->body('Este visitante não possui uma visita em andamento.')
+                            ->send();
+                        return;
+                    }
+
+                    $lastLog->update(['out_date' => now()]);
+                    
+                    Notification::make()
+                        ->success()
+                        ->title('Saída registrada com sucesso!')
+                        ->send();
+
+                    $this->redirect($this->getResource()::getUrl('index'));
+                })
+                ->requiresConfirmation()
+                ->modalHeading('Registrar Saída')
+                ->modalDescription('Tem certeza que deseja registrar a saída deste visitante?')
+                ->modalSubmitActionLabel('Sim, registrar saída'),
+
             Actions\Action::make('cancel')
                 ->label('Cancelar')
                 ->color('gray')
                 ->url($this->getResource()::getUrl('index')),
+
             Actions\DeleteAction::make()
-                ->label('Excluir'),
+                ->label('Excluir')
+                ->action(function () {
+                    $hasActiveVisit = $this->record->visitorLogs()
+                        ->whereNull('out_date')
+                        ->exists();
+
+                    if ($hasActiveVisit) {
+                        Notification::make()
+                            ->warning()
+                            ->title('Exclusão não permitida')
+                            ->body('Não é possível excluir um visitante com visita em andamento.')
+                            ->send();
+                        return;
+                    }
+
+                    $this->record->delete();
+                    
+                    $this->redirect($this->getResource()::getUrl('index'));
+                }),
         ];
     }
 
