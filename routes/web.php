@@ -5,13 +5,13 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 Route::get('/', function () {
     // return view('welcome');
-    // redirect para tea de login
-    return redirect()->route('login');
+    // redirect para o path 'dashboard/login'
+    return redirect('dashboard/login');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+// Route::get('/dashboard', function () {
+//     return view('dashboard');
+// })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
