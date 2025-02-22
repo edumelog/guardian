@@ -276,14 +276,22 @@ class VisitorResource extends Resource
                                 $logs = $record->visitorLogs()
                                     ->with('destination')
                                     ->orderBy('in_date', 'desc')
-                                    ->get();
+                                    ->get()
+                                    ->unique('destination_id')
+                                    ->values();
 
                                 if ($logs->isEmpty()) return 'Nenhuma visita registrada';
 
                                 $html = '<div class="space-y-4">';
                                 foreach ($logs as $log) {
+                                    $status = $log->out_date ? 'Finalizada' : 'Em andamento';
+                                    $statusColor = $log->out_date ? 'text-green-600' : 'text-amber-600';
+
                                     $html .= '<div class="p-4 bg-gray-50 rounded-lg space-y-2">';
+                                    $html .= '<div class="flex justify-between items-center">';
                                     $html .= '<div class="font-medium text-gray-900">Local: ' . e($log->destination->name) . '</div>';
+                                    $html .= '<div class="font-medium ' . $statusColor . '">' . $status . '</div>';
+                                    $html .= '</div>';
                                     $html .= '<div class="text-sm text-gray-600">Entrada: ' . $log->in_date->format('d/m/Y H:i') . '</div>';
                                     $html .= '<div class="text-sm text-gray-600">Saída: ' . ($log->out_date ? $log->out_date->format('d/m/Y H:i') : 'Não registrada') . '</div>';
                                     $html .= '</div>';
