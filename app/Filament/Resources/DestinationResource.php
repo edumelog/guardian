@@ -32,6 +32,9 @@ class DestinationResource extends Resource
 
     public static function form(Form $form): Form
     {
+        $record = $form->getRecord();
+        $hasVisits = $record ? $record->visitorLogs()->exists() : false;
+
         return $form
             ->schema([
                 Section::make('Informações do Destino')
@@ -39,7 +42,9 @@ class DestinationResource extends Resource
                         TextInput::make('name')
                             ->label('Nome')
                             ->required()
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->disabled($hasVisits)
+                            ->helperText($hasVisits ? 'O nome não pode ser alterado pois este destino possui visitas registradas.' : null),
                             
                         TextInput::make('address')
                             ->label('Endereço')
