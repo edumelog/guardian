@@ -118,7 +118,60 @@ class CreateVisitor extends CreateRecord
                                 if (!$destinationId) return '-';
                                 
                                 $destination = \App\Models\Destination::find($destinationId);
-                                return $destination?->phone ?: 'Não cadastrado';
+                                if (!$destination || !$destination->is_active) {
+                                    return '-';
+                                }
+                                return $destination->phone ?: 'Não cadastrado';
+                            })
+                            ->columnSpanFull(),
+
+                        Placeholder::make('visitors_count')
+                            ->label('Visitantes presentes no destino:')
+                            ->visible(fn (Get $get): bool => $this->showAllFields)
+                            ->content(function ($get) {
+                                $destinationId = $get('destination_id');
+                                if (!$destinationId) return '-';
+                                
+                                $destination = \App\Models\Destination::find($destinationId);
+                                if (!$destination || !$destination->is_active) {
+                                    return '-';
+                                }
+
+                                $currentCount = $destination->getCurrentVisitorsCount();
+                                $maxVisitors = $destination->max_visitors;
+
+                                // Se não tem limite, mostra em preto sem destaque
+                                if ($maxVisitors <= 0) {
+                                    return new \Illuminate\Support\HtmlString(
+                                        "<span class='text-gray-900'>{$currentCount}</span>"
+                                    );
+                                }
+
+                                // Calcula a porcentagem de ocupação
+                                $occupancyRate = ($currentCount / $maxVisitors) * 100;
+
+                                // Define a cor e estilo baseado na ocupação
+                                if ($currentCount >= $maxVisitors) {
+                                    // Vermelho quando atingir o limite
+                                    $style = 'text-red-600 dark:text-red-400';
+                                    
+                                    \Filament\Notifications\Notification::make()
+                                        ->warning()
+                                        ->title('Limite de visitantes atingido')
+                                        ->body("O destino {$destination->name} atingiu o limite de {$maxVisitors} visitantes.")
+                                        ->persistent()
+                                        ->send();
+                                } elseif ($occupancyRate >= 50 && $occupancyRate < 80) {
+                                    // Laranja entre 50% e 80%
+                                    $style = 'text-orange-500 dark:text-orange-400';
+                                } else {
+                                    // Verde abaixo de 50%
+                                    $style = 'text-emerald-600 dark:text-emerald-400';
+                                }
+
+                                return new \Illuminate\Support\HtmlString(
+                                    "<span class='{$style}'>{$currentCount}/{$maxVisitors}</span>"
+                                );
                             })
                             ->columnSpanFull(),
                             
@@ -294,6 +347,21 @@ class CreateVisitor extends CreateRecord
             return $data;
         }
 
+        // Verifica o limite de visitantes
+        if ($destination->max_visitors > 0) {
+            $currentCount = $destination->getCurrentVisitorsCount();
+            if ($currentCount >= $destination->max_visitors) {
+                Notification::make()
+                    ->danger()
+                    ->title('Limite de visitantes atingido')
+                    ->body("O destino {$destination->name} atingiu o limite de {$destination->max_visitors} visitantes.")
+                    ->persistent()
+                    ->send();
+                $this->halt();
+                return $data;
+            }
+        }
+
         $visitor = \App\Models\Visitor::where('doc', $doc)
             ->where('doc_type_id', $docTypeId)
             ->first();
@@ -341,12 +409,15 @@ class CreateVisitor extends CreateRecord
             return;
         }
 
-        // Cria o log de visita para o novo visitante
-        $this->record->visitorLogs()->create([
-            'destination_id' => $formData['destination_id'],
-            'in_date' => now(),
-            'operator_id' => Auth::id(),
-        ]);
+        // Cria o log de visita APENAS se for um novo visitante
+        // (visitantes existentes já têm o log criado em mutateFormDataBeforeCreate)
+        if (!$this->record->visitorLogs()->where('in_date', now())->exists()) {
+            $this->record->visitorLogs()->create([
+                'destination_id' => $formData['destination_id'],
+                'in_date' => now(),
+                'operator_id' => Auth::id(),
+            ]);
+        }
 
         // Redireciona para a página de edição
         $this->redirect($this->getResource()::getUrl('edit', ['record' => $this->record]));

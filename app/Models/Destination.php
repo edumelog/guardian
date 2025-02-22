@@ -99,6 +99,17 @@ class Destination extends Model
         return false;
     }
 
+    public function getCurrentVisitorsCount(): int
+    {
+        return $this->visitorLogs()
+            ->where('destination_id', $this->id)
+            ->whereNull('out_date')
+            ->whereNotNull('in_date')
+            ->where('in_date', '<=', now())
+            ->distinct('visitor_id')
+            ->count();
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
