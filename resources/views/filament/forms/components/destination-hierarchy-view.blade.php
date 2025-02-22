@@ -45,9 +45,9 @@
         </button>
 
         <div class="space-y-2 mt-4">
-            @foreach(\App\Models\Destination::whereNull('parent_id')->where('is_active', true)->with(['children' => function($query) {
-                $query->where('is_active', true)->with(['children' => function($q) {
-                    $q->where('is_active', true);
+            @foreach(\App\Models\Destination::whereNull('parent_id')->with(['children' => function($query) {
+                $query->with(['children' => function($q) {
+                    $q->with('children');
                 }]);
             }])->get() as $destination)
                 <x-destination-tree-node-select 

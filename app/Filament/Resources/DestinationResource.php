@@ -67,16 +67,38 @@ class DestinationResource extends Resource
                                 'parent',
                                 'name',
                                 function (Builder $query, $record) {
+                                    // Se estiver editando, exclui o próprio registro e seus filhos
                                     if ($record) {
                                         $childrenIds = $record->getAllChildrenIds();
                                         $query->whereNotIn('id', [...$childrenIds, $record->id]);
                                     }
-                                    return $query->where('is_active', true);
+
+                                    // Sempre mostra apenas destinos ativos como opções de pai
+                                    $query->where('is_active', true);
+
+                                    return $query;
                                 }
                             )
                             ->searchable()
                             ->preload()
-                            ->placeholder('Selecione o destino pai (opcional)'),
+                            ->placeholder('Selecione o destino pai (opcional)')
+                            ->afterStateHydrated(function ($component, $state, $record) {
+                                // Se o pai atual está inativo, limpa a seleção
+                                if ($state && $record) {
+                                    $parent = \App\Models\Destination::find($state);
+                                    if ($parent && !$parent->is_active) {
+                                        $component->state(null);
+                                        
+                                        // Notifica o usuário sobre a mudança
+                                        \Filament\Notifications\Notification::make()
+                                            ->warning()
+                                            ->title('Destino pai removido')
+                                            ->body('O destino pai foi removido pois está inativo.')
+                                            ->persistent()
+                                            ->send();
+                                    }
+                                }
+                            }),
 
                         Forms\Components\Toggle::make('is_active')
                             ->label('Ativo')

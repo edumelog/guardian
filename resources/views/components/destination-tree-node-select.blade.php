@@ -71,14 +71,21 @@
         
         <button 
             type="button"
-            class="text-sm font-medium transition-colors duration-200"
+            class="text-sm font-medium transition-colors duration-200 flex items-center gap-2"
             :class="{
                 'text-primary-600 font-bold': $wire.get('data.destination_id') == {{ $destination->id }},
-                'text-gray-600 hover:text-primary-500': $wire.get('data.destination_id') != {{ $destination->id }}
+                'text-gray-600 hover:text-primary-500': $wire.get('data.destination_id') != {{ $destination->id }} && {{ $destination->is_active ? 'true' : 'false' }},
+                'text-gray-400 line-through': !{{ $destination->is_active ? 'true' : 'false' }}
             }"
             @click="$wire.set('data.destination_id', {{ $destination->id }})"
+            @if(!$destination->is_active)
+            title="Este destino está inativo"
+            @endif
         >
             {{ $destination->name }}
+            @if(!$destination->is_active)
+                <span class="text-xs text-gray-400">(Inativo)</span>
+            @endif
             @if($destination->address)
                 <span class="text-gray-400"> - {{ $destination->address }}</span>
             @endif
