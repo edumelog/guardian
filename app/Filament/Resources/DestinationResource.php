@@ -66,12 +66,17 @@ class DestinationResource extends Resource
                                         $childrenIds = $record->getAllChildrenIds();
                                         $query->whereNotIn('id', [...$childrenIds, $record->id]);
                                     }
-                                    return $query;
+                                    return $query->where('is_active', true);
                                 }
                             )
                             ->searchable()
                             ->preload()
                             ->placeholder('Selecione o destino pai (opcional)'),
+
+                        Forms\Components\Toggle::make('is_active')
+                            ->label('Ativo')
+                            ->default(true)
+                            ->helperText('Destinos inativos não aparecem no cadastro de visitantes'),
                     ])->columns(2)
             ]);
     }
@@ -91,6 +96,11 @@ class DestinationResource extends Resource
                 Tables\Columns\TextColumn::make('phone')
                     ->label('Telefone')
                     ->searchable(),
+
+                Tables\Columns\IconColumn::make('is_active')
+                    ->label('Ativo')
+                    ->boolean()
+                    ->sortable(),
                     
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Criado em')
@@ -98,7 +108,12 @@ class DestinationResource extends Resource
                     ->sortable(),
             ])
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('is_active')
+                    ->label('Status')
+                    ->options([
+                        '1' => 'Ativo',
+                        '0' => 'Inativo',
+                    ])
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
@@ -205,14 +220,16 @@ class DestinationResource extends Resource
                             }
 
                             if ($message) {
-                                return $message . ($canDeleteAny ? "\n\nDeseja continuar com a exclusão dos destinos permitidos?" : "");
+                                if (!$canDeleteAny) {
+                                    return $message . "\n\nNenhum dos destinos selecionados pode ser excluído.";
+                                }
+                                return $message . "\n\nDeseja continuar com a exclusão dos destinos permitidos?";
                             }
 
                             return 'Tem certeza que deseja deletar os destinos selecionados?';
                         })
                         ->modalSubmitActionLabel('Sim, deletar')
-                        // Esconde o botão de confirmação quando nenhum destino puder ser excluído
-                        ->hidden(function ($action): bool {
+                        ->disabled(function ($action): bool {
                             $records = $action->getRecords();
                             if (!$records) {
                                 return false;
@@ -220,10 +237,10 @@ class DestinationResource extends Resource
 
                             foreach ($records as $record) {
                                 if (!$record->hasVisitsInHierarchy()) {
-                                    return false; // Mostra o botão se pelo menos um destino puder ser excluído
+                                    return false; // Habilita o botão se pelo menos um destino puder ser excluído
                                 }
                             }
-                            return true; // Esconde o botão se nenhum destino puder ser excluído
+                            return true; // Desabilita o botão se nenhum destino puder ser excluído
                         })
                         ->action(function (Collection $records) {
                             $hasVisits = false;
@@ -270,6 +287,9 @@ class DestinationResource extends Resource
                             }
                         }),
                 ]),
+            ])
+            ->emptyStateActions([
+                Tables\Actions\CreateAction::make(),
             ]);
     }
     

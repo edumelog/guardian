@@ -16,13 +16,19 @@ class Destination extends Model
         'address',
         'phone',
         'max_visitors',
-        'parent_id'
+        'parent_id',
+        'is_active'
     ];
 
     protected $attributes = [
         'max_visitors' => 0,
         'address' => '',
-        'phone' => ''
+        'phone' => '',
+        'is_active' => true
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean'
     ];
 
     public function parent()
@@ -91,5 +97,10 @@ class Destination extends Model
         }
 
         return false;
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 }

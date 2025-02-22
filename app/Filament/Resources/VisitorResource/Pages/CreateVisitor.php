@@ -18,6 +18,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\View;
 use Illuminate\Support\Facades\Auth;
+use Filament\Notifications\Notification;
 
 class CreateVisitor extends CreateRecord
 {
@@ -86,8 +87,11 @@ class CreateVisitor extends CreateRecord
                             ->live()
                             ->visible(fn (Get $get): bool => $this->showAllFields)
                             ->getSearchResultsUsing(function (string $search) {
-                                return \App\Models\Destination::where('name', 'like', "%{$search}%")
-                                    ->orWhere('address', 'like', "%{$search}%")
+                                return \App\Models\Destination::where('is_active', true)
+                                    ->where(function ($query) use ($search) {
+                                        $query->where('name', 'like', "%{$search}%")
+                                            ->orWhere('address', 'like', "%{$search}%");
+                                    })
                                     ->limit(50)
                                     ->get()
                                     ->mapWithKeys(fn ($destination) => [
@@ -98,9 +102,10 @@ class CreateVisitor extends CreateRecord
                                     ->toArray();
                             })
                             ->getOptionLabelUsing(fn ($value): ?string => 
-                                \App\Models\Destination::find($value)?->address 
-                                    ? \App\Models\Destination::find($value)->name . ' - ' . \App\Models\Destination::find($value)->address
-                                    : \App\Models\Destination::find($value)?->name
+                                \App\Models\Destination::where('is_active', true)
+                                    ->find($value)?->address 
+                                        ? \App\Models\Destination::find($value)->name . ' - ' . \App\Models\Destination::find($value)->address
+                                        : \App\Models\Destination::find($value)?->name
                             )
                             ->placeholder('Digite o nome ou endereço do destino')
                             ->columnSpanFull(),
@@ -270,8 +275,21 @@ class CreateVisitor extends CreateRecord
         
         $doc = $formData['doc'] ?? null;
         $docTypeId = $formData['doc_type_id'] ?? null;
+        $destinationId = $formData['destination_id'] ?? null;
 
         if (!$doc || !$docTypeId) {
+            $this->halt();
+            return $data;
+        }
+
+        // Verifica se o destino está ativo
+        $destination = \App\Models\Destination::find($destinationId);
+        if (!$destination || !$destination->is_active) {
+            Notification::make()
+                ->danger()
+                ->title('Destino inválido')
+                ->body('O destino selecionado está inativo ou não existe.')
+                ->send();
             $this->halt();
             return $data;
         }
@@ -310,9 +328,20 @@ class CreateVisitor extends CreateRecord
 
     protected function afterCreate(): void
     {
-        // Cria o log de visita para o novo visitante
+        // Verifica se o destino está ativo
         $formData = $this->form->getRawState();
+        $destination = \App\Models\Destination::find($formData['destination_id']);
         
+        if (!$destination || !$destination->is_active) {
+            Notification::make()
+                ->danger()
+                ->title('Destino inválido')
+                ->body('O destino selecionado está inativo ou não existe.')
+                ->send();
+            return;
+        }
+
+        // Cria o log de visita para o novo visitante
         $this->record->visitorLogs()->create([
             'destination_id' => $formData['destination_id'],
             'in_date' => now(),

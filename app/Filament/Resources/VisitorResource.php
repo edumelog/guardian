@@ -22,6 +22,8 @@ use Filament\Forms\Components\Placeholder;
 use App\Filament\Forms\Components\DocumentPhotoCapture;
 use Illuminate\Database\Eloquent\Collection;
 use Filament\Notifications\Notification;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Get;
 
 class VisitorResource extends Resource
 {
@@ -167,15 +169,18 @@ class VisitorResource extends Resource
                             ->side('back')
                             ->disabled($hasActiveVisit),
                             
-                        Forms\Components\Select::make('destination_id')
+                        Select::make('destination_id')
                             ->label('Destino')
                             ->required()
                             ->searchable()
                             ->live()
                             ->disabled($hasActiveVisit)
                             ->getSearchResultsUsing(function (string $search) {
-                                return \App\Models\Destination::where('name', 'like', "%{$search}%")
-                                    ->orWhere('address', 'like', "%{$search}%")
+                                return \App\Models\Destination::where('is_active', true)
+                                    ->where(function ($query) use ($search) {
+                                        $query->where('name', 'like', "%{$search}%")
+                                            ->orWhere('address', 'like', "%{$search}%");
+                                    })
                                     ->limit(50)
                                     ->get()
                                     ->mapWithKeys(fn ($destination) => [
@@ -185,11 +190,25 @@ class VisitorResource extends Resource
                                     ])
                                     ->toArray();
                             })
-                            ->getOptionLabelUsing(fn ($value): ?string => 
-                                \App\Models\Destination::find($value)?->address 
-                                    ? \App\Models\Destination::find($value)->name . ' - ' . \App\Models\Destination::find($value)->address
-                                    : \App\Models\Destination::find($value)?->name
-                            )
+                            ->getOptionLabelUsing(function ($value): ?string {
+                                $destination = \App\Models\Destination::find($value);
+                                if (!$destination || !$destination->is_active) {
+                                    return null;
+                                }
+                                return $destination->address 
+                                    ? "{$destination->name} - {$destination->address}"
+                                    : $destination->name;
+                            })
+                            ->options(function () {
+                                return \App\Models\Destination::where('is_active', true)
+                                    ->get()
+                                    ->mapWithKeys(fn ($destination) => [
+                                        $destination->id => $destination->address 
+                                            ? "{$destination->name} - {$destination->address}"
+                                            : $destination->name
+                                    ])
+                                    ->toArray();
+                            })
                             ->placeholder('Digite o nome ou endereço do destino')
                             ->columnSpanFull(),
 
@@ -200,7 +219,10 @@ class VisitorResource extends Resource
                                 if (!$destinationId) return '-';
                                 
                                 $destination = \App\Models\Destination::find($destinationId);
-                                return $destination?->phone ?: 'Não cadastrado';
+                                if (!$destination || !$destination->is_active) {
+                                    return '-';
+                                }
+                                return $destination->phone ?: 'Não cadastrado';
                             })
                             ->columnSpanFull(),
                             
