@@ -96,12 +96,14 @@
         x-transition:leave-end="opacity-0 transform -translate-y-2"
         style="display: none;"
     >
-        @foreach($destination->children as $child)
-            <x-destination-tree-node-select 
-                :destination="$child" 
-                :level="$level + 1" 
-            />
-        @endforeach
+        <div class="space-y-2 mt-4">
+            @foreach($destination->children as $child)
+                <x-destination-tree-node-select 
+                    :destination="$child" 
+                    :level="$level + 1" 
+                />
+            @endforeach
+        </div>
     </div>
 </div>
 
