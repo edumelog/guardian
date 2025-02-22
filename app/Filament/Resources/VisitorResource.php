@@ -242,15 +242,17 @@ class VisitorResource extends Resource
                                 if (!$record) return 'Primeira visita';
                                 
                                 $lastLog = $record->visitorLogs()
-                                    ->orderBy('in_date', 'desc')
+                                    ->latest('in_date')
                                     ->first();
 
                                 if (!$lastLog) return 'Primeira visita';
 
+                                $status = $lastLog->out_date ? 'Finalizada' : 'Em andamento';
                                 return sprintf(
-                                    'Local: %s - Data: %s',
+                                    'Local: %s - Data: %s - Status: %s',
                                     $lastLog->destination->name,
-                                    $lastLog->in_date->format('d/m/Y H:i')
+                                    $lastLog->in_date->format('d/m/Y H:i'),
+                                    $status
                                 );
                             }),
                     ])->columns(2),
@@ -338,22 +340,32 @@ class VisitorResource extends Resource
                     
                 Tables\Columns\TextColumn::make('destination.name')
                     ->label('Destino')
-                    ->sortable(),
+                    ->sortable()
+                    ->getStateUsing(function ($record) {
+                        $lastLog = $record->visitorLogs()
+                            ->latest('in_date')
+                            ->first();
+                        return $lastLog?->destination?->name;
+                    }),
 
                 Tables\Columns\TextColumn::make('visitorLogs.in_date')
                     ->label('Entrada')
                     ->dateTime('d/m/Y H:i')
                     ->sortable()
-                    ->getStateUsing(function (Visitor $record) {
-                        return $record->visitorLogs()->latest('in_date')->first()?->in_date;
+                    ->getStateUsing(function ($record) {
+                        return $record->visitorLogs()
+                            ->latest('in_date')
+                            ->first()?->in_date;
                     }),
 
                 Tables\Columns\TextColumn::make('visitorLogs.out_date')
                     ->label('Saída')
                     ->dateTime('d/m/Y H:i')
                     ->sortable()
-                    ->getStateUsing(function (Visitor $record) {
-                        return $record->visitorLogs()->latest('in_date')->first()?->out_date;
+                    ->getStateUsing(function ($record) {
+                        return $record->visitorLogs()
+                            ->latest('in_date')
+                            ->first()?->out_date;
                     }),
                     
                 // Tables\Columns\TextColumn::make('created_at')
