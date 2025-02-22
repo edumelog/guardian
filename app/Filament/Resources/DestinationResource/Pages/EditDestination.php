@@ -3,9 +3,10 @@
 namespace App\Filament\Resources\DestinationResource\Pages;
 
 use App\Filament\Resources\DestinationResource;
-use App\Models\Destination;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
+use App\Models\Destination;
+use Filament\Notifications\Notification;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Placeholder;
 use Illuminate\Support\HtmlString;
@@ -24,15 +25,61 @@ class EditDestination extends EditRecord
         return [
             Actions\DeleteAction::make()
                 ->requiresConfirmation()
-                ->modalHeading(fn(): string => 'Deletar Destino')
+                ->modalHeading('Deletar Destino')
                 ->modalDescription(function (Destination $record): string {
+                    // Verifica se tem visitas na hierarquia
+                    if ($record->hasVisitsInHierarchy()) {
+                        $message = "Não é possível excluir o destino \"{$record->name}\"";
+                        
+                        // Se o próprio destino tem visitas
+                        if ($record->visitorLogs()->exists()) {
+                            $message .= " pois ele possui visitas registradas";
+                        } else {
+                            $message .= " pois um ou mais de seus subdestinos possuem visitas registradas";
+                        }
+                        
+                        return $message . ".";
+                    }
+
+                    // Verifica se tem subdestinos
                     $childrenCount = $record->children()->count();
                     if ($childrenCount > 0) {
                         return "O destino \"{$record->name}\" possui {$childrenCount} subdestino(s) associado(s). Ao deletar este destino, todos os subdestinos também serão removidos. Deseja continuar?";
                     }
+
                     return "Tem certeza que deseja deletar o destino \"{$record->name}\"?";
                 })
-                ->modalSubmitActionLabel('Sim, deletar'),
+                ->modalSubmitActionLabel('Sim, deletar')
+                // Esconde o botão de confirmação quando não for possível excluir
+                ->hidden(fn (Destination $record) => $record->hasVisitsInHierarchy())
+                ->action(function (Destination $record) {
+                    // Verifica se o destino ou seus filhos têm visitas
+                    if ($record->hasVisitsInHierarchy()) {
+                        $message = 'Não é possível excluir um destino que ';
+                        if ($record->visitorLogs()->exists()) {
+                            $message .= 'possui visitas registradas.';
+                        } else {
+                            $message .= 'possui subdestinos com visitas registradas.';
+                        }
+
+                        Notification::make()
+                            ->danger()
+                            ->title('Exclusão não permitida')
+                            ->body($message)
+                            ->send();
+                        return;
+                    }
+
+                    $record->delete();
+
+                    Notification::make()
+                        ->success()
+                        ->title('Destino excluído')
+                        ->body('O destino foi excluído com sucesso.')
+                        ->send();
+
+                    $this->redirect($this->getResource()::getUrl('index'));
+                }),
         ];
     }
 

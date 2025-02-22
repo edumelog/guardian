@@ -25,39 +25,39 @@ class Destination extends Model
         'phone' => ''
     ];
 
-    public function parent(): BelongsTo
+    public function parent()
     {
         return $this->belongsTo(Destination::class, 'parent_id');
     }
 
-    public function children(): HasMany
+    public function children()
     {
         return $this->hasMany(Destination::class, 'parent_id');
     }
 
-    public function visitors(): HasMany
+    public function visitors()
     {
         return $this->hasMany(Visitor::class);
     }
 
-    public function activityLogs(): HasMany
+    public function visitorLogs()
     {
-        return $this->hasMany(ActivityLog::class);
+        return $this->hasMany(\App\Models\VisitorLog::class);
     }
 
+    /**
+     * Retorna um array com os IDs de todos os destinos filhos (recursivamente)
+     */
     public function getAllChildrenIds(): array
     {
         $ids = [];
-        $this->appendChildrenIds($this, $ids);
-        return $ids;
-    }
-
-    private function appendChildrenIds(Destination $destination, array &$ids): void
-    {
-        foreach ($destination->children as $child) {
+        
+        foreach ($this->children as $child) {
             $ids[] = $child->id;
-            $this->appendChildrenIds($child, $ids);
+            $ids = array_merge($ids, $child->getAllChildrenIds());
         }
+        
+        return $ids;
     }
 
     public function getAllAncestors(): array
@@ -71,5 +71,25 @@ class Destination extends Model
         }
         
         return $ancestors;
+    }
+
+    /**
+     * Verifica se este destino ou qualquer um de seus filhos (recursivamente) tem visitas
+     */
+    public function hasVisitsInHierarchy(): bool
+    {
+        // Verifica se o destino atual tem visitas
+        if ($this->visitorLogs()->exists()) {
+            return true;
+        }
+
+        // Verifica recursivamente os filhos
+        foreach ($this->children as $child) {
+            if ($child->hasVisitsInHierarchy()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
