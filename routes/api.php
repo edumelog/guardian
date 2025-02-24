@@ -24,4 +24,9 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 // Rotas para templates de impressão
 Route::get('/print-templates', [PrintTemplateController::class, 'index']);
 Route::post('/print-templates/upload', [PrintTemplateController::class, 'upload']);
-Route::get('/print-templates/{name}', [PrintTemplateController::class, 'getTemplate']); 
+Route::get('/print-templates/{name}', [PrintTemplateController::class, 'getTemplate']);
+
+Route::prefix('qz')->group(function () {
+    Route::post('sign', [App\Http\Controllers\QZPrintController::class, 'sign']);
+    Route::get('certificate', [App\Http\Controllers\QZPrintController::class, 'getCertificate']);
+}); 

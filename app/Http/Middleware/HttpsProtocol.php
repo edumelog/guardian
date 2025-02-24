@@ -14,6 +14,14 @@ class HttpsProtocol
             return redirect()->secure($request->getRequestUri());
         }
 
+        $request->server->set('HTTPS', 'on');
+        $request->server->set('SERVER_PORT', 443);
+
+        if ($request->header('x-forwarded-proto') === 'http') {
+            $request->server->set('HTTP_X_FORWARDED_PROTO', 'https');
+            $request->server->set('HTTP_X_FORWARDED_PORT', 443);
+        }
+
         return $next($request);
     }
 } 
