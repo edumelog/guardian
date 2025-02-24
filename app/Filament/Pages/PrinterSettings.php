@@ -5,10 +5,13 @@ namespace App\Filament\Pages;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 use Filament\Notifications\Notification;
-use Spatie\Permission\Traits\HasRoles;
+// use Spatie\Permission\Traits\HasRoles;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 class PrinterSettings extends Page
 {
+    use HasPageShield;
+
     protected static ?string $navigationIcon = 'heroicon-o-printer';
     protected static ?string $navigationLabel = 'Configurar Impressora';
     protected static ?string $title = 'Configuração da Impressora';
@@ -18,13 +21,7 @@ class PrinterSettings extends Page
 
     protected static string $view = 'filament.pages.printer-setup';
 
-    public function mount(): void
-    {
-        // Verifica se o usuário tem permissão usando o Gate
-        if (!Auth::user()?->hasPermissionTo('page_PrinterSettings')) {
-            abort(403);
-        }
-    }
+   
 
     public function notify(string $status, string $title, string $message): void
     {

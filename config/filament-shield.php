@@ -108,6 +108,7 @@ return [
             'CameraSettings' => 'camera_settings',
             'PrinterSettings' => 'printer_settings',
             'QzTrayDemo' => 'qz_tray_demo',
+            'QzCertificateSettings' => 'qz_certificate_settings',
         ],
     ],
 

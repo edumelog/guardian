@@ -4,9 +4,12 @@ namespace App\Filament\Pages;
 
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 class QzTrayDemo extends Page
 {
+    use HasPageShield;
+
     protected static ?string $navigationIcon = 'heroicon-o-printer';
     protected static ?string $navigationLabel = 'QZ Tray Demo';
     protected static ?string $title = 'QZ Tray Demo';
@@ -16,14 +19,7 @@ class QzTrayDemo extends Page
 
     protected static string $view = 'filament.pages.qz-tray-demo';
 
-    public function mount(): void
-    {
-        // Verifica se o usuário tem permissão
-        if (!Auth::user()->can('page_QzTrayDemo')) {
-            abort(403);
-        }
-    }
-
+    
     protected function getHeaderActions(): array
     {
         return [];

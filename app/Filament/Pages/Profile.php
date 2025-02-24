@@ -12,9 +12,12 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rules\Password;
 use App\Models\User;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 class Profile extends Page
 {
+    use HasPageShield;
+
     protected static ?string $navigationIcon = 'heroicon-o-user';
     protected static ?string $navigationLabel = 'Meu Perfil';
     protected static ?string $title = 'Meu Perfil';
@@ -26,13 +29,13 @@ class Profile extends Page
 
     public ?array $data = [];
 
-    public function mount(): void
-    {
-        $this->form->fill([
-            'name' => Auth::user()->name,
-            'email' => Auth::user()->email,
-        ]);
-    }
+    // public function mount(): void
+    // {
+    //     $this->form->fill([
+    //         'name' => Auth::user()->name,
+    //         'email' => Auth::user()->email,
+    //     ]);
+    // }
 
     public function form(Form $form): Form
     {

@@ -4,9 +4,12 @@ namespace App\Filament\Pages;
 
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 class CameraSettings extends Page
 {
+    use HasPageShield;
+
     protected static ?string $navigationIcon = 'heroicon-o-camera';
     protected static ?string $navigationLabel = 'Configurar Câmeras';
     protected static ?string $title = 'Configuração de Câmeras';
@@ -16,11 +19,5 @@ class CameraSettings extends Page
 
     protected static string $view = 'filament.pages.camera-setup';
 
-    public function mount(): void
-    {
-        // Verifica se o usuário tem permissão
-        if (!Auth::user()->can('page_CameraSettings')) {
-            abort(403);
-        }
-    }
+
 } 
