@@ -30,15 +30,26 @@
             if (this.isDisabled) return;
 
             try {
-                this.stream = await navigator.mediaDevices.getUserMedia({ 
+                // Recupera a configuração das câmeras
+                const config = localStorage.getItem('guardian_cameras_config');
+                let constraints = { 
                     video: { 
                         width: { ideal: 640 },
                         height: { ideal: 640 },
                         facingMode: 'user',
                         aspectRatio: 1
                     } 
-                });
-                
+                };
+
+                // Se existe configuração, usa a câmera específica para visitantes
+                if (config) {
+                    const { visitor } = JSON.parse(config);
+                    if (visitor) {
+                        constraints.video.deviceId = { exact: visitor };
+                    }
+                }
+
+                this.stream = await navigator.mediaDevices.getUserMedia(constraints);
                 this.capturing = true;
                 this.$refs.video.srcObject = this.stream;
             } catch (error) {

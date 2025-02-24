@@ -36,18 +36,29 @@
             if (this.isDisabled) return;
 
             try {
-                this.stream = await navigator.mediaDevices.getUserMedia({ 
+                // Recupera a configuração das câmeras
+                const config = localStorage.getItem('guardian_cameras_config');
+                let constraints = { 
                     video: { 
                         width: { ideal: 1280 },
                         height: { ideal: 720 },
-                        facingMode: 'environment'
+                        facingMode: 'environment',
                     } 
-                });
-                
+                };
+
+                // Se existe configuração, usa a câmera específica para documentos
+                if (config) {
+                    const { document } = JSON.parse(config);
+                    if (document) {
+                        constraints.video.deviceId = { exact: document };
+                    }
+                }
+
+                this.stream = await navigator.mediaDevices.getUserMedia(constraints);
                 this.capturing = true;
                 this.$refs.video.srcObject = this.stream;
             } catch (error) {
-                console.error('Erro ao acessar câmera:', error);
+                console.error('Erro ao acessar webcam:', error);
                 alert('Não foi possível acessar a câmera. Verifique as permissões.');
             }
         },
