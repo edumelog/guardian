@@ -50,6 +50,8 @@ class DashboardPanelProvider extends PanelProvider
             ->pages([
                 Pages\Dashboard::class,
                 \App\Filament\Pages\CameraSettings::class,
+                \App\Filament\Pages\PrinterSettings::class,
+                \App\Filament\Pages\QzTrayDemo::class,
             ])
             ->plugins([
                 \BezhanSalleh\FilamentShield\FilamentShieldPlugin::make()

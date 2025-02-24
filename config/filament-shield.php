@@ -88,4 +88,27 @@ return [
         'enabled' => true,
     ],
 
+    'resources' => [
+        'enabled' => true,
+        'label' => 'Resource',
+        'plural_label' => 'Resources',
+        'navigation_group' => true,
+        'navigation_group_label' => 'Resource Permissions',
+        'navigation_sort' => 1,
+    ],
+    'pages' => [
+        'enabled' => true,
+        'label' => 'Page',
+        'plural_label' => 'Pages',
+        'navigation_group' => true,
+        'navigation_group_label' => 'Page Permissions',
+        'navigation_sort' => 2,
+        'register' => [
+            'Dashboard' => 'dashboard',
+            'CameraSettings' => 'camera_settings',
+            'PrinterSettings' => 'printer_settings',
+            'QzTrayDemo' => 'qz_tray_demo',
+        ],
+    ],
+
 ];
