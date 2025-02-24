@@ -5,39 +5,11 @@
             status: 'Unknown',
             statusColor: 'gray',
             connected: false,
-            printers: [],
-            selectedPrinter: null,
             loading: false,
             error: null,
-            orientation: 'portrait',
+            config: null,
             init() {
-                // Carrega o script do QZ Tray e configuração salva
                 this.loadQZTray();
-                this.loadConfig();
-            },
-            loadConfig() {
-                const config = localStorage.getItem('guardian_qz_config');
-                if (config) {
-                    const saved = JSON.parse(config);
-                    this.orientation = saved.orientation || 'portrait';
-                }
-            },
-            saveConfig() {
-                const config = {
-                    orientation: this.orientation,
-                    timestamp: new Date().toISOString()
-                };
-                localStorage.setItem('guardian_qz_config', JSON.stringify(config));
-                
-                $dispatch('notify', {
-                    message: 'Configuração salva',
-                    description: 'A orientação da impressão foi configurada com sucesso',
-                    status: 'success'
-                });
-            },
-            toggleOrientation() {
-                this.orientation = this.orientation === 'portrait' ? 'landscape' : 'portrait';
-                this.saveConfig();
             },
             async loadQZTray() {
                 return new Promise((resolve, reject) => {
@@ -73,14 +45,26 @@
                     this.status = 'Connected';
                     this.statusColor = 'success';
 
-                    // Lista todas as impressoras
-                    this.printers = await qz.printers.find();
-                    console.log('Impressoras encontradas:', this.printers);
+                    // Carrega a configuração salva
+                    const savedConfig = localStorage.getItem('guardian_printer_config');
+                    if (!savedConfig) {
+                        throw new Error('Nenhuma impressora configurada. Configure uma impressora na página de Configurações.');
+                    }
+
+                    const { printer, orientation } = JSON.parse(savedConfig);
+                    if (!printer) {
+                        throw new Error('Nenhuma impressora configurada. Configure uma impressora na página de Configurações.');
+                    }
+
+                    // Cria a configuração com a impressora salva
+                    this.config = qz.configs.create(printer, {
+                        orientation: orientation || null
+                    });
 
                     // Notifica sucesso
                     $dispatch('notify', { 
                         message: 'Conectado ao QZ Tray',
-                        description: `${this.printers.length} impressora(s) encontrada(s)`,
+                        description: 'Pronto para imprimir',
                         status: 'success'
                     });
                 } catch (err) {
@@ -99,28 +83,27 @@
                 }
             },
             async printTest() {
-                if (!this.selectedPrinter) {
+                if (!this.config) {
                     $dispatch('notify', {
                         message: 'Erro',
-                        description: 'Selecione uma impressora primeiro',
+                        description: 'Configure uma impressora na página de Configurações primeiro',
                         status: 'danger'
                     });
                     return;
                 }
 
                 try {
-                    const config = qz.configs.create(this.selectedPrinter, {
-                        orientation: this.orientation
-                    });
-                    const data = [
-                        '^XA',
-                        '^FO50,50^ADN,36,20^FD=== TESTE DE IMPRESSÃO ===^FS',
-                        '^FO50,100^ADN,36,20^FDGuardian - Controle de Acesso^FS',
-                        '^FO50,150^ADN,36,20^FD' + new Date().toLocaleString() + '^FS',
-                        '^XZ'
-                    ];
+                    const data = [{
+                        type: 'pixel',
+                        format: 'html',
+                        flavor: 'plain',
+                        data: '<h1>Teste de impressão</h1>',
+                        options: {
+                            // verificar opções em  https://qz.io/api/qz.configs#.setDefaults                          
+                        }
+                    }];
 
-                    await qz.print(config, data);
+                    await qz.print(this.config, data);
                     
                     $dispatch('notify', {
                         message: 'Teste enviado',
@@ -189,54 +172,6 @@
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- Seleção de Impressora -->
-                            <div x-show="connected" class="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                                <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Configurações da Impressora</h3>
-                                
-                                <div class="grid grid-cols-1 gap-4">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Impressora
-                                        </label>
-                                        <select 
-                                            x-model="selectedPrinter"
-                                            class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
-                                        >
-                                            <option value="">Selecione uma impressora</option>
-                                            <template x-for="printer in printers" :key="printer">
-                                                <option 
-                                                    :value="printer"
-                                                    x-text="printer"
-                                                ></option>
-                                            </template>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Orientação
-                                        </label>
-                                        <button
-                                            type="button"
-                                            @click="toggleOrientation"
-                                            class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                                        >
-                                            <template x-if="orientation === 'portrait'">
-                                                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
-                                                </svg>
-                                            </template>
-                                            <template x-if="orientation === 'landscape'">
-                                                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/>
-                                                </svg>
-                                            </template>
-                                            <span x-text="orientation === 'portrait' ? 'Retrato' : 'Paisagem'"></span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -258,7 +193,7 @@
                 <button
                     type="button"
                     @click="printTest"
-                    :disabled="!selectedPrinter"
+                    :disabled="!config"
                     class="fi-btn fi-btn-size-md inline-flex items-center justify-center gap-1 font-medium rounded-lg bg-primary-600 px-4 py-2 text-white shadow-sm hover:bg-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-70 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus:ring-offset-gray-800"
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
