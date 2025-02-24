@@ -3,6 +3,7 @@
 @endphp
 
 <x-filament-panels::page>
+    @csrf
     <div
         x-data="{
             printers: [],
@@ -12,6 +13,11 @@
             error: null,
             connected: false,
             printerStatus: null,
+            templates: [],
+            selectedTemplate: null,
+            uploadError: null,
+            selectedFile: null,
+            hasChanges: false,
             async init() {
                 // Carrega o script do QZ Tray
                 await this.loadQZTray();
@@ -25,12 +31,18 @@
                     const saved = JSON.parse(config);
                     this.selectedPrinter = saved.printer;
                     this.orientation = saved.orientation || null;
+                    this.selectedTemplate = saved.template || 'default.html';
                 }
 
                 // Inicia monitoramento da impressora
                 if (this.selectedPrinter) {
                     await this.startMonitoring();
                 }
+
+                // Observa mudanças
+                this.$watch('selectedPrinter', () => this.hasChanges = true);
+                this.$watch('orientation', () => this.hasChanges = true);
+                this.$watch('selectedTemplate', () => this.hasChanges = true);
             },
             async loadQZTray() {
                 return new Promise((resolve, reject) => {
@@ -67,11 +79,7 @@
                     console.error('Erro ao conectar com QZ Tray:', err);
                     this.error = err.message;
                     
-                    $dispatch('notify', { 
-                        message: 'Erro ao conectar com QZ Tray',
-                        description: err.message,
-                        status: 'danger'
-                    });
+                    $wire.call('notify', 'danger', 'Erro ao conectar com QZ Tray', err.message);
                 } finally {
                     this.loading = false;
                 }
@@ -87,11 +95,7 @@
                         
                         // Notifica o usuário sobre problemas
                         if (status.severity === 'ERROR' || status.severity === 'WARN') {
-                            $dispatch('notify', {
-                                message: 'Alerta da Impressora',
-                                description: status.message,
-                                status: status.severity === 'ERROR' ? 'danger' : 'warning'
-                            });
+                            $wire.call('notify', status.severity === 'ERROR' ? 'danger' : 'warning', 'Alerta da Impressora', status.message);
                         }
                     });
 
@@ -102,11 +106,7 @@
                     await qz.printers.getStatus();
                 } catch (err) {
                     console.error('Erro ao monitorar impressora:', err);
-                    $dispatch('notify', {
-                        message: 'Erro ao monitorar impressora',
-                        description: err.message,
-                        status: 'danger'
-                    });
+                    $wire.call('notify', 'danger', 'Erro ao monitorar impressora', err.message);
                 }
             },
             async stopMonitoring() {
@@ -119,26 +119,32 @@
                 }
             },
             async saveConfig() {
-                // Salva configuração
-                const config = {
-                    printer: this.selectedPrinter,
-                    orientation: this.orientation,
-                    timestamp: new Date().toISOString()
-                };
-                
-                localStorage.setItem('{{ $storageKey }}', JSON.stringify(config));
-                
-                // Para monitoramento atual
-                await this.stopMonitoring();
-                
-                // Inicia monitoramento da nova impressora
-                await this.startMonitoring();
-                
-                $dispatch('notify', {
-                    message: 'Configuração salva',
-                    description: 'A impressora foi configurada com sucesso',
-                    status: 'success'
-                });
+                try {
+                    // Salva configuração
+                    const config = {
+                        printer: this.selectedPrinter,
+                        orientation: this.orientation,
+                        template: this.selectedTemplate,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    localStorage.setItem('{{ $storageKey }}', JSON.stringify(config));
+                    
+                    // Para monitoramento atual
+                    await this.stopMonitoring();
+                    
+                    // Inicia monitoramento da nova impressora
+                    await this.startMonitoring();
+
+                    // Reseta flag de mudanças
+                    this.hasChanges = false;
+                    
+                    // Notificação do Filament
+                    $wire.call('notify', 'success', 'Configurações salvas', 'As configurações foram salvas com sucesso');
+                } catch (error) {
+                    console.error('Erro ao salvar configurações:', error);
+                    $wire.call('notify', 'danger', 'Erro ao salvar', 'Ocorreu um erro ao salvar as configurações');
+                }
             },
             getStatusColor(status) {
                 if (!status) return 'gray';
@@ -149,44 +155,77 @@
                     default: return 'emerald';
                 }
             },
-            async testPrint() {
-                if (!this.selectedPrinter) {
-                    $dispatch('notify', {
-                        message: 'Erro',
-                        description: 'Selecione uma impressora primeiro',
-                        status: 'danger'
-                    });
+            async loadTemplates() {
+                try {
+                    const response = await fetch('/print-templates');
+                    const data = await response.json();
+                    this.templates = data;
+                } catch (err) {
+                    console.error('Erro ao carregar templates:', err);
+                    this.templates = [{ name: 'default.html', path: '/templates/default.html' }];
+                }
+            },
+            handleFileSelect(event) {
+                const file = event.target.files[0];
+                console.log('Arquivo selecionado:', file);
+                
+                if (!file) {
+                    console.log('Nenhum arquivo selecionado');
+                    return;
+                }
+                
+                // Verifica se é um arquivo HTML
+                if (!file.name.endsWith('.html')) {
+                    console.log('Arquivo inválido:', file.name);
+                    this.uploadError = 'Apenas arquivos HTML são permitidos';
+                    
+                    $wire.call('notify', 'danger', 'Erro no upload', 'Apenas arquivos HTML são permitidos');
+                    return;
+                }
+
+                // Armazena o arquivo para upload posterior
+                this.selectedFile = file;
+                this.uploadError = null;
+            },
+            async uploadTemplate() {
+                if (!this.selectedFile) {
+                    console.log('Nenhum arquivo selecionado');
                     return;
                 }
 
                 try {
-                    const config = qz.configs.create(this.selectedPrinter, {
-                        orientation: this.orientation || null
-                    });
-                    const data = [{
-                        type: 'pixel',
-                        format: 'html',
-                        flavor: 'plain',
-                        data: '<h1>Teste de impressão</h1>',
-                        options: {
-                            // verificar opções em  https://qz.io/api/qz.configs#.setDefaults                          
-                        }
-                    }];
+                    console.log('Iniciando upload do arquivo:', this.selectedFile.name);
+                    const formData = new FormData();
+                    formData.append('template', this.selectedFile);
+                    formData.append('_token', '{{ csrf_token() }}');
 
-                    await qz.print(config, data);
-                    
-                    $dispatch('notify', {
-                        message: 'Teste enviado',
-                        description: 'O teste de impressão foi enviado com sucesso',
-                        status: 'success'
+                    console.log('Enviando requisição para o servidor...');
+                    const response = await fetch('/print-templates/upload', {
+                        method: 'POST',
+                        body: formData
                     });
+
+                    console.log('Resposta do servidor:', response);
+                    const data = await response.json();
+                    console.log('Dados da resposta:', data);
+
+                    if (!response.ok) {
+                        console.error('Erro na resposta:', data);
+                        throw new Error(data.message || 'Erro ao fazer upload do template');
+                    }
+
+                    await this.loadTemplates();
+                    this.uploadError = null;
+                    this.selectedFile = null;
+
+                    // Notificação do Filament
+                    $wire.call('notify', 'success', data.message || 'Template enviado', data.success ? 'O template foi processado com sucesso' : 'Houve um problema ao processar o template');
                 } catch (err) {
-                    console.error('Erro ao imprimir teste:', err);
-                    $dispatch('notify', {
-                        message: 'Erro ao imprimir',
-                        description: err.message,
-                        status: 'danger'
-                    });
+                    console.error('Erro durante o upload:', err);
+                    this.uploadError = err.message;
+                    
+                    // Notificação do Filament para erro
+                    $wire.call('notify', 'danger', 'Erro no upload', err.message);
                 }
             }
         }"
@@ -248,7 +287,6 @@
                                     <div>
                                         <select 
                                             x-model="selectedPrinter"
-                                            @change="saveConfig"
                                             class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
                                         >
                                             <option value="">Selecione uma impressora</option>
@@ -274,7 +312,6 @@
                                         </label>
                                         <select 
                                             x-model="orientation"
-                                            @change="saveConfig"
                                             class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
                                         >
                                             <option value="">Automático</option>
@@ -282,6 +319,192 @@
                                             <option value="landscape">Paisagem</option>
                                             <option value="reverse-landscape">Paisagem Invertida</option>
                                         </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Templates de Impressão -->
+                            <div x-show="selectedPrinter" 
+                                x-data="{
+                                    templates: [],
+                                    uploadError: null,
+                                    selectedFile: null,
+                                    async init() {
+                                        await this.loadTemplates();
+                                        
+                                        // Carrega template selecionado do localStorage
+                                        const config = localStorage.getItem('{{ $storageKey }}');
+                                        if (config) {
+                                            const saved = JSON.parse(config);
+                                            this.selectedTemplate = saved.template || 'default.html';
+                                        }
+                                    },
+                                    async loadTemplates() {
+                                        try {
+                                            const response = await fetch('/print-templates');
+                                            const data = await response.json();
+                                            this.templates = data;
+                                        } catch (err) {
+                                            console.error('Erro ao carregar templates:', err);
+                                            this.templates = [{ name: 'default.html', path: '/templates/default.html' }];
+                                        }
+                                    },
+                                    async uploadTemplate() {
+                                        if (!this.selectedFile) {
+                                            console.log('Nenhum arquivo selecionado');
+                                            return;
+                                        }
+
+                                        try {
+                                            console.log('Iniciando upload do arquivo:', this.selectedFile.name);
+                                            const formData = new FormData();
+                                            formData.append('template', this.selectedFile);
+                                            formData.append('_token', '{{ csrf_token() }}');
+
+                                            console.log('Enviando requisição para o servidor...');
+                                            const response = await fetch('/print-templates/upload', {
+                                                method: 'POST',
+                                                body: formData
+                                            });
+
+                                            console.log('Resposta do servidor:', response);
+                                            const data = await response.json();
+                                            console.log('Dados da resposta:', data);
+
+                                            if (!response.ok) {
+                                                console.error('Erro na resposta:', data);
+                                                throw new Error(data.message || 'Erro ao fazer upload do template');
+                                            }
+
+                                            await this.loadTemplates();
+                                            this.uploadError = null;
+                                            this.selectedFile = null;
+
+                                            // Notificação do Filament
+                                            $wire.call('notify', 'success', data.message || 'Template enviado', data.success ? 'O template foi processado com sucesso' : 'Houve um problema ao processar o template');
+                                        } catch (err) {
+                                            console.error('Erro durante o upload:', err);
+                                            this.uploadError = err.message;
+                                            
+                                            // Notificação do Filament para erro
+                                            $wire.call('notify', 'danger', 'Erro no upload', err.message);
+                                        }
+                                    }
+                                }"
+                                class="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg"
+                            >
+                                <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Templates de Impressão</h3>
+                                
+                                <div class="space-y-4">
+                                    <!-- Upload de Template -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Enviar Novo Template
+                                        </label>
+                                        <div class="mt-1 space-y-2">
+                                            <div class="flex items-center gap-2">
+                                                <label class="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                                    </svg>
+                                                    Escolher Arquivo
+                                                    <input 
+                                                        type="file" 
+                                                        accept=".html"
+                                                        @change="handleFileSelect"
+                                                        class="hidden"
+                                                    >
+                                                </label>
+
+                                                <button
+                                                    type="button"
+                                                    x-show="selectedFile"
+                                                    @click="uploadTemplate"
+                                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                                                >
+                                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                    </svg>
+                                                    Enviar Template
+                                                </button>
+                                            </div>
+
+                                            <!-- Nome do arquivo selecionado -->
+                                            <div x-show="selectedFile" class="text-sm text-gray-600">
+                                                Arquivo selecionado: <span x-text="selectedFile?.name"></span>
+                                            </div>
+
+                                            <template x-if="uploadError">
+                                                <p class="mt-2 text-sm text-red-600" x-text="uploadError"></p>
+                                            </template>
+                                        </div>
+                                    </div>
+
+                                    <!-- Lista de Templates -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Template Padrão
+                                        </label>
+                                        <div class="flex gap-2">
+                                            <select 
+                                                x-model="selectedTemplate"
+                                                @change="
+                                                    selectedTemplate = $event.target.value;
+                                                    hasChanges = true;
+                                                "
+                                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                            >
+                                                <template x-for="template in templates" :key="template.name">
+                                                    <option 
+                                                        :value="template.name"
+                                                        x-text="template.name + (template.isDefault ? ' (Padrão)' : '')"
+                                                    ></option>
+                                                </template>
+                                            </select>
+                                            <button
+                                                type="button"
+                                                @click="async () => {
+                                                    if (!selectedTemplate || templates.find(t => t.name === selectedTemplate)?.isDefault) {
+                                                        $wire.call('notify', 'warning', 'Operação não permitida', 'Não é possível excluir o template padrão');
+                                                        return;
+                                                    }
+
+                                                    if (!confirm('Tem certeza que deseja excluir este template?')) {
+                                                        return;
+                                                    }
+
+                                                    try {
+                                                        const response = await fetch(`/print-templates/${selectedTemplate}`, {
+                                                            method: 'DELETE',
+                                                            headers: {
+                                                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                                                            }
+                                                        });
+
+                                                        if (!response.ok) throw new Error('Erro ao excluir template');
+
+                                                        await loadTemplates();
+                                                        selectedTemplate = 'default.html';
+
+                                                        $wire.call('notify', 'success', 'Template excluído', 'O template foi excluído com sucesso');
+                                                    } catch (err) {
+                                                        console.error('Erro ao excluir template:', err);
+                                                        $wire.call('notify', 'danger', 'Erro ao excluir', err.message);
+                                                    }
+                                                }"
+                                                :disabled="!selectedTemplate || templates.find(t => t.name === selectedTemplate)?.isDefault"
+                                                class="mt-1 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <p class="mt-2 text-sm text-gray-500">
+                                            O template selecionado será usado como padrão para todas as impressões.
+                                            <br>
+                                            <span class="text-xs text-gray-400">O template padrão (default.html) não pode ser excluído.</span>
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -334,14 +557,15 @@
 
                 <button
                     type="button"
-                    @click="testPrint"
-                    :disabled="!selectedPrinter"
+                    @click="saveConfig"
+                    :disabled="!hasChanges"
+                    :class="{ 'opacity-50 cursor-not-allowed': !hasChanges }"
                     class="fi-btn fi-btn-size-md inline-flex items-center justify-center gap-1 font-medium rounded-lg bg-primary-600 px-4 py-2 text-white shadow-sm hover:bg-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-70 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus:ring-offset-gray-800"
                 >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                     </svg>
-                    Imprimir Teste
+                    Salvar Configurações
                 </button>
             </div>
         </div>

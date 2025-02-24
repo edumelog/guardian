@@ -93,13 +93,34 @@
                 }
 
                 try {
+                    // Carrega a configuração salva para pegar o template
+                    const savedConfig = localStorage.getItem('guardian_printer_config');
+                    const templateName = savedConfig ? JSON.parse(savedConfig).template || 'default.html' : 'default.html';
+
+                    // Carrega o template
+                    let response;
+                    if (templateName === 'default.html') {
+                        response = await fetch('/templates/default.html');
+                    } else {
+                        response = await fetch(`/print-templates/${templateName}`);
+                    }
+                    
+                    if (!response.ok) throw new Error('Erro ao carregar template');
+                    
+                    let templateHtml = await response.text();
+                    
+                    // Substitui variáveis no template
+                    templateHtml = templateHtml.replace(/\{\{datetime\}\}/g, new Date().toLocaleString());
+
                     const data = [{
                         type: 'pixel',
                         format: 'html',
                         flavor: 'plain',
-                        data: '<h1>Teste de impressão</h1>',
+                        data: templateHtml,
                         options: {
-                            // verificar opções em  https://qz.io/api/qz.configs#.setDefaults                          
+                            pageWidth: '80mm',  // Largura padrão
+                            pageHeight: '120mm', // Altura estimada
+                            margins: { top: '5mm', right: '5mm', bottom: '5mm', left: '5mm' }
                         }
                     }];
 
