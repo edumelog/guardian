@@ -55,7 +55,9 @@ return [
         'pages' => true,
         'widgets' => true,
         'resources' => true,
-        'custom_permissions' => false,
+        'custom_permissions' => [
+            'manage_qz_certificates',
+        ],
     ],
 
     'generator' => [
@@ -108,7 +110,7 @@ return [
             'CameraSettings' => 'camera_settings',
             'PrinterSettings' => 'printer_settings',
             'QzTrayDemo' => 'qz_tray_demo',
-            'QzCertificateSettings' => 'qz_certificate_settings',
+            'QZCertificates' => 'qz_certificates',
         ],
     ],
 
