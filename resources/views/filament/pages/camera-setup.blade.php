@@ -27,20 +27,25 @@
                     const devices = await navigator.mediaDevices.enumerateDevices();
                     this.cameras = devices.filter(device => device.kind === 'videoinput');
                     
-                    if (this.cameras.length < 2) {
-                        throw new Error(`Foram encontradas apenas ${this.cameras.length} câmera(s). São necessárias 2 câmeras para o funcionamento adequado do sistema.`);
+                    if (this.cameras.length === 0) {
+                        throw new Error('Nenhuma câmera foi encontrada. Por favor, conecte pelo menos uma câmera ao sistema.');
                     }
 
                     // Recupera configuração existente ou define padrão
                     const config = localStorage.getItem('{{ $storageKey }}');
                     if (config) {
                         const { visitor, document } = JSON.parse(config);
-                        this.visitorCamera = visitor;
-                        this.documentCamera = document;
+                        // Verifica se as câmeras configuradas ainda existem
+                        const visitorExists = this.cameras.some(cam => cam.deviceId === visitor);
+                        const documentExists = this.cameras.some(cam => cam.deviceId === document);
+                        
+                        this.visitorCamera = visitorExists ? visitor : this.cameras[0].deviceId;
+                        this.documentCamera = documentExists ? document : 
+                            (this.cameras.length > 1 ? this.cameras[1].deviceId : this.cameras[0].deviceId);
                     } else {
-                        // Por padrão, define a primeira câmera para visitantes e a segunda para documentos
+                        // Configuração inicial
                         this.visitorCamera = this.cameras[0].deviceId;
-                        this.documentCamera = this.cameras[1].deviceId;
+                        this.documentCamera = this.cameras.length > 1 ? this.cameras[1].deviceId : this.cameras[0].deviceId;
                     }
 
                     // Salva a configuração
@@ -118,27 +123,34 @@
                         </div>
                     </div>
 
-                    <div x-show="!loading && !error && cameras.length >= 2" x-cloak>
+                    <div x-show="!loading && !error && cameras.length > 0" x-cloak>
                         <div class="space-y-4">
                             <!-- Câmeras detectadas -->
                             <div class="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
                                 <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100">Câmeras Detectadas</h3>
                                 <div class="mt-2">
+                                    <template x-if="cameras.length === 1">
+                                        <div class="text-sm text-amber-600 dark:text-amber-400 mb-2">
+                                            Apenas uma câmera foi detectada. Ela será usada tanto para fotos de visitantes quanto para documentos.
+                                        </div>
+                                    </template>
                                     <ul class="list-disc pl-5 space-y-1">
                                         <template x-for="(camera, index) in cameras" :key="camera.deviceId">
                                             <li class="text-sm text-gray-600 dark:text-gray-400">
                                                 <div>
                                                     <span x-text="`Câmera ${String(index + 1).padStart(2, '0')} - ${camera.label || 'Dispositivo Desconhecido'} (${camera.deviceId.slice(-11)})`"></span>
-                                                    <template x-if="camera.deviceId === visitorCamera">
-                                                        <span class="inline-flex items-center ml-2 px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200">
-                                                            Fotos de Visitantes
-                                                        </span>
-                                                    </template>
-                                                    <template x-if="camera.deviceId === documentCamera">
-                                                        <span class="inline-flex items-center ml-2 px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200">
-                                                            Fotos de Documentos
-                                                        </span>
-                                                    </template>
+                                                    <div class="inline-flex gap-2">
+                                                        <template x-if="camera.deviceId === visitorCamera">
+                                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200">
+                                                                Fotos de Visitantes
+                                                            </span>
+                                                        </template>
+                                                        <template x-if="camera.deviceId === documentCamera">
+                                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200">
+                                                                Fotos de Documentos
+                                                            </span>
+                                                        </template>
+                                                    </div>
                                                 </div>
                                             </li>
                                         </template>

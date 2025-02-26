@@ -33,7 +33,7 @@ class DashboardPanelProvider extends PanelProvider
             ->sidebarFullyCollapsibleOnDesktop()
             ->login()
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Blue,
             ])
             ->renderHook(
                 'panels::head.start',
