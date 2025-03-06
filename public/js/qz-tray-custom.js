@@ -40,12 +40,17 @@ document.addEventListener('alpine:init', () => {
                             fetch("/qz/sign", {
                                 method: 'POST',
                                 headers: { 
-                                    'Content-Type': 'application/json',
+                                    'Content-Type': 'text/plain',
                                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                                 },
                                 body: toSign
                             })
-                            .then(response => response.text())
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Erro ao assinar mensagem');
+                                }
+                                return response.text();
+                            })
                             .then(resolve)
                             .catch(reject);
                         };

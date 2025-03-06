@@ -27,5 +27,10 @@ Route::middleware('auth')->group(function () {
     Route::delete('/print-templates/{name}', [PrintTemplateController::class, 'delete']);
 });
 
+Route::prefix('qz')->group(function () {
+    Route::post('sign', [App\Http\Controllers\QZSignController::class, 'sign']);
+    Route::get('certificate', [App\Http\Controllers\QZPrintController::class, 'getCertificate']);
+});
+
 require __DIR__.'/auth.php';
 URL::forceScheme('https');
