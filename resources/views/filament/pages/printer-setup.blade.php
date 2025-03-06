@@ -3,235 +3,12 @@
 @endphp
 
 <x-filament-panels::page>
+    @push('scripts')
+        <script src="{{ asset('js/printer-settings.js') }}"></script>
+    @endpush
+
     @csrf
-    <div
-        x-data="{
-            printers: [],
-            selectedPrinter: null,
-            orientation: null,
-            loading: true,
-            error: null,
-            connected: false,
-            printerStatus: null,
-            templates: [],
-            selectedTemplate: null,
-            uploadError: null,
-            selectedFile: null,
-            hasChanges: false,
-            async init() {
-                // Carrega o script do QZ Tray
-                await this.loadQZTray();
-                
-                // Conecta ao QZ Tray
-                await this.connectQZ();
-                
-                // Carrega configuração salva
-                const config = localStorage.getItem('{{ $storageKey }}');
-                if (config) {
-                    const saved = JSON.parse(config);
-                    this.selectedPrinter = saved.printer;
-                    this.orientation = saved.orientation || null;
-                    this.selectedTemplate = saved.template || 'default.html';
-                }
-
-                // Inicia monitoramento da impressora
-                if (this.selectedPrinter) {
-                    await this.startMonitoring();
-                }
-
-                // Observa mudanças
-                this.$watch('selectedPrinter', () => this.hasChanges = true);
-                this.$watch('orientation', () => this.hasChanges = true);
-                this.$watch('selectedTemplate', () => this.hasChanges = true);
-            },
-            async loadQZTray() {
-                return new Promise((resolve, reject) => {
-                    if (window.qz) {
-                        resolve();
-                        return;
-                    }
-
-                    const script = document.createElement('script');
-                    script.src = '/js/qz-tray.js';
-                    script.onload = resolve;
-                    script.onerror = reject;
-                    document.head.appendChild(script);
-                });
-            },
-            async connectQZ() {
-                try {
-                    this.loading = true;
-                    this.error = null;
-
-                    if (!window.qz) {
-                        throw new Error('QZ Tray não está instalado ou não foi carregado corretamente');
-                    }
-
-                    // Tenta conectar ao QZ Tray
-                    await qz.websocket.connect({ retries: 3, delay: 1 });
-                    this.connected = true;
-
-                    // Lista todas as impressoras
-                    this.printers = await qz.printers.find();
-                    
-                    console.log('Impressoras encontradas:', this.printers);
-                } catch (err) {
-                    console.error('Erro ao conectar com QZ Tray:', err);
-                    this.error = err.message;
-                    
-                    $wire.call('notify', 'danger', 'Erro ao conectar com QZ Tray', err.message);
-                } finally {
-                    this.loading = false;
-                }
-            },
-            async startMonitoring() {
-                if (!this.selectedPrinter) return;
-
-                try {
-                    // Configura callback para status da impressora
-                    qz.printers.setPrinterCallbacks(status => {
-                        console.log('Status da impressora:', status);
-                        this.printerStatus = status;
-                        
-                        // Notifica o usuário sobre problemas
-                        if (status.severity === 'ERROR' || status.severity === 'WARN') {
-                            $wire.call('notify', status.severity === 'ERROR' ? 'danger' : 'warning', 'Alerta da Impressora', status.message);
-                        }
-                    });
-
-                    // Inicia monitoramento
-                    await qz.printers.startListening(this.selectedPrinter);
-                    
-                    // Solicita status atual
-                    await qz.printers.getStatus();
-                } catch (err) {
-                    console.error('Erro ao monitorar impressora:', err);
-                    $wire.call('notify', 'danger', 'Erro ao monitorar impressora', err.message);
-                }
-            },
-            async stopMonitoring() {
-                if (!this.selectedPrinter) return;
-                
-                try {
-                    await qz.printers.stopListening();
-                } catch (err) {
-                    console.error('Erro ao parar monitoramento:', err);
-                }
-            },
-            async saveConfig() {
-                try {
-                    // Salva configuração
-                    const config = {
-                        printer: this.selectedPrinter,
-                        orientation: this.orientation,
-                        template: this.selectedTemplate,
-                        timestamp: new Date().toISOString()
-                    };
-                    
-                    localStorage.setItem('{{ $storageKey }}', JSON.stringify(config));
-                    
-                    // Para monitoramento atual
-                    await this.stopMonitoring();
-                    
-                    // Inicia monitoramento da nova impressora
-                    await this.startMonitoring();
-
-                    // Reseta flag de mudanças
-                    this.hasChanges = false;
-                    
-                    // Notificação do Filament
-                    $wire.call('notify', 'success', 'Configurações salvas', 'As configurações foram salvas com sucesso');
-                } catch (error) {
-                    console.error('Erro ao salvar configurações:', error);
-                    $wire.call('notify', 'danger', 'Erro ao salvar', 'Ocorreu um erro ao salvar as configurações');
-                }
-            },
-            getStatusColor(status) {
-                if (!status) return 'gray';
-                
-                switch (status.severity) {
-                    case 'ERROR': return 'red';
-                    case 'WARN': return 'yellow';
-                    default: return 'emerald';
-                }
-            },
-            async loadTemplates() {
-                try {
-                    const response = await fetch('/print-templates');
-                    const data = await response.json();
-                    this.templates = data;
-                } catch (err) {
-                    console.error('Erro ao carregar templates:', err);
-                    this.templates = [{ name: 'default.html', path: '/templates/default.html' }];
-                }
-            },
-            handleFileSelect(event) {
-                const file = event.target.files[0];
-                console.log('Arquivo selecionado:', file);
-                
-                if (!file) {
-                    console.log('Nenhum arquivo selecionado');
-                    return;
-                }
-                
-                // Verifica se é um arquivo HTML
-                if (!file.name.endsWith('.html')) {
-                    console.log('Arquivo inválido:', file.name);
-                    this.uploadError = 'Apenas arquivos HTML são permitidos';
-                    
-                    $wire.call('notify', 'danger', 'Erro no upload', 'Apenas arquivos HTML são permitidos');
-                    return;
-                }
-
-                // Armazena o arquivo para upload posterior
-                this.selectedFile = file;
-                this.uploadError = null;
-            },
-            async uploadTemplate() {
-                if (!this.selectedFile) {
-                    console.log('Nenhum arquivo selecionado');
-                    return;
-                }
-
-                try {
-                    console.log('Iniciando upload do arquivo:', this.selectedFile.name);
-                    const formData = new FormData();
-                    formData.append('template', this.selectedFile);
-                    formData.append('_token', '{{ csrf_token() }}');
-
-                    console.log('Enviando requisição para o servidor...');
-                    const response = await fetch('/print-templates/upload', {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    console.log('Resposta do servidor:', response);
-                    const data = await response.json();
-                    console.log('Dados da resposta:', data);
-
-                    if (!response.ok) {
-                        console.error('Erro na resposta:', data);
-                        throw new Error(data.message || 'Erro ao fazer upload do template');
-                    }
-
-                    await this.loadTemplates();
-                    this.uploadError = null;
-                    this.selectedFile = null;
-
-                    // Notificação do Filament
-                    $wire.call('notify', 'success', data.message || 'Template enviado', data.success ? 'O template foi processado com sucesso' : 'Houve um problema ao processar o template');
-                } catch (err) {
-                    console.error('Erro durante o upload:', err);
-                    this.uploadError = err.message;
-                    
-                    // Notificação do Filament para erro
-                    $wire.call('notify', 'danger', 'Erro no upload', err.message);
-                }
-            }
-        }"
-        x-init="init"
-        @disconnect.window="stopMonitoring"
-    >
+    <div x-data="printerSettings">
         <div class="space-y-6">
             <!-- Status atual -->
             <div class="p-6 bg-white rounded-xl shadow dark:bg-gray-800">
@@ -267,7 +44,10 @@
                                     <div class="flex-shrink-0">
                                         <div 
                                             class="h-3 w-3 rounded-full"
-                                            :class="connected ? 'bg-emerald-500' : 'bg-red-500'"
+                                            :class="{
+                                                'bg-emerald-500': connected,
+                                                'bg-red-500': !connected
+                                            }"
                                         ></div>
                                     </div>
                                     <div class="ml-3">
@@ -323,76 +103,37 @@
                                 </div>
                             </div>
 
+                            <!-- Status da Impressora -->
+                            <div x-show="selectedPrinter" class="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
+                                <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Status da Impressora</h3>
+                                
+                                <div x-show="printerStatus" class="space-y-2">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0">
+                                            <div 
+                                                class="h-3 w-3 rounded-full"
+                                                :class="{
+                                                    'bg-emerald-500': getStatusColor(printerStatus) === 'emerald',
+                                                    'bg-yellow-500': getStatusColor(printerStatus) === 'yellow',
+                                                    'bg-red-500': getStatusColor(printerStatus) === 'red',
+                                                    'bg-gray-500': getStatusColor(printerStatus) === 'gray'
+                                                }"
+                                            ></div>
+                                        </div>
+                                        <div class="ml-3">
+                                            <p class="text-sm text-gray-900 dark:text-gray-100" x-text="printerStatus?.message || 'Status desconhecido'"></p>
+                                            <p class="text-xs text-gray-500" x-text="printerStatus?.statusText || ''"></p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div x-show="!printerStatus" class="text-sm text-gray-500">
+                                    Aguardando status da impressora...
+                                </div>
+                            </div>
+
                             <!-- Templates de Impressão -->
-                            <div x-show="selectedPrinter" 
-                                x-data="{
-                                    templates: [],
-                                    uploadError: null,
-                                    selectedFile: null,
-                                    async init() {
-                                        await this.loadTemplates();
-                                        
-                                        // Carrega template selecionado do localStorage
-                                        const config = localStorage.getItem('{{ $storageKey }}');
-                                        if (config) {
-                                            const saved = JSON.parse(config);
-                                            this.selectedTemplate = saved.template || 'default.html';
-                                        }
-                                    },
-                                    async loadTemplates() {
-                                        try {
-                                            const response = await fetch('/print-templates');
-                                            const data = await response.json();
-                                            this.templates = data;
-                                        } catch (err) {
-                                            console.error('Erro ao carregar templates:', err);
-                                            this.templates = [{ name: 'default.html', path: '/templates/default.html' }];
-                                        }
-                                    },
-                                    async uploadTemplate() {
-                                        if (!this.selectedFile) {
-                                            console.log('Nenhum arquivo selecionado');
-                                            return;
-                                        }
-
-                                        try {
-                                            console.log('Iniciando upload do arquivo:', this.selectedFile.name);
-                                            const formData = new FormData();
-                                            formData.append('template', this.selectedFile);
-                                            formData.append('_token', '{{ csrf_token() }}');
-
-                                            console.log('Enviando requisição para o servidor...');
-                                            const response = await fetch('/print-templates/upload', {
-                                                method: 'POST',
-                                                body: formData
-                                            });
-
-                                            console.log('Resposta do servidor:', response);
-                                            const data = await response.json();
-                                            console.log('Dados da resposta:', data);
-
-                                            if (!response.ok) {
-                                                console.error('Erro na resposta:', data);
-                                                throw new Error(data.message || 'Erro ao fazer upload do template');
-                                            }
-
-                                            await this.loadTemplates();
-                                            this.uploadError = null;
-                                            this.selectedFile = null;
-
-                                            // Notificação do Filament
-                                            $wire.call('notify', 'success', data.message || 'Template enviado', data.success ? 'O template foi processado com sucesso' : 'Houve um problema ao processar o template');
-                                        } catch (err) {
-                                            console.error('Erro durante o upload:', err);
-                                            this.uploadError = err.message;
-                                            
-                                            // Notificação do Filament para erro
-                                            $wire.call('notify', 'danger', 'Erro no upload', err.message);
-                                        }
-                                    }
-                                }"
-                                class="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg"
-                            >
+                            <div x-show="selectedPrinter" class="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
                                 <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Templates de Impressão</h3>
                                 
                                 <div class="space-y-4">
@@ -463,35 +204,7 @@
                                             </select>
                                             <button
                                                 type="button"
-                                                @click="async () => {
-                                                    if (!selectedTemplate || templates.find(t => t.name === selectedTemplate)?.isDefault) {
-                                                        $wire.call('notify', 'warning', 'Operação não permitida', 'Não é possível excluir o template padrão');
-                                                        return;
-                                                    }
-
-                                                    if (!confirm('Tem certeza que deseja excluir este template?')) {
-                                                        return;
-                                                    }
-
-                                                    try {
-                                                        const response = await fetch(`/print-templates/${selectedTemplate}`, {
-                                                            method: 'DELETE',
-                                                            headers: {
-                                                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                                                            }
-                                                        });
-
-                                                        if (!response.ok) throw new Error('Erro ao excluir template');
-
-                                                        await loadTemplates();
-                                                        selectedTemplate = 'default.html';
-
-                                                        $wire.call('notify', 'success', 'Template excluído', 'O template foi excluído com sucesso');
-                                                    } catch (err) {
-                                                        console.error('Erro ao excluir template:', err);
-                                                        $wire.call('notify', 'danger', 'Erro ao excluir', err.message);
-                                                    }
-                                                }"
+                                                @click="deleteTemplate"
                                                 :disabled="!selectedTemplate || templates.find(t => t.name === selectedTemplate)?.isDefault"
                                                 class="mt-1 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
@@ -506,35 +219,6 @@
                                             <span class="text-xs text-gray-400">O template padrão (default.html) não pode ser excluído.</span>
                                         </p>
                                     </div>
-                                </div>
-                            </div>
-
-                            <!-- Status da Impressora -->
-                            <div x-show="selectedPrinter" class="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                                <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Status da Impressora</h3>
-                                
-                                <div x-show="printerStatus" class="space-y-2">
-                                    <div class="flex items-center">
-                                        <div class="flex-shrink-0">
-                                            <div 
-                                                class="h-3 w-3 rounded-full"
-                                                :class="{
-                                                    'bg-emerald-500': getStatusColor(printerStatus) === 'emerald',
-                                                    'bg-yellow-500': getStatusColor(printerStatus) === 'yellow',
-                                                    'bg-red-500': getStatusColor(printerStatus) === 'red',
-                                                    'bg-gray-500': getStatusColor(printerStatus) === 'gray'
-                                                }"
-                                            ></div>
-                                        </div>
-                                        <div class="ml-3">
-                                            <p class="text-sm text-gray-900 dark:text-gray-100" x-text="printerStatus?.message || 'Status desconhecido'"></p>
-                                            <p class="text-xs text-gray-500" x-text="printerStatus?.statusText || ''"></p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div x-show="!printerStatus" class="text-sm text-gray-500">
-                                    Aguardando status da impressora...
                                 </div>
                             </div>
                         </div>
