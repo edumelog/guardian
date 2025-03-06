@@ -39,20 +39,14 @@ class QZCertificates extends Page implements HasForms
                 FileUpload::make('private_key')
                     ->label('Chave Privada (PKCS#8)')
                     ->helperText('Selecione o arquivo private-key.pem')
-                    ->disk('private')
-                    ->directory('temp')
-                    ->preserveFilenames()
-                    ->acceptedFileTypes(['application/x-pem-file', 'text/plain'])
+                    ->disk('local')
                     ->maxSize(512)
                     ->required(),
 
                 FileUpload::make('digital_certificate')
                     ->label('Certificado Digital (x509)')
                     ->helperText('Selecione o arquivo do certificado digital')
-                    ->disk('private')
-                    ->directory('temp')
-                    ->preserveFilenames()
-                    ->acceptedFileTypes(['application/x-x509-ca-cert', 'application/x-pem-file', 'text/plain'])
+                    ->disk('local')
                     ->maxSize(512)
                     ->required(),
 
@@ -67,46 +61,65 @@ class QZCertificates extends Page implements HasForms
 
     public function submit(): void
     {
-        $data = $this->form->getState();
+        try {
+            $data = $this->form->getState();
 
-        // Remove arquivos antigos se existirem
-        Storage::disk('private')->delete([
-            'private-key.pem',
-            'digital-certificate.txt',
-            'pfx-password.txt'
-        ]);
+            // Remove arquivos antigos se existirem
+            Storage::disk('local')->delete('private/private-key.pem');
+            Storage::disk('local')->delete('private/pfx-password.txt');
+            Storage::disk('public')->delete('digital-certificate.txt');
 
-        // Processa a chave privada
-        if (!empty($data['private_key'])) {
-            // Move e renomeia o arquivo
-            Storage::disk('private')->move(
-                'temp/' . $data['private_key'],
-                'private-key.pem'
-            );
+            // Processa a chave privada
+            if (!empty($data['private_key'])) {
+                $sourcePath = Storage::disk('local')->path($data['private_key']);
+                if (!file_exists($sourcePath)) {
+                    throw new \Exception('Arquivo da chave privada não encontrado');
+                }
+                
+                // Move o arquivo para o diretório private com o nome correto
+                Storage::disk('local')->put(
+                    'private/private-key.pem',
+                    Storage::disk('local')->get($data['private_key'])
+                );
+            }
+
+            // Processa o certificado digital
+            if (!empty($data['digital_certificate'])) {
+                $sourcePath = Storage::disk('local')->path($data['digital_certificate']);
+                if (!file_exists($sourcePath)) {
+                    throw new \Exception('Arquivo do certificado digital não encontrado');
+                }
+                
+                // Move o arquivo para o diretório public com o nome correto
+                Storage::disk('public')->put(
+                    'digital-certificate.txt',
+                    Storage::disk('local')->get($data['digital_certificate'])
+                );
+            }
+
+            // Salva a senha do PFX se fornecida
+            if (!empty($data['pfx_password'])) {
+                Storage::disk('local')->put('private/pfx-password.txt', $data['pfx_password']);
+            }
+
+            // Limpa os arquivos temporários
+            Storage::disk('local')->delete([
+                $data['private_key'] ?? '',
+                $data['digital_certificate'] ?? ''
+            ]);
+
+            Notification::make()
+                ->title('Certificados salvos com sucesso')
+                ->success()
+                ->send();
+
+            $this->form->fill();
+        } catch (\Exception $e) {
+            Notification::make()
+                ->title('Erro ao salvar certificados')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
         }
-
-        // Processa o certificado digital
-        if (!empty($data['digital_certificate'])) {
-            // Move e renomeia o arquivo
-            Storage::disk('private')->move(
-                'temp/' . $data['digital_certificate'],
-                'digital-certificate.txt'
-            );
-        }
-
-        // Salva a senha do PFX se fornecida
-        if (!empty($data['pfx_password'])) {
-            Storage::disk('private')->put('pfx-password.txt', $data['pfx_password']);
-        }
-
-        // Limpa arquivos temporários que possam ter sobrado
-        Storage::disk('private')->deleteDirectory('temp');
-
-        Notification::make()
-            ->title('Certificados salvos com sucesso')
-            ->success()
-            ->send();
-
-        $this->form->fill();
     }
 } 
