@@ -130,27 +130,25 @@ document.addEventListener('alpine:init', () => {
             }
 
             try {
-                // Carrega a configuração salva para pegar o template
+                // Carrega a configuração salva para pegar o template default
                 const savedConfig = localStorage.getItem('guardian_printer_config');
-                let templateName, templateSlug;
-                
-                if (savedConfig) {
-                    const config = JSON.parse(savedConfig);
-                    templateName = config.template || 'default.zip';
-                    templateSlug = config.templateSlug || 'default';
-                } else {
-                    templateName = 'default.zip';
-                    templateSlug = 'default';
+                if (!savedConfig) {
+                    throw new Error('Nenhuma configuração encontrada. Configure um template padrão primeiro.');
                 }
-                
-                console.log('Usando template:', { name: templateName, slug: templateSlug });
+
+                const config = JSON.parse(savedConfig);
+                if (!config.template) {
+                    throw new Error('Nenhum template padrão configurado. Configure um template padrão primeiro.');
+                }
+
+                console.log('Template configurado:', config.template);
 
                 // Carrega o template
                 let response;
-                if (templateSlug === 'default') {
-                    response = await fetch('/templates/default/index.html');
+                if (config.template === 'default.zip') {
+                    response = await fetch('/storage/templates/default/index.html');
                 } else {
-                    response = await fetch(`/print-templates/${templateName}`);
+                    response = await fetch(`/print-templates/${config.template}`);
                 }
                 
                 if (!response.ok) throw new Error('Erro ao carregar template');
@@ -159,6 +157,9 @@ document.addEventListener('alpine:init', () => {
                 
                 // Substitui variáveis no template
                 templateHtml = templateHtml.replace(/\{\{datetime\}\}/g, new Date().toLocaleString());
+                templateHtml = templateHtml.replace(/\{\{protocol\}\}/g, 'TESTE-' + Math.floor(Math.random() * 10000));
+                templateHtml = templateHtml.replace(/\{\{operator\}\}/g, 'Operador de Teste');
+                templateHtml = templateHtml.replace(/\{\{customer\}\}/g, 'Cliente de Teste');
 
                 const data = [{
                     type: 'pixel',
@@ -180,7 +181,7 @@ document.addEventListener('alpine:init', () => {
                     status: 'success'
                 });
             } catch (err) {
-                console.error('Erro ao imprimir teste:', err);
+                console.error('Erro ao imprimir:', err);
                 this.$dispatch('notify', {
                     message: 'Erro ao imprimir',
                     description: err.message,

@@ -198,19 +198,32 @@
                                                 <template x-for="template in templates" :key="template.name">
                                                     <option 
                                                         :value="template.name"
-                                                        x-text="template.name + (template.isDefault ? ' (Padrão)' : '')"
+                                                        x-text="template.name + (template.isDefault ? ' (Default)' : '')"
                                                     ></option>
                                                 </template>
                                             </select>
+                                            
                                             <button
                                                 type="button"
-                                                @click="deleteTemplate"
-                                                :disabled="!selectedTemplate || templates.find(t => t.name === selectedTemplate)?.isDefault"
-                                                class="mt-1 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                @click="setDefaultTemplate(selectedTemplate)"
+                                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus:ring-offset-gray-800"
                                             >
-                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                Definir como Default
+                                            </button>
+                                            
+                                            <button
+                                                type="button"
+                                                @click="deleteTemplate()"
+                                                x-bind:disabled="isDeleteDisabled"
+                                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-70 disabled:cursor-not-allowed disabled:bg-red-400"
+                                            >
+                                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                 </svg>
+                                                Excluir
                                             </button>
                                         </div>
                                         <p class="mt-2 text-sm text-gray-500">

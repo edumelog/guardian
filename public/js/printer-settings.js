@@ -245,7 +245,16 @@ document.addEventListener('alpine:init', () => {
             try {
                 const response = await fetch('/print-templates');
                 const data = await response.json();
-                this.templates = data;
+                
+                // Get default template from localStorage
+                const config = localStorage.getItem('guardian_printer_config');
+                const defaultTemplate = config ? JSON.parse(config).template : 'default.zip';
+                
+                // Mark templates as default based on localStorage
+                this.templates = data.map(template => ({
+                    ...template,
+                    isDefault: template.name === defaultTemplate
+                }));
             } catch (err) {
                 console.error('Erro ao carregar templates:', err);
                 this.templates = [{ 
@@ -254,6 +263,60 @@ document.addEventListener('alpine:init', () => {
                     slug: 'default',
                     isDefault: true 
                 }];
+            }
+        },
+
+        async setDefaultTemplate(templateName) {
+            if (!templateName) {
+                console.error('Nome do template não fornecido');
+                return;
+            }
+            
+            try {
+                console.log('Definindo template como default:', templateName);
+                
+                // Encontra o template na lista
+                const template = this.templates.find(t => t.name === templateName);
+                if (!template) {
+                    throw new Error('Template não encontrado na lista');
+                }
+                
+                // Carrega a configuração atual
+                const config = localStorage.getItem('guardian_printer_config') 
+                    ? JSON.parse(localStorage.getItem('guardian_printer_config')) 
+                    : {};
+                
+                // Atualiza o template default
+                config.template = templateName;
+                config.templateSlug = template.slug;
+                config.timestamp = new Date().toISOString();
+                
+                // Salva a configuração
+                localStorage.setItem('guardian_printer_config', JSON.stringify(config));
+                console.log('Configuração atualizada:', config);
+                
+                // Atualiza o template selecionado
+                this.selectedTemplate = templateName;
+                
+                // Atualiza o status de default em todos os templates
+                this.templates = this.templates.map(t => ({
+                    ...t,
+                    isDefault: t.name === templateName
+                }));
+                
+                // Notifica o usuário
+                this.$dispatch('notify', {
+                    message: 'Template Default',
+                    description: `O template "${templateName}" foi definido como default`,
+                    status: 'success'
+                });
+            } catch (err) {
+                console.error('Erro ao definir template como default:', err);
+                this.$dispatch('notify', {
+                    message: 'Erro',
+                    description: err.message,
+                    status: 'danger'
+                });
             }
         },
 
@@ -332,8 +395,12 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        get isDeleteDisabled() {
+            return !this.selectedTemplate || this.selectedTemplate === 'default.zip';
+        },
+
         async deleteTemplate() {
-            if (!this.selectedTemplate || this.templates.find(t => t.name === this.selectedTemplate)?.isDefault) {
+            if (this.isDeleteDisabled) {
                 this.$dispatch('notify', {
                     message: 'Operação não permitida',
                     description: 'Não é possível excluir o template padrão',

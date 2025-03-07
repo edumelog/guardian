@@ -30,21 +30,38 @@ class PrintTemplateController extends Controller
                     'name' => $zipName, // Mantém o nome com .zip para compatibilidade
                     'path' => '/storage/' . $dir . '/index.html',
                     'slug' => $name,
-                    'isDefault' => $name === 'default',
+                    'isDefault' => $name === 'default', // Apenas o template 'default' é marcado como default por padrão
                     'zipExists' => $zipExists
                 ];
             })
             ->values();
 
-        // Sempre inclui o template padrão
-        if (!$templates->contains('slug', 'default')) {
-            $templates->prepend([
-                'name' => 'default.zip',
-                'path' => '/templates/default/index.html',
-                'slug' => 'default',
-                'isDefault' => true,
-                'zipExists' => false
-            ]);
+        // Verifica se existe um template marcado como default
+        $hasDefault = $templates->contains('isDefault', true);
+
+        // Se não houver um template default, inclui o template padrão do sistema
+        if (!$hasDefault) {
+            // Verifica se o diretório default existe
+            $defaultExists = Storage::disk('public')->exists("templates/default/index.html");
+            
+            if ($defaultExists) {
+                // Se o diretório default existe, marca-o como default
+                $templates = $templates->map(function ($template) {
+                    if ($template['slug'] === 'default') {
+                        $template['isDefault'] = true;
+                    }
+                    return $template;
+                });
+            } else {
+                // Se não existir, adiciona o template padrão do sistema
+                $templates->prepend([
+                    'name' => 'default.zip',
+                    'path' => '/templates/default/index.html',
+                    'slug' => 'default',
+                    'isDefault' => true,
+                    'zipExists' => false
+                ]);
+            }
         }
 
         // Log para debug
