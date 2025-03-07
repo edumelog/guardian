@@ -40,7 +40,100 @@ class EditVisitor extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        return [];
+        return [
+            Actions\Action::make('reprintCredential')
+                ->label('Reimprimir Credencial')
+                ->color('warning')
+                ->icon('heroicon-o-printer')
+                ->action(function () {
+                    $this->printVisitorCredential();
+                }),
+        ];
+    }
+
+    protected function printVisitorCredential()
+    {
+        // Registra no log para debug
+        \Illuminate\Support\Facades\Log::info('Método printVisitorCredential chamado', [
+            'visitor_id' => $this->record->id,
+            'visitor_name' => $this->record->name,
+        ]);
+
+        // Prepara os dados do visitante
+        $visitorData = [
+            'id' => $this->record->id,
+            'name' => $this->record->name,
+            'doc' => $this->record->doc,
+            'docType' => $this->record->docType->type,
+            'photo' => $this->record->photo ? "/storage/visitors-photos/{$this->record->photo}" : null,
+            'destination' => $this->record->destination->name,
+            'destinationAddress' => $this->record->destination->address,
+            'inDate' => $this->record->visitorLogs()->latest('in_date')->first()?->in_date->format('d/m/Y H:i'),
+            'other' => $this->record->other,
+        ];
+
+        // Adiciona um script inline para carregar o script dinamicamente e então executar a função
+        $this->js(<<<JS
+            console.log('Iniciando impressão de credencial via JS inline');
+            
+            // Função para carregar o script dinamicamente
+            function loadScript(url, callback) {
+                console.log('Carregando script:', url);
+                const script = document.createElement('script');
+                script.type = 'text/javascript';
+                script.src = url;
+                script.onload = function() {
+                    console.log('Script carregado com sucesso:', url);
+                    callback();
+                };
+                script.onerror = function() {
+                    console.error('Erro ao carregar script:', url);
+                };
+                document.head.appendChild(script);
+            }
+            
+            // Dados do visitante
+            const visitorData = {$this->encodeVisitorData($visitorData)};
+            console.log('Dados do visitante:', visitorData);
+            
+            // Verifica se o script já está carregado
+            if (typeof window.printVisitorCredential === 'function') {
+                console.log('Script já carregado, chamando função diretamente');
+                window.printVisitorCredential(visitorData);
+            } else {
+                console.log('Script não carregado, carregando dinamicamente');
+                // Carrega o script e então executa a função
+                loadScript('/js/visitor-credential-print.js?v=' + new Date().getTime(), function() {
+                    console.log('Script carregado, verificando função');
+                    // Verifica novamente se a função está disponível
+                    if (typeof window.printVisitorCredential === 'function') {
+                        console.log('Função encontrada após carregar script, chamando');
+                        window.printVisitorCredential(visitorData);
+                    } else {
+                        console.error('Função ainda não encontrada após carregar script');
+                        // Tenta disparar o evento diretamente
+                        const event = new CustomEvent('print-visitor-credential', {
+                            detail: {
+                                visitor: visitorData
+                            }
+                        });
+                        document.dispatchEvent(event);
+                    }
+                });
+            }
+        JS);
+
+        Notification::make()
+            ->success()
+            ->title('Credencial enviada para impressão')
+            ->body('A credencial foi enviada para impressão.')
+            ->send();
+    }
+    
+    // Método auxiliar para codificar os dados do visitante em JSON
+    protected function encodeVisitorData($data)
+    {
+        return json_encode($data, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
     }
 
     protected function getFormActions(): array
@@ -86,12 +179,7 @@ class EditVisitor extends EditRecord
                 ->color('warning')
                 ->icon('heroicon-o-printer')
                 ->action(function () {
-                    // TODO: Implementar a lógica de impressão da credencial
-                    Notification::make()
-                        ->warning()
-                        ->title('Impressão de Credencial')
-                        ->body('Funcionalidade em desenvolvimento.')
-                        ->send();
+                    $this->printVisitorCredential();
                 }),
 
             Actions\Action::make('register_exit')
