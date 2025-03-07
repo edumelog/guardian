@@ -41,40 +41,85 @@ class EditVisitor extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('reprintCredential')
-                ->label('Reimprimir Credencial')
-                ->color('warning')
-                ->icon('heroicon-o-printer')
+            Actions\Action::make('previewCredential')
+                ->label('Preview da Credencial')
+                ->color('info')
+                ->icon('heroicon-o-eye')
                 ->action(function () {
-                    $this->printVisitorCredential();
+                    $this->previewVisitorCredential();
                 }),
         ];
     }
 
-    protected function printVisitorCredential()
+    protected function previewVisitorCredential()
     {
         // Registra no log para debug
-        \Illuminate\Support\Facades\Log::info('Método printVisitorCredential chamado', [
+        \Illuminate\Support\Facades\Log::info('Método previewVisitorCredential chamado', [
             'visitor_id' => $this->record->id,
             'visitor_name' => $this->record->name,
         ]);
 
+        // Carrega o visitante com seus relacionamentos
+        $visitor = $this->record->load(['docType', 'destination', 'visitorLogs' => function($query) {
+            $query->latest('in_date')->first();
+        }]);
+        
+        $lastLog = $visitor->visitorLogs()->latest('in_date')->first();
+        
+        // Prepara a URL da foto
+        $photoUrl = null;
+        if ($visitor->photo) {
+            // Verifica se a foto existe
+            $photoPath = "visitors-photos/{$visitor->photo}";
+            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($photoPath)) {
+                $photoUrl = url(\Illuminate\Support\Facades\Storage::url($photoPath));
+                \Illuminate\Support\Facades\Log::info('URL da foto gerada', [
+                    'visitor_id' => $visitor->id,
+                    'photo_filename' => $visitor->photo,
+                    'photo_path' => $photoPath,
+                    'photo_url' => $photoUrl,
+                    'storage_path' => \Illuminate\Support\Facades\Storage::disk('public')->path($photoPath),
+                    'storage_url' => \Illuminate\Support\Facades\Storage::url($photoPath),
+                ]);
+            } else {
+                \Illuminate\Support\Facades\Log::warning('Foto do visitante não encontrada', [
+                    'visitor_id' => $visitor->id,
+                    'photo_filename' => $visitor->photo,
+                    'photo_path' => $photoPath,
+                ]);
+            }
+        } else {
+            \Illuminate\Support\Facades\Log::info('Visitante sem foto', [
+                'visitor_id' => $visitor->id,
+            ]);
+        }
+
         // Prepara os dados do visitante
         $visitorData = [
-            'id' => $this->record->id,
-            'name' => $this->record->name,
-            'doc' => $this->record->doc,
-            'docType' => $this->record->docType->type,
-            'photo' => $this->record->photo ? "/storage/visitors-photos/{$this->record->photo}" : null,
-            'destination' => $this->record->destination->name,
-            'destinationAddress' => $this->record->destination->address,
-            'inDate' => $this->record->visitorLogs()->latest('in_date')->first()?->in_date->format('d/m/Y H:i'),
-            'other' => $this->record->other,
+            'id' => $visitor->id,
+            'name' => $visitor->name,
+            'doc' => $visitor->doc,
+            'docType' => $visitor->docType->type,
+            'photo' => $photoUrl,
+            'destination' => $visitor->destination->name,
+            'destinationAddress' => $visitor->destination->address,
+            'inDate' => $lastLog ? $lastLog->in_date->format('d/m/Y H:i') : null,
+            'outDate' => $lastLog && $lastLog->out_date ? $lastLog->out_date->format('d/m/Y H:i') : null,
+            'other' => $visitor->other,
+            // Dados adicionais
+            'docTypeName' => $visitor->docType->type,
+            'docTypeId' => $visitor->docType->id,
+            'destinationId' => $visitor->destination->id,
+            'destinationName' => $visitor->destination->name,
+            'destinationAddress' => $visitor->destination->address,
+            'destinationPhone' => $visitor->destination->phone,
+            'createdAt' => $visitor->created_at->format('d/m/Y H:i'),
+            'updatedAt' => $visitor->updated_at->format('d/m/Y H:i'),
         ];
 
         // Adiciona um script inline para carregar o script dinamicamente e então executar a função
         $this->js(<<<JS
-            console.log('Iniciando impressão de credencial via JS inline');
+            console.log('Iniciando preview de credencial via JS inline');
             
             // Função para carregar o script dinamicamente
             function loadScript(url, callback) {
@@ -95,6 +140,7 @@ class EditVisitor extends EditRecord
             // Dados do visitante
             const visitorData = {$this->encodeVisitorData($visitorData)};
             console.log('Dados do visitante:', visitorData);
+            console.log('URL da foto do visitante:', visitorData.photo);
             
             // Verifica se o script já está carregado
             if (typeof window.printVisitorCredential === 'function') {
@@ -125,8 +171,8 @@ class EditVisitor extends EditRecord
 
         Notification::make()
             ->success()
-            ->title('Credencial enviada para impressão')
-            ->body('A credencial foi enviada para impressão.')
+            ->title('Preview da Credencial')
+            ->body('O preview da credencial foi aberto.')
             ->send();
     }
     
@@ -174,12 +220,12 @@ class EditVisitor extends EditRecord
 
         // Se não deu saída, mostra todos os botões
         return [
-            Actions\Action::make('reprint')
-                ->label('Reimprimir Credencial')
-                ->color('warning')
-                ->icon('heroicon-o-printer')
+            Actions\Action::make('preview')
+                ->label('Preview da Credencial')
+                ->color('info')
+                ->icon('heroicon-o-eye')
                 ->action(function () {
-                    $this->printVisitorCredential();
+                    $this->previewVisitorCredential();
                 }),
 
             Actions\Action::make('register_exit')

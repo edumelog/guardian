@@ -12,48 +12,179 @@ document.addEventListener('alpine:init', () => {
         uploadError: null,
         selectedFile: null,
         hasChanges: false,
+        
+        // Configurações de tamanho da etiqueta
+        pageWidth: '80',
+        pageHeight: '120',
+        marginTop: '5',
+        marginRight: '5',
+        marginBottom: '5',
+        marginLeft: '5',
+        units: 'mm', // Unidade de medida (mm, cm, in)
+        
+        // Parâmetros adicionais de impressão (não exibidos na interface)
+        printParams: {
+            type: 'pixel',
+            format: 'html',
+            flavor: 'plain',
+            scaleContent: true,
+            rasterize: true,
+            interpolation: 'bicubic',
+            density: '300',
+            altFontRendering: true,
+            ignoreTransparency: true
+        },
 
         async init() {
+            this.loading = true;
+            
             try {
-                // Carrega o script do QZ Tray
-                await this.loadQZTray();
+                console.log('Inicializando configurações da impressora...');
                 
-                // Conecta ao QZ Tray
-                await this.connectQZ();
+                // Variável para armazenar a impressora salva
+                let savedPrinter = null;
                 
-                // Carrega configuração salva
-                const config = localStorage.getItem('guardian_printer_config');
-                if (config) {
-                    const saved = JSON.parse(config);
-                    this.selectedPrinter = saved.printer;
-                    this.orientation = saved.orientation || null;
-                    this.selectedTemplate = saved.template || 'default.zip';
-                    console.log('Configuração carregada:', saved);
+                // Carrega a configuração salva primeiro (independente do QZ Tray)
+                const savedConfig = localStorage.getItem('guardian_printer_config');
+                if (savedConfig) {
+                    try {
+                        const config = JSON.parse(savedConfig);
+                        console.log('Configuração carregada do localStorage:', config);
+                        
+                        // Armazena a impressora salva para usar depois
+                        savedPrinter = config.printer;
+                        
+                        this.orientation = config.orientation || 'portrait';
+                        this.selectedTemplate = config.template;
+                        
+                        // Carrega as configurações de tamanho da etiqueta
+                        if (config.printOptions) {
+                            // Extrai o valor numérico e a unidade da largura
+                            if (config.printOptions.pageWidth) {
+                                const match = config.printOptions.pageWidth.match(/^(\d+)(\w+)$/);
+                                if (match) {
+                                    this.pageWidth = match[1];
+                                    this.units = match[2]; // Usa a unidade da largura para todas as medidas
+                                }
+                            }
+                            
+                            // Extrai o valor numérico da altura
+                            if (config.printOptions.pageHeight) {
+                                const match = config.printOptions.pageHeight.match(/^(\d+)(\w+)$/);
+                                if (match) {
+                                    this.pageHeight = match[1];
+                                }
+                            }
+                            
+                            // Extrai os valores das margens
+                            if (config.printOptions.margins) {
+                                const margins = config.printOptions.margins;
+                                
+                                if (margins.top) {
+                                    const match = margins.top.match(/^(\d+)(\w+)$/);
+                                    if (match) {
+                                        this.marginTop = match[1];
+                                    }
+                                }
+                                
+                                if (margins.right) {
+                                    const match = margins.right.match(/^(\d+)(\w+)$/);
+                                    if (match) {
+                                        this.marginRight = match[1];
+                                    }
+                                }
+                                
+                                if (margins.bottom) {
+                                    const match = margins.bottom.match(/^(\d+)(\w+)$/);
+                                    if (match) {
+                                        this.marginBottom = match[1];
+                                    }
+                                }
+                                
+                                if (margins.left) {
+                                    const match = margins.left.match(/^(\d+)(\w+)$/);
+                                    if (match) {
+                                        this.marginLeft = match[1];
+                                    }
+                                }
+                            }
+                            
+                            // Carrega os parâmetros adicionais de impressão
+                            if (config.printOptions.type) this.printParams.type = config.printOptions.type;
+                            if (config.printOptions.format) this.printParams.format = config.printOptions.format;
+                            if (config.printOptions.flavor) this.printParams.flavor = config.printOptions.flavor;
+                            if (config.printOptions.scaleContent !== undefined) this.printParams.scaleContent = config.printOptions.scaleContent;
+                            if (config.printOptions.rasterize !== undefined) this.printParams.rasterize = config.printOptions.rasterize;
+                            if (config.printOptions.interpolation) this.printParams.interpolation = config.printOptions.interpolation;
+                            if (config.printOptions.density) this.printParams.density = config.printOptions.density;
+                            if (config.printOptions.altFontRendering !== undefined) this.printParams.altFontRendering = config.printOptions.altFontRendering;
+                            if (config.printOptions.ignoreTransparency !== undefined) this.printParams.ignoreTransparency = config.printOptions.ignoreTransparency;
+                        }
+                    } catch (configErr) {
+                        console.error('Erro ao carregar configuração do localStorage:', configErr);
+                    }
                 } else {
-                    this.selectedTemplate = 'default.zip';
+                    console.log('Nenhuma configuração encontrada no localStorage');
                 }
-
-                // Carrega os templates
-                await this.loadTemplates();
-                console.log('Templates carregados:', this.templates);
-
-                // Inicia monitoramento da impressora
-                if (this.selectedPrinter) {
-                    await this.startMonitoring();
+                
+                // Carrega a lista de templates (independente do QZ Tray)
+                try {
+                    await this.loadTemplates();
+                    console.log('Templates carregados com sucesso');
+                } catch (templatesErr) {
+                    console.error('Erro ao carregar templates:', templatesErr);
                 }
-
-                // Observa mudanças
+                
+                // Tenta carregar e conectar ao QZ Tray
+                try {
+                    // Carrega o script do QZ Tray
+                    await this.loadQZTray();
+                    
+                    // Conecta ao QZ Tray
+                    await this.connectQZ();
+                    
+                    // Agora que temos a lista de impressoras, verifica se a impressora salva existe
+                    if (savedPrinter && this.printers.includes(savedPrinter)) {
+                        console.log('Selecionando impressora salva:', savedPrinter);
+                        this.selectedPrinter = savedPrinter;
+                    } else if (savedPrinter) {
+                        console.warn('Impressora salva não encontrada na lista:', savedPrinter);
+                        // Mantém a impressora salva mesmo que não esteja na lista
+                        // Isso é útil caso a impressora esteja temporariamente indisponível
+                        this.selectedPrinter = savedPrinter;
+                    }
+                    
+                    // Inicia o monitoramento da impressora selecionada
+                    if (this.connected && this.selectedPrinter) {
+                        await this.startMonitoring();
+                    }
+                } catch (qzErr) {
+                    console.error('Erro ao inicializar QZ Tray:', qzErr);
+                    this.error = qzErr.message || 'Erro ao conectar com QZ Tray';
+                    this.connected = false;
+                    
+                    // Mesmo com erro, ainda define a impressora salva
+                    if (savedPrinter) {
+                        this.selectedPrinter = savedPrinter;
+                    }
+                }
+                
+                // Observa mudanças nos campos
                 this.$watch('selectedPrinter', () => this.hasChanges = true);
                 this.$watch('orientation', () => this.hasChanges = true);
                 this.$watch('selectedTemplate', () => this.hasChanges = true);
+                this.$watch('pageWidth', () => this.hasChanges = true);
+                this.$watch('pageHeight', () => this.hasChanges = true);
+                this.$watch('marginTop', () => this.hasChanges = true);
+                this.$watch('marginRight', () => this.hasChanges = true);
+                this.$watch('marginBottom', () => this.hasChanges = true);
+                this.$watch('marginLeft', () => this.hasChanges = true);
+                this.$watch('units', () => this.hasChanges = true);
+                
+                console.log('Inicialização concluída');
             } catch (err) {
-                console.error('Erro ao inicializar:', err);
-                this.error = err.message;
-                this.$dispatch('notify', { 
-                    message: 'Erro ao conectar com QZ Tray',
-                    description: err.message,
-                    status: 'danger'
-                });
+                console.error('Erro geral ao inicializar configurações:', err);
+                this.error = err.message || 'Erro ao carregar configurações';
             } finally {
                 this.loading = false;
             }
@@ -62,50 +193,93 @@ document.addEventListener('alpine:init', () => {
         async loadQZTray() {
             return new Promise((resolve, reject) => {
                 if (window.qz) {
+                    console.log('QZ Tray já está carregado');
                     resolve();
                     return;
                 }
 
+                console.log('Carregando script do QZ Tray...');
                 const script = document.createElement('script');
                 script.src = '/js/qz-tray.js';
+                
                 script.onload = () => {
+                    console.log('Script do QZ Tray carregado com sucesso');
+                    
+                    if (!window.qz) {
+                        console.error('Script carregado, mas objeto qz não está disponível');
+                        reject(new Error('Objeto qz não está disponível após carregamento do script'));
+                        return;
+                    }
+                    
                     // Configura o certificado
+                    console.log('Configurando certificado...');
                     qz.security.setCertificatePromise(function(resolve, reject) {
                         fetch("/storage/digital-certificate.txt", {
                             cache: 'no-store', 
                             headers: {'Content-Type': 'text/plain'}
                         })
-                        .then(response => response.text())
-                        .then(resolve)
-                        .catch(reject);
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Erro ao obter certificado: ' + response.status);
+                            }
+                            return response.text();
+                        })
+                        .then(cert => {
+                            console.log('Certificado obtido com sucesso');
+                            resolve(cert);
+                        })
+                        .catch(err => {
+                            console.error('Erro ao obter certificado:', err);
+                            reject(err);
+                        });
                     });
 
                     // Configura a assinatura
+                    console.log('Configurando assinatura...');
                     qz.security.setSignatureAlgorithm("SHA512");
                     qz.security.setSignaturePromise(function(toSign) {
                         return function(resolve, reject) {
+                            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+                            if (!csrfToken) {
+                                console.error('Token CSRF não encontrado');
+                                reject(new Error('Token CSRF não encontrado'));
+                                return;
+                            }
+                            
                             fetch("/qz/sign", {
                                 method: 'POST',
                                 headers: { 
                                     'Content-Type': 'text/plain',
-                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                                    'X-CSRF-TOKEN': csrfToken
                                 },
                                 body: toSign
                             })
                             .then(response => {
                                 if (!response.ok) {
-                                    throw new Error('Erro ao assinar mensagem');
+                                    throw new Error('Erro ao assinar mensagem: ' + response.status);
                                 }
                                 return response.text();
                             })
-                            .then(resolve)
-                            .catch(reject);
+                            .then(signature => {
+                                console.log('Assinatura obtida com sucesso');
+                                resolve(signature);
+                            })
+                            .catch(err => {
+                                console.error('Erro ao obter assinatura:', err);
+                                reject(err);
+                            });
                         };
                     });
 
+                    console.log('QZ Tray configurado com sucesso');
                     resolve();
                 };
-                script.onerror = reject;
+                
+                script.onerror = (err) => {
+                    console.error('Erro ao carregar script do QZ Tray:', err);
+                    reject(new Error('Erro ao carregar script do QZ Tray'));
+                };
+                
                 document.head.appendChild(script);
             });
         },
@@ -114,32 +288,50 @@ document.addEventListener('alpine:init', () => {
             try {
                 this.loading = true;
                 this.error = null;
-                this.status = 'Connecting...';
-                this.statusColor = 'warning';
 
                 if (!window.qz) {
                     throw new Error('QZ Tray não está instalado ou não foi carregado corretamente');
                 }
 
-                // Tenta conectar ao QZ Tray
-                await qz.websocket.connect();
-                this.connected = true;
-                this.status = 'Connected';
-                this.statusColor = 'success';
+                // Verifica se já está conectado
+                if (qz.websocket.isActive()) {
+                    console.log('QZ Tray já está conectado');
+                    this.connected = true;
+                } else {
+                    // Tenta conectar ao QZ Tray
+                    await qz.websocket.connect();
+                    console.log('QZ Tray conectado com sucesso');
+                    this.connected = true;
+                }
 
-                // Lista todas as impressoras
-                this.printers = await qz.printers.find();
+                // Tenta carregar a lista de impressoras
+                try {
+                    if (typeof qz.printers === 'object' && typeof qz.printers.find === 'function') {
+                        this.printers = await qz.printers.find();
+                        console.log('Impressoras encontradas:', this.printers);
+                    } else if (typeof qz.printers === 'function') {
+                        this.printers = await qz.printers();
+                        console.log('Impressoras encontradas (método alternativo):', this.printers);
+                    } else {
+                        console.warn('Método qz.printers não disponível');
+                    }
+                } catch (printerErr) {
+                    console.warn('Erro ao obter lista de impressoras:', printerErr);
+                }
                 
-                console.log('Impressoras encontradas:', this.printers);
+                return true;
             } catch (err) {
                 console.error('Erro ao conectar com QZ Tray:', err);
                 this.error = err.message;
+                this.connected = false;
                 
                 this.$dispatch('notify', { 
                     message: 'Erro ao conectar com QZ Tray',
                     description: err.message,
                     status: 'danger'
                 });
+                
+                return false;
             } finally {
                 this.loading = false;
             }
@@ -200,7 +392,32 @@ document.addEventListener('alpine:init', () => {
                     orientation: this.orientation,
                     template: this.selectedTemplate, // Nome do arquivo para compatibilidade
                     templateSlug: selectedTemplate?.slug || 'default', // Slug para uso interno
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
+                    // Configurações de impressão
+                    printOptions: {
+                        // Parâmetros de tamanho
+                        pageWidth: this.pageWidth + this.units,
+                        pageHeight: this.pageHeight + this.units,
+                        margins: { 
+                            top: this.marginTop + this.units, 
+                            right: this.marginRight + this.units, 
+                            bottom: this.marginBottom + this.units, 
+                            left: this.marginLeft + this.units 
+                        },
+                        
+                        // Parâmetros de formato e tipo
+                        type: this.printParams.type,
+                        format: this.printParams.format,
+                        flavor: this.printParams.flavor,
+                        
+                        // Parâmetros de qualidade
+                        scaleContent: this.printParams.scaleContent,
+                        rasterize: this.printParams.rasterize,
+                        interpolation: this.printParams.interpolation,
+                        density: this.printParams.density,
+                        altFontRendering: this.printParams.altFontRendering,
+                        ignoreTransparency: this.printParams.ignoreTransparency
+                    }
                 };
                 
                 console.log('Salvando configuração:', config);
@@ -221,11 +438,12 @@ document.addEventListener('alpine:init', () => {
                     description: 'As configurações foram salvas com sucesso',
                     status: 'success'
                 });
-            } catch (error) {
-                console.error('Erro ao salvar configurações:', error);
+            } catch (err) {
+                console.error('Erro ao salvar configurações:', err);
+                
                 this.$dispatch('notify', { 
-                    message: 'Erro ao salvar',
-                    description: 'Ocorreu um erro ao salvar as configurações',
+                    message: 'Erro ao salvar configurações',
+                    description: err.message,
                     status: 'danger'
                 });
             }

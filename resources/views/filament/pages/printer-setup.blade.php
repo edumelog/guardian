@@ -100,6 +100,124 @@
                                             <option value="reverse-landscape">Paisagem Invertida</option>
                                         </select>
                                     </div>
+                                    
+                                    <!-- Configurações de Tamanho da Etiqueta -->
+                                    <div class="mt-4">
+                                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Tamanho da Etiqueta
+                                        </h4>
+                                        
+                                        <div class="grid grid-cols-2 gap-4 mb-4">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                    Largura
+                                                </label>
+                                                <div class="flex">
+                                                    <input 
+                                                        type="number" 
+                                                        x-model="pageWidth"
+                                                        min="1"
+                                                        step="1"
+                                                        @change="hasChanges = true"
+                                                        class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                                    >
+                                </div>
+                            </div>
+
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                    Altura
+                                                </label>
+                                                <div class="flex">
+                                                    <input 
+                                                        type="number" 
+                                                        x-model="pageHeight"
+                                                        min="1"
+                                                        step="1"
+                                                        @change="hasChanges = true"
+                                                        class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                                    >
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-2">
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                Unidade de Medida
+                                            </label>
+                                            <select 
+                                                x-model="units"
+                                                @change="hasChanges = true"
+                                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                            >
+                                                <option value="mm">Milímetros (mm)</option>
+                                                <option value="cm">Centímetros (cm)</option>
+                                                <option value="in">Polegadas (in)</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 mt-4">
+                                            Margens
+                                        </h4>
+                                        
+                                        <div class="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                    Superior
+                                                </label>
+                                                <input 
+                                                    type="number" 
+                                                    x-model="marginTop"
+                                                    min="0"
+                                                    step="1"
+                                                    @change="hasChanges = true"
+                                                    class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                                >
+                                            </div>
+                                            
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                    Direita
+                                                </label>
+                                                <input 
+                                                    type="number" 
+                                                    x-model="marginRight"
+                                                    min="0"
+                                                    step="1"
+                                                    @change="hasChanges = true"
+                                                    class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                                >
+                                            </div>
+                                            
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                    Inferior
+                                                </label>
+                                                <input 
+                                                    type="number" 
+                                                    x-model="marginBottom"
+                                                    min="0"
+                                                    step="1"
+                                                    @change="hasChanges = true"
+                                                    class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                                >
+                                            </div>
+                                            
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                    Esquerda
+                                                </label>
+                                                <input 
+                                                    type="number" 
+                                                    x-model="marginLeft"
+                                                    min="0"
+                                                    step="1"
+                                                    @change="hasChanges = true"
+                                                    class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                                >
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 

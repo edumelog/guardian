@@ -185,6 +185,18 @@ class PrintTemplateController extends Controller
                 if ($extractResult) {
                     Log::info('Arquivo ZIP descompactado com sucesso');
                     
+                    // Debug antes de processar os arquivos HTML
+                    Log::info('Iniciando processamento dos arquivos HTML');
+                    try {
+                        $this->processHtmlFiles($extractPath, $slug);
+                        Log::info('Processamento dos arquivos HTML concluído com sucesso');
+                    } catch (\Exception $e) {
+                        Log::error('Erro ao processar arquivos HTML', [
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString()
+                        ]);
+                    }
+                    
                     // Exclui o arquivo ZIP após descompactação bem-sucedida
                     Storage::disk('public')->delete($zipPath);
                     Log::info('Arquivo ZIP excluído após descompactação bem-sucedida', ['zipPath' => $zipPath]);
@@ -244,6 +256,329 @@ class PrintTemplateController extends Controller
                 'type' => 'error'
             ], 500);
         }
+    }
+
+    /**
+     * Processa os arquivos HTML para corrigir caminhos relativos
+     * 
+     * @param string $extractPath Caminho completo para o diretório do template
+     * @param string $slug Nome do template (slug)
+     * @return void
+     */
+    private function processHtmlFiles($extractPath, $slug)
+    {
+        Log::info('Processando arquivos HTML do template', ['path' => $extractPath, 'slug' => $slug]);
+        
+        // Verifica se o diretório existe
+        if (!File::exists($extractPath)) {
+            Log::error('Diretório de extração não existe', ['path' => $extractPath]);
+            return;
+        }
+        
+        // Obtém a URL base da aplicação
+        $baseUrl = rtrim(config('app.url'), '/');
+        Log::info('URL base da aplicação:', ['baseUrl' => $baseUrl]);
+        
+        // Lista todos os arquivos no diretório para debug
+        $allFiles = File::allFiles($extractPath);
+        $fileList = [];
+        foreach ($allFiles as $file) {
+            $fileList[] = $file->getPathname();
+        }
+        Log::info('Todos os arquivos encontrados no diretório:', ['files' => $fileList]);
+        
+        // Procura todos os arquivos HTML no diretório extraído
+        $htmlFiles = [];
+        foreach ($allFiles as $file) {
+            if (strtolower($file->getExtension()) === 'html' || strtolower($file->getExtension()) === 'htm') {
+                $htmlFiles[] = $file->getPathname();
+            }
+        }
+        
+        Log::info('Arquivos HTML encontrados:', ['files' => $htmlFiles]);
+        
+        if (empty($htmlFiles)) {
+            Log::warning('Nenhum arquivo HTML encontrado no template');
+            return;
+        }
+        
+        foreach ($htmlFiles as $htmlFile) {
+            Log::info('Processando arquivo HTML:', ['file' => $htmlFile]);
+            
+            // Lê o conteúdo do arquivo
+            $html = File::get($htmlFile);
+            
+            // Define o caminho base absoluto para o template com a URL base da aplicação
+            $storagePath = "/storage/templates/{$slug}";
+            $absolutePath = "{$baseUrl}{$storagePath}";
+            
+            Log::info('Caminhos para substituição:', [
+                'storagePath' => $storagePath,
+                'absolutePath' => $absolutePath
+            ]);
+            
+            // Remove qualquer tag base existente
+            $html = preg_replace('/<base[^>]*>/', '', $html);
+            
+            // Log do HTML antes das substituições
+            Log::info('HTML antes das substituições:', ['html' => $html]);
+            
+            // Extrai links para arquivos CSS
+            $cssFiles = [];
+            preg_match_all('/<link[^>]*rel=["\']stylesheet["\'][^>]*href=["\']([^"\']*)["\'][^>]*>/i', $html, $matches);
+            
+            if (!empty($matches[1])) {
+                foreach ($matches[1] as $cssLink) {
+                    Log::info('Link CSS encontrado:', ['link' => $cssLink]);
+                    
+                    // Determina o caminho completo do arquivo CSS
+                    $cssPath = $this->resolveCssPath($cssLink, $extractPath, dirname($htmlFile));
+                    
+                    if ($cssPath && File::exists($cssPath)) {
+                        $cssFiles[] = [
+                            'link' => $cssLink,
+                            'path' => $cssPath
+                        ];
+                        Log::info('Arquivo CSS encontrado:', ['path' => $cssPath]);
+                    } else {
+                        Log::warning('Arquivo CSS não encontrado:', ['link' => $cssLink, 'resolved_path' => $cssPath]);
+                    }
+                }
+            }
+            
+            // Carrega e processa o conteúdo CSS
+            $cssContent = '';
+            foreach ($cssFiles as $cssFile) {
+                $css = File::get($cssFile['path']);
+                $cssContent .= $css . "\n";
+                
+                // Remove o link para o CSS do HTML
+                $html = str_replace('<link rel="stylesheet" href="' . $cssFile['link'] . '">', '', $html);
+                $html = str_replace("<link rel=\"stylesheet\" href='" . $cssFile['link'] . "'>", '', $html);
+                $html = preg_replace('/<link[^>]*href=["\']' . preg_quote($cssFile['link'], '/') . '["\'][^>]*>/i', '', $html);
+            }
+            
+            // Se encontrou CSS, converte para inline
+            if (!empty($cssContent)) {
+                Log::info('Conteúdo CSS encontrado, convertendo para inline');
+                $html = $this->convertCssToInline($html, $cssContent);
+            }
+            
+            // Substitui caminhos que começam com ./
+            $html = preg_replace('/href=["\']\.\/([^"\']*)["\']/', "href=\"{$absolutePath}/$1\"", $html);
+            $html = preg_replace('/src=["\']\.\/([^"\']*)["\']/', "src=\"{$absolutePath}/$1\"", $html);
+            
+            // Substitui caminhos relativos sem ./
+            $html = preg_replace('/href=["\'](?!http|\/\/|\/storage)([^"\'\/][^"\']*)["\']/', "href=\"{$absolutePath}/$1\"", $html);
+            $html = preg_replace('/src=["\'](?!http|\/\/|\/storage)([^"\'\/][^"\']*)["\']/', "src=\"{$absolutePath}/$1\"", $html);
+            
+            // Substitui caminhos que começam com /
+            $html = preg_replace('/href=["\']\/(?!storage|http)([^"\']*)["\']/', "href=\"{$absolutePath}/$1\"", $html);
+            $html = preg_replace('/src=["\']\/(?!storage|http)([^"\']*)["\']/', "src=\"{$absolutePath}/$1\"", $html);
+            
+            // Log do HTML após as substituições
+            Log::info('HTML após todas as substituições:', ['html' => $html]);
+            
+            // Salva o arquivo modificado
+            File::put($htmlFile, $html);
+            
+            Log::info('Arquivo HTML processado com sucesso', [
+                'file' => $htmlFile,
+                'absolutePath' => $absolutePath
+            ]);
+        }
+    }
+    
+    /**
+     * Resolve o caminho completo para um arquivo CSS
+     * 
+     * @param string $cssLink Link para o arquivo CSS
+     * @param string $extractPath Caminho de extração do template
+     * @param string $htmlDir Diretório do arquivo HTML
+     * @return string|null Caminho completo do arquivo CSS ou null se não encontrado
+     */
+    private function resolveCssPath($cssLink, $extractPath, $htmlDir)
+    {
+        Log::info('Resolvendo caminho CSS:', ['link' => $cssLink, 'extractPath' => $extractPath, 'htmlDir' => $htmlDir]);
+        
+        // Remove parâmetros de URL se existirem
+        $cssLink = preg_replace('/\?.*$/', '', $cssLink);
+        
+        // Caminho absoluto no sistema de arquivos
+        if (strpos($cssLink, '/') === 0) {
+            $path = $extractPath . $cssLink;
+            Log::info('Tentando caminho absoluto:', ['path' => $path]);
+            return File::exists($path) ? $path : null;
+        }
+        
+        // Caminho relativo começando com ./
+        if (strpos($cssLink, './') === 0) {
+            $path = $htmlDir . '/' . substr($cssLink, 2);
+            Log::info('Tentando caminho relativo com ./:', ['path' => $path]);
+            return File::exists($path) ? $path : null;
+        }
+        
+        // Caminho relativo sem ./
+        $path = $htmlDir . '/' . $cssLink;
+        Log::info('Tentando caminho relativo simples:', ['path' => $path]);
+        if (File::exists($path)) {
+            return $path;
+        }
+        
+        // Tenta encontrar no diretório raiz do template
+        $path = $extractPath . '/' . $cssLink;
+        Log::info('Tentando caminho na raiz do template:', ['path' => $path]);
+        return File::exists($path) ? $path : null;
+    }
+    
+    /**
+     * Converte CSS para estilos inline nos elementos HTML
+     * 
+     * @param string $html Conteúdo HTML
+     * @param string $css Conteúdo CSS
+     * @return string HTML com estilos inline
+     */
+    private function convertCssToInline($html, $css)
+    {
+        Log::info('Iniciando conversão de CSS para inline');
+        
+        // Carrega o HTML em um DOMDocument
+        $doc = new \DOMDocument();
+        
+        // Preserva espaços em branco
+        $doc->preserveWhiteSpace = true;
+        
+        // Suprime erros de parsing HTML
+        libxml_use_internal_errors(true);
+        $doc->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
+        libxml_clear_errors();
+        
+        // Parse o CSS
+        $cssRules = $this->parseCssRules($css);
+        Log::info('Regras CSS parseadas:', ['count' => count($cssRules)]);
+        
+        // Aplica as regras CSS aos elementos
+        foreach ($cssRules as $selector => $styles) {
+            try {
+                // Converte o seletor CSS para XPath
+                $xpath = new \DOMXPath($doc);
+                $query = $this->cssToXPath($selector);
+                
+                // Encontra os elementos que correspondem ao seletor
+                $elements = $xpath->query($query);
+                
+                if ($elements && $elements->length > 0) {
+                    foreach ($elements as $element) {
+                        // Certifica-se de que estamos trabalhando com um DOMElement
+                        if ($element instanceof \DOMElement) {
+                            // Obtém o estilo atual do elemento
+                            $currentStyle = '';
+                            if ($element->hasAttribute('style')) {
+                                $currentStyle = $element->getAttribute('style');
+                            }
+                            
+                            // Combina com os novos estilos
+                            $newStyle = $currentStyle ? $currentStyle . '; ' . $styles : $styles;
+                            
+                            // Define o atributo style
+                            $element->setAttribute('style', $newStyle);
+                        }
+                    }
+                    
+                    Log::info('Aplicado estilo para seletor:', [
+                        'selector' => $selector, 
+                        'elements' => $elements->length
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Erro ao aplicar estilo:', [
+                    'selector' => $selector,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+        
+        // Converte de volta para string HTML
+        $inlineHtml = $doc->saveHTML();
+        
+        Log::info('Conversão de CSS para inline concluída');
+        
+        return $inlineHtml;
+    }
+    
+    /**
+     * Parseia regras CSS em um array de seletores e estilos
+     * 
+     * @param string $css Conteúdo CSS
+     * @return array Array associativo de seletores e estilos
+     */
+    private function parseCssRules($css)
+    {
+        $rules = [];
+        
+        // Remove comentários
+        $css = preg_replace('!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $css);
+        
+        // Encontra todas as regras CSS
+        preg_match_all('/([^{]+){([^}]+)}/s', $css, $matches, PREG_SET_ORDER);
+        
+        foreach ($matches as $match) {
+            // Seletores (podem ser múltiplos, separados por vírgula)
+            $selectors = explode(',', trim($match[1]));
+            
+            // Estilos
+            $styles = trim($match[2]);
+            
+            // Remove quebras de linha e espaços extras
+            $styles = preg_replace('/\s+/', ' ', $styles);
+            
+            foreach ($selectors as $selector) {
+                $selector = trim($selector);
+                
+                // Ignora seletores vazios ou pseudo-elementos complexos
+                if (empty($selector) || strpos($selector, '::') !== false) {
+                    continue;
+                }
+                
+                // Adiciona ou combina estilos para o seletor
+                if (isset($rules[$selector])) {
+                    $rules[$selector] .= '; ' . $styles;
+                } else {
+                    $rules[$selector] = $styles;
+                }
+            }
+        }
+        
+        return $rules;
+    }
+    
+    /**
+     * Converte um seletor CSS para XPath
+     * Implementação simplificada que suporta seletores básicos
+     * 
+     * @param string $selector Seletor CSS
+     * @return string Expressão XPath
+     */
+    private function cssToXPath($selector)
+    {
+        // Implementação simplificada para seletores básicos
+        $selector = trim($selector);
+        
+        // Substitui # por [@id='...']
+        $selector = preg_replace('/#([a-zA-Z0-9_-]+)/', "*[@id='$1']", $selector);
+        
+        // Substitui . por [@class='...']
+        $selector = preg_replace('/\.([a-zA-Z0-9_-]+)/', "*[contains(concat(' ', normalize-space(@class), ' '), ' $1 ')]", $selector);
+        
+        // Substitui espaços por /
+        $selector = preg_replace('/\s+/', '//', $selector);
+        
+        // Adiciona // no início se não começar com /
+        if (strpos($selector, '/') !== 0) {
+            $selector = '//' . $selector;
+        }
+        
+        return $selector;
     }
 
     public function delete($name)
