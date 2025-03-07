@@ -151,7 +151,7 @@
                                                     Escolher Arquivo
                                                     <input 
                                                         type="file" 
-                                                        accept=".html"
+                                                        accept=".zip"
                                                         @change="handleFileSelect"
                                                         class="hidden"
                                                     >

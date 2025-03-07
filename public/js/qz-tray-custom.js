@@ -132,12 +132,23 @@ document.addEventListener('alpine:init', () => {
             try {
                 // Carrega a configuração salva para pegar o template
                 const savedConfig = localStorage.getItem('guardian_printer_config');
-                const templateName = savedConfig ? JSON.parse(savedConfig).template || 'default.html' : 'default.html';
+                let templateName, templateSlug;
+                
+                if (savedConfig) {
+                    const config = JSON.parse(savedConfig);
+                    templateName = config.template || 'default.zip';
+                    templateSlug = config.templateSlug || 'default';
+                } else {
+                    templateName = 'default.zip';
+                    templateSlug = 'default';
+                }
+                
+                console.log('Usando template:', { name: templateName, slug: templateSlug });
 
                 // Carrega o template
                 let response;
-                if (templateName === 'default.html') {
-                    response = await fetch('/templates/default.html');
+                if (templateSlug === 'default') {
+                    response = await fetch('/templates/default/index.html');
                 } else {
                     response = await fetch(`/print-templates/${templateName}`);
                 }

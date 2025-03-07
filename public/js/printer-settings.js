@@ -27,11 +27,15 @@ document.addEventListener('alpine:init', () => {
                     const saved = JSON.parse(config);
                     this.selectedPrinter = saved.printer;
                     this.orientation = saved.orientation || null;
-                    this.selectedTemplate = saved.template || 'default.html';
+                    this.selectedTemplate = saved.template || 'default.zip';
+                    console.log('Configuração carregada:', saved);
+                } else {
+                    this.selectedTemplate = 'default.zip';
                 }
 
                 // Carrega os templates
                 await this.loadTemplates();
+                console.log('Templates carregados:', this.templates);
 
                 // Inicia monitoramento da impressora
                 if (this.selectedPrinter) {
@@ -187,14 +191,19 @@ document.addEventListener('alpine:init', () => {
 
         async saveConfig() {
             try {
+                // Encontra o template selecionado
+                const selectedTemplate = this.templates.find(t => t.name === this.selectedTemplate);
+                
                 // Salva configuração
                 const config = {
                     printer: this.selectedPrinter,
                     orientation: this.orientation,
-                    template: this.selectedTemplate,
+                    template: this.selectedTemplate, // Nome do arquivo para compatibilidade
+                    templateSlug: selectedTemplate?.slug || 'default', // Slug para uso interno
                     timestamp: new Date().toISOString()
                 };
                 
+                console.log('Salvando configuração:', config);
                 localStorage.setItem('guardian_printer_config', JSON.stringify(config));
                 
                 // Para monitoramento atual
@@ -239,7 +248,12 @@ document.addEventListener('alpine:init', () => {
                 this.templates = data;
             } catch (err) {
                 console.error('Erro ao carregar templates:', err);
-                this.templates = [{ name: 'default.html', path: '/templates/default.html', isDefault: true }];
+                this.templates = [{ 
+                    name: 'default.zip', 
+                    path: '/templates/default/index.html', 
+                    slug: 'default',
+                    isDefault: true 
+                }];
             }
         },
 
@@ -252,14 +266,14 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
             
-            // Verifica se é um arquivo HTML
-            if (!file.name.endsWith('.html')) {
+            // Verifica se é um arquivo ZIP
+            if (!file.name.endsWith('.zip')) {
                 console.log('Arquivo inválido:', file.name);
-                this.uploadError = 'Apenas arquivos HTML são permitidos';
+                this.uploadError = 'Apenas arquivos ZIP são permitidos';
                 
                 this.$dispatch('notify', {
                     message: 'Erro no upload',
-                    description: 'Apenas arquivos HTML são permitidos',
+                    description: 'Apenas arquivos ZIP são permitidos',
                     status: 'danger'
                 });
                 return;
@@ -333,6 +347,16 @@ document.addEventListener('alpine:init', () => {
             }
 
             try {
+                console.log('Excluindo template:', this.selectedTemplate);
+                
+                // Encontra o template selecionado para obter o slug
+                const selectedTemplate = this.templates.find(t => t.name === this.selectedTemplate);
+                if (!selectedTemplate) {
+                    throw new Error('Template não encontrado na lista');
+                }
+                
+                console.log('Template encontrado:', selectedTemplate);
+                
                 const response = await fetch(`/print-templates/${this.selectedTemplate}`, {
                     method: 'DELETE',
                     headers: {
@@ -340,10 +364,18 @@ document.addEventListener('alpine:init', () => {
                     }
                 });
 
-                if (!response.ok) throw new Error('Erro ao excluir template');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Erro ao excluir template');
+                }
 
+                // Recarrega a lista de templates
                 await this.loadTemplates();
-                this.selectedTemplate = 'default.html';
+                
+                // Se o template excluído era o selecionado, seleciona o padrão
+                if (this.selectedTemplate === selectedTemplate.name) {
+                    this.selectedTemplate = 'default.zip';
+                }
 
                 this.$dispatch('notify', {
                     message: 'Template excluído',
