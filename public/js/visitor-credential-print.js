@@ -279,7 +279,10 @@ async function showTemplateModal(html, visitor, config) {
                 
                 // Obtém o HTML atualizado com as imagens convertidas para base64
                 const updatedHtml = contentWrapper.innerHTML;
-                console.log('[CredentialPrint] HTML atualizado para impressão:', updatedHtml.substring(0, 100) + '...');
+                
+                // Verifica se o HTML contém imagens base64
+                const hasBase64 = updatedHtml.includes('data:image/');
+                console.log('[CredentialPrint] HTML contém imagens base64:', hasBase64);
                 
                 // Prepara o HTML completo para impressão
                 let printHtml = `<!DOCTYPE html>
@@ -313,7 +316,7 @@ async function showTemplateModal(html, visitor, config) {
                     options: config.printOptions
                 }];
                 
-                console.log('[CredentialPrint] Dados para impressão:', printData);
+                console.log('[CredentialPrint] Enviando para impressão...');
                 
                 // Envia para impressão
                 await qz.print(printerConfig, printData);
@@ -401,92 +404,59 @@ async function showTemplateModal(html, visitor, config) {
                     const images = contentWrapper.querySelectorAll('img');
                     console.log(`[CredentialPrint] Verificando ${images.length} imagens`);
                     
+                    // Se não houver imagens, habilita o botão de impressão imediatamente
                     if (images.length === 0) {
-                        // Se não houver imagens, habilita o botão de impressão imediatamente
                         printButton.disabled = false;
                         printButton.style.opacity = '1';
                         return;
                     }
                     
-                    let loadedCount = 0;
-                    const totalImages = images.length;
+                    // Força a conversão de todas as imagens para base64
+                    let conversionPromises = [];
                     
-                    // Converte imagens para data URLs para garantir que sejam impressas corretamente
-                    Promise.all(Array.from(images).map(async (img) => {
-                        try {
-                            // Só converte se a imagem já estiver carregada
-                            if (img.complete && img.naturalWidth > 0) {
-                                const dataUrl = await imageToDataURL(img.src);
-                                img.src = dataUrl;
-                                console.log('[CredentialPrint] Imagem convertida para data URL:', img.src.substring(0, 50) + '...');
-                            }
-                        } catch (err) {
-                            console.warn('[CredentialPrint] Erro ao converter imagem para data URL:', err);
-                        }
-                    })).then(() => {
-                        console.log('[CredentialPrint] Todas as imagens processadas');
-                    }).catch(err => {
-                        console.warn('[CredentialPrint] Erro ao processar imagens:', err);
-                    });
-                    
-                    // Verifica se cada imagem está carregada
-                    images.forEach(img => {
+                    images.forEach((img, index) => {
                         // Garante que a imagem tenha tamanho máximo para caber no container
                         img.style.maxWidth = '100%';
                         img.style.maxHeight = '100%';
                         
-                        if (img.complete) {
-                            loadedCount++;
-                            console.log(`[CredentialPrint] Imagem já carregada: ${img.src.substring(0, 50)}... (${loadedCount}/${totalImages})`);
-                            
-                            // Tenta converter para data URL
-                            imageToDataURL(img.src)
-                                .then(dataUrl => {
-                                    img.src = dataUrl;
-                                    console.log('[CredentialPrint] Imagem convertida para data URL');
-                                })
-                                .catch(err => {
-                                    console.warn('[CredentialPrint] Erro ao converter imagem para data URL:', err);
-                                });
-                            
-                            if (loadedCount === totalImages) {
-                                printButton.disabled = false;
-                                printButton.style.opacity = '1';
-                            }
-                        } else {
-                            img.onload = () => {
-                                loadedCount++;
-                                console.log(`[CredentialPrint] Imagem carregada: ${img.src.substring(0, 50)}... (${loadedCount}/${totalImages})`);
-                                
-                                // Tenta converter para data URL
-                                imageToDataURL(img.src)
-                                    .then(dataUrl => {
-                                        img.src = dataUrl;
-                                        console.log('[CredentialPrint] Imagem convertida para data URL');
-                                    })
-                                    .catch(err => {
-                                        console.warn('[CredentialPrint] Erro ao converter imagem para data URL:', err);
-                                    });
-                                
-                                if (loadedCount === totalImages) {
-                                    printButton.disabled = false;
-                                    printButton.style.opacity = '1';
-                                }
-                            };
-                            img.onerror = () => {
-                                loadedCount++;
-                                console.warn(`[CredentialPrint] Erro ao carregar imagem: ${img.src.substring(0, 50)}... (${loadedCount}/${totalImages})`);
-                                if (loadedCount === totalImages) {
-                                    printButton.disabled = false;
-                                    printButton.style.opacity = '1';
-                                }
-                            };
-                        }
+                        // Força a conversão mesmo se já for base64 (para garantir)
+                        const originalSrc = img.src;
+                        
+                        // Adiciona um timestamp para evitar cache
+                        const srcWithTimestamp = originalSrc.includes('?') 
+                            ? `${originalSrc}&_t=${Date.now()}` 
+                            : `${originalSrc}?_t=${Date.now()}`;
+                        
+                        const promise = imageToDataURL(srcWithTimestamp)
+                            .then(dataUrl => {
+                                img.src = dataUrl;
+                                console.log(`[CredentialPrint] Imagem ${index + 1} convertida para base64`);
+                            })
+                            .catch(err => {
+                                console.warn(`[CredentialPrint] Erro ao converter imagem ${index + 1} para base64:`, err);
+                            });
+                        
+                        conversionPromises.push(promise);
                     });
+                    
+                    // Aguarda todas as conversões terminarem
+                    Promise.all(conversionPromises)
+                        .then(() => {
+                            console.log('[CredentialPrint] Todas as imagens processadas');
+                            // Habilita o botão de impressão após processar todas as imagens
+                            printButton.disabled = false;
+                            printButton.style.opacity = '1';
+                        })
+                        .catch(err => {
+                            console.warn('[CredentialPrint] Erro ao processar imagens:', err);
+                            // Habilita o botão mesmo com erro
+                            printButton.disabled = false;
+                            printButton.style.opacity = '1';
+                        });
                 };
                 
                 // Verifica se todas as imagens estão carregadas
-                checkAllImagesLoaded();
+                setTimeout(checkAllImagesLoaded, 100);
                 
             } catch (err) {
                 console.error('[CredentialPrint] Erro ao injetar conteúdo HTML:', err);
@@ -850,16 +820,27 @@ async function convertImagesToDataURLs(doc) {
 // Função para converter uma URL de imagem para data URL
 function imageToDataURL(url) {
     return new Promise((resolve, reject) => {
+        // Se a URL já for um data URL, retorna imediatamente
+        if (url.startsWith('data:')) {
+            resolve(url);
+            return;
+        }
+        
+        console.log('[CredentialPrint] Convertendo imagem para base64:', url);
+        
         // Cria um elemento de imagem temporário
         const img = new Image();
-        img.crossOrigin = 'Anonymous'; // Tenta permitir o carregamento cross-origin
         
+        // Configura o crossOrigin para permitir o carregamento de imagens de outros domínios
+        img.crossOrigin = 'Anonymous';
+        
+        // Define handlers antes de definir src
         img.onload = function() {
             try {
-                // Cria um canvas para desenhar a imagem
+                // Cria um canvas temporário
                 const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
+                canvas.width = img.width || 300;  // Usa largura padrão se não for possível determinar
+                canvas.height = img.height || 200; // Usa altura padrão se não for possível determinar
                 
                 // Desenha a imagem no canvas
                 const ctx = canvas.getContext('2d');
@@ -867,20 +848,31 @@ function imageToDataURL(url) {
                 
                 // Converte o canvas para data URL
                 const dataURL = canvas.toDataURL('image/png');
+                
+                console.log('[CredentialPrint] Conversão para base64 concluída');
+                
+                // Retorna o data URL
                 resolve(dataURL);
             } catch (err) {
-                console.error('[CredentialPrint] Erro ao converter imagem para data URL:', err);
-                reject(err);
+                console.error('[CredentialPrint] Erro ao converter imagem para base64:', err);
+                // Em caso de erro, tenta retornar a URL original
+                resolve(url);
             }
         };
         
         img.onerror = function(err) {
-            console.error('[CredentialPrint] Erro ao carregar imagem para conversão:', url, err);
-            reject(new Error(`Falha ao carregar imagem: ${url}`));
+            console.error('[CredentialPrint] Erro ao carregar imagem:', url);
+            // Em caso de erro, retorna a URL original
+            resolve(url);
         };
         
-        // Inicia o carregamento da imagem
+        // Define a URL da imagem
         img.src = url;
+        
+        // Se a imagem já estiver em cache e carregada, o evento onload pode não disparar
+        if (img.complete) {
+            img.onload();
+        }
     });
 }
 
