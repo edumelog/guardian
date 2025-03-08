@@ -1,0 +1,24 @@
+---
+description: Regras do projeto
+globs: *
+alwaysApply: true
+---
+# O Projeto:
+
+- Você está desenvolvendo um VMS (Visitor Managment System). Este sistema é um sistema de gerenciamento de visitantes;
+- Este sistema permite o cadastro de visitantes, captura de seus dados e fotos para impressão de credenciais na forma de etiquetas impressas em uma impressora termica;
+- Deve manter sempre os dados sensiveis tais como fotos e documentos dos visitantes em repositorios seguros, acessiveis apenas pela aplicação;
+- Para a impressão o sistema usa a biblioteca qz-tray.js, cuja documentação está disponivel em https://qz.io/docs/getting-started
+- O sistema captura as fotos usando webcams;
+- As estações dos usuários podem ter configurações, impressoras, etiquetas e cameras diferentes. Portanto algumas configurações são salvas no local storage do browser;
+- O projeto usa as seguintes bibliotecas:
+	a) Laravel v11
+	b) Laravel Breeze
+	c) FilamentPHP v3
+	d) Filament Shield
+	e) AlpineJS
+	f) Vite
+	
+- O projeto é versionado no github;
+- Mantenha sempre seu codebase atualizado;
+

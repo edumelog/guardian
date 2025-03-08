@@ -1,0 +1,9 @@
+---
+description: Ambiente de desenvolvimento
+globs: *
+alwaysApply: true
+---
+# O Ambiente de desenvolvimento:
+
+- Neste desenvolvimento o Laravel está rodando em um ambiente de container docker, usando o NGinx como web server e o Traefik como proxy reverso usando SSL;
+- O Vite está sendo exposto pelo nginx repassando os headers https e o traefik possui labels para direcionar o trafego corretamento quando usamos o npm run dev;
