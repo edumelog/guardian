@@ -302,7 +302,7 @@
                                     <!-- Lista de Templates -->
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Template Padrão
+                                            Template Selecionado
                                         </label>
                                         <div class="flex gap-2">
                                             <select 
@@ -311,8 +311,10 @@
                                                     selectedTemplate = $event.target.value;
                                                     hasChanges = true;
                                                 "
-                                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                                :disabled="templates.length === 0"
+                                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 disabled:opacity-70 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-700"
                                             >
+                                                <option value="" x-show="templates.length === 0">Nenhum template disponível</option>
                                                 <template x-for="template in templates" :key="template.name">
                                                     <option 
                                                         :value="template.name"
@@ -324,7 +326,8 @@
                                             <button
                                                 type="button"
                                                 @click="setDefaultTemplate(selectedTemplate)"
-                                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus:ring-offset-gray-800"
+                                                :disabled="templates.length === 0 || !selectedTemplate"
+                                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus:ring-offset-gray-800 disabled:opacity-70 disabled:cursor-not-allowed disabled:bg-primary-400"
                                             >
                                                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -335,7 +338,7 @@
                                             <button
                                                 type="button"
                                                 @click="deleteTemplate()"
-                                                x-bind:disabled="isDeleteDisabled"
+                                                x-bind:disabled="isDeleteDisabled || templates.length === 0"
                                                 class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-70 disabled:cursor-not-allowed disabled:bg-red-400"
                                             >
                                                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -345,9 +348,14 @@
                                             </button>
                                         </div>
                                         <p class="mt-2 text-sm text-gray-500">
-                                            O template selecionado será usado como padrão para todas as impressões.
-                                            <br>
-                                            <span class="text-xs text-gray-400">O template padrão (default.html) não pode ser excluído.</span>
+                                            <span x-show="templates.length > 0">
+                                                O template selecionado será usado como padrão para todas as impressões.
+                                                <br>
+                                                <span class="text-xs text-gray-400">Atenção: Ao excluir um template, certifique-se de que ele não está sendo usado.</span>
+                                            </span>
+                                            <span x-show="templates.length === 0" class="text-yellow-600">
+                                                Nenhum template disponível. Por favor, faça upload de um template.
+                                            </span>
                                         </p>
                                     </div>
                                 </div>
