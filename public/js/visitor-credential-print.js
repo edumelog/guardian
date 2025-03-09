@@ -65,11 +65,7 @@ async function processPrintRequest(visitor) {
         
         // Carrega o template
         let response;
-        if (config.template === 'default.zip') {
-            response = await fetch('/storage/templates/default/index.html');
-        } else {
-            response = await fetch(`/print-templates/${config.template}`);
-        }
+        response = await fetch(`/print-templates/${config.template}`);
         
         if (!response.ok) {
             throw new Error('Erro ao carregar o template');
