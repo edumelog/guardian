@@ -35,8 +35,8 @@ class WebcamCapture extends Field
                 // Converte base64 para arquivo
                 $image = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $state));
                 
-                // Salva o arquivo
-                Storage::disk('public')->put('visitors-photos/' . $filename, $image);
+                // Salva o arquivo no disco private
+                Storage::disk('private')->put('visitors-photos/' . $filename, $image);
                 
                 return $filename;
             }
@@ -59,6 +59,16 @@ class WebcamCapture extends Field
     public function getStorageDirectory(): string
     {
         return 'visitors-photos';
+    }
+
+    /**
+     * Retorna o disco de armazenamento para as fotos
+     * 
+     * @return string
+     */
+    public function getStorageDisk(): string
+    {
+        return 'private';
     }
 
     public function isDisabled(): bool

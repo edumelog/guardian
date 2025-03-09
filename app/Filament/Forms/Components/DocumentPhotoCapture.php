@@ -4,6 +4,7 @@ namespace App\Filament\Forms\Components;
 
 use Filament\Forms\Components\Field;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class DocumentPhotoCapture extends Field
 {
@@ -13,11 +14,13 @@ class DocumentPhotoCapture extends Field
     public function side(string $side): static
     {
         $this->side = $side;
+        Log::info("DocumentPhotoCapture: side definido como {$side} para o campo {$this->getName()}");
         return $this;
     }
 
     public function getSide(): string
     {
+        Log::info("DocumentPhotoCapture: getSide retornando {$this->side} para o campo {$this->getName()}");
         return $this->side;
     }
 
@@ -47,19 +50,95 @@ class DocumentPhotoCapture extends Field
                 // Converte base64 para arquivo
                 $image = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $state));
                 
-                // Salva o arquivo
-                Storage::disk('public')->put('visitors-photos/' . $filename, $image);
+                // Salva o arquivo no disco private
+                Storage::disk('private')->put('visitors-photos/' . $filename, $image);
+                
+                Log::info("DocumentPhotoCapture: Salvando foto do documento {$this->side} como {$filename}");
                 
                 return $filename;
             }
 
+            // Se o estado não é uma imagem base64, verifica se o nome do arquivo corresponde ao lado correto
+            if (is_string($state) && !empty($state)) {
+                // Verifica se o nome do arquivo contém o lado correto
+                if (!str_contains($state, "_{$this->side}.")) {
+                    Log::warning("DocumentPhotoCapture: Nome do arquivo inconsistente com o lado", [
+                        'field' => $this->getName(),
+                        'side' => $this->side,
+                        'filename' => $state
+                    ]);
+                    
+                    // Extrai as partes do nome do arquivo
+                    $parts = explode('_', pathinfo($state, PATHINFO_FILENAME));
+                    if (count($parts) >= 3) {
+                        // Reconstrói o nome do arquivo com o lado correto
+                        $newFilename = $parts[0] . '_' . $parts[1] . '_' . $this->side . '.jpg';
+                        
+                        Log::info("DocumentPhotoCapture: Corrigindo nome do arquivo para {$newFilename}");
+                        
+                        // Verifica se o arquivo existe com o novo nome
+                        if (!Storage::disk('private')->exists('visitors-photos/' . $newFilename)) {
+                            // Se não existir, copia o arquivo atual com o novo nome
+                            if (Storage::disk('private')->exists('visitors-photos/' . $state)) {
+                                $fileContent = Storage::disk('private')->get('visitors-photos/' . $state);
+                                Storage::disk('private')->put('visitors-photos/' . $newFilename, $fileContent);
+                                Log::info("DocumentPhotoCapture: Arquivo copiado para {$newFilename}");
+                            }
+                        }
+                        
+                        return $newFilename;
+                    }
+                }
+            }
+
             return $state;
+        });
+
+        $this->afterStateHydrated(function ($state) {
+            // Verifica se o estado é um nome de arquivo e se corresponde ao lado correto
+            if (is_string($state) && !empty($state) && !str_starts_with($state, 'data:image')) {
+                Log::info("DocumentPhotoCapture: Estado hidratado", [
+                    'field' => $this->getName(),
+                    'side' => $this->side,
+                    'state' => $state
+                ]);
+                
+                // Verifica se o nome do arquivo contém o lado correto
+                if (!str_contains($state, "_{$this->side}.")) {
+                    Log::warning("DocumentPhotoCapture: Nome do arquivo hidratado inconsistente com o lado", [
+                        'field' => $this->getName(),
+                        'side' => $this->side,
+                        'filename' => $state
+                    ]);
+                }
+            }
         });
     }
 
     public static function make(string $name): static
     {
-        return parent::make($name);
+        $instance = parent::make($name);
+        
+        // Define o lado com base no nome do campo, se não for explicitamente definido
+        if (str_contains($name, 'front')) {
+            $instance->side('front');
+        } elseif (str_contains($name, 'back')) {
+            $instance->side('back');
+        }
+        
+        \Illuminate\Support\Facades\Log::info("DocumentPhotoCapture::make: Criando componente {$name} com lado {$instance->getSide()}");
+        
+        return $instance;
+    }
+
+    /**
+     * Retorna o disco de armazenamento para as fotos
+     * 
+     * @return string
+     */
+    public function getStorageDisk(): string
+    {
+        return 'private';
     }
 
     public function isDisabled(): bool

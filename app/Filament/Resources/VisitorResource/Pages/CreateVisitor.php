@@ -305,10 +305,58 @@ class CreateVisitor extends CreateRecord
 
         // Dispara eventos para atualizar os previews das fotos
         $photoData = [
-            'photo' => $visitor->photo ? '/storage/visitors-photos/' . $visitor->photo : null,
-            'doc_photo_front' => $visitor->doc_photo_front ? '/storage/visitors-photos/' . $visitor->doc_photo_front : null,
-            'doc_photo_back' => $visitor->doc_photo_back ? '/storage/visitors-photos/' . $visitor->doc_photo_back : null,
+            'photo' => $visitor->photo ? route('visitor.photo', ['filename' => $visitor->photo]) : null,
+            'doc_photo_front' => null,
+            'doc_photo_back' => null,
         ];
+        
+        // Verifica se os nomes dos arquivos das fotos dos documentos são consistentes com o lado
+        if ($visitor->doc_photo_front) {
+            // Verifica se o nome do arquivo contém '_front.'
+            if (strpos($visitor->doc_photo_front, '_front.') !== false) {
+                $photoData['doc_photo_front'] = route('visitor.photo', ['filename' => $visitor->doc_photo_front]);
+            } else {
+                // Extrai as partes do nome do arquivo
+                $parts = explode('_', pathinfo($visitor->doc_photo_front, PATHINFO_FILENAME));
+                if (count($parts) >= 2) {
+                    // Reconstrói o nome do arquivo com o lado correto
+                    $correctFilename = $parts[0] . '_' . $parts[1] . '_front.jpg';
+                    \Illuminate\Support\Facades\Log::warning("CreateVisitor: Nome do arquivo da foto frontal inconsistente", [
+                        'original' => $visitor->doc_photo_front,
+                        'corrected' => $correctFilename
+                    ]);
+                    $photoData['doc_photo_front'] = route('visitor.photo', ['filename' => $correctFilename]);
+                } else {
+                    $photoData['doc_photo_front'] = route('visitor.photo', ['filename' => $visitor->doc_photo_front]);
+                }
+            }
+        }
+        
+        if ($visitor->doc_photo_back) {
+            // Verifica se o nome do arquivo contém '_back.'
+            if (strpos($visitor->doc_photo_back, '_back.') !== false) {
+                $photoData['doc_photo_back'] = route('visitor.photo', ['filename' => $visitor->doc_photo_back]);
+            } else {
+                // Extrai as partes do nome do arquivo
+                $parts = explode('_', pathinfo($visitor->doc_photo_back, PATHINFO_FILENAME));
+                if (count($parts) >= 2) {
+                    // Reconstrói o nome do arquivo com o lado correto
+                    $correctFilename = $parts[0] . '_' . $parts[1] . '_back.jpg';
+                    \Illuminate\Support\Facades\Log::warning("CreateVisitor: Nome do arquivo da foto traseira inconsistente", [
+                        'original' => $visitor->doc_photo_back,
+                        'corrected' => $correctFilename
+                    ]);
+                    $photoData['doc_photo_back'] = route('visitor.photo', ['filename' => $correctFilename]);
+                } else {
+                    $photoData['doc_photo_back'] = route('visitor.photo', ['filename' => $visitor->doc_photo_back]);
+                }
+            }
+        }
+        
+        // Log para depuração
+        \Illuminate\Support\Facades\Log::info('CreateVisitor: Dados das fotos', [
+            'photoData' => $photoData
+        ]);
         
         $this->dispatch('photo-found', photoData: $photoData);
 
@@ -325,6 +373,12 @@ class CreateVisitor extends CreateRecord
     {
         // Verifica se o visitante já existe
         $formData = $this->form->getRawState();
+        
+        // Log para depuração
+        \Illuminate\Support\Facades\Log::info('CreateVisitor: Dados do formulário', [
+            'formData' => $formData,
+            'data' => $data
+        ]);
         
         $doc = $formData['doc'] ?? null;
         $docTypeId = $formData['doc_type_id'] ?? null;
