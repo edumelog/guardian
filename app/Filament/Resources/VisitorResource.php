@@ -110,12 +110,66 @@ class VisitorResource extends Resource
                                         $livewire->data['doc_photo_back'] = $visitor->doc_photo_back;
                                         $livewire->data['other'] = $visitor->other;
 
-                                        // Log para debug
+                                        // Log para depuração
+                                        \Illuminate\Support\Facades\Log::info('VisitorResource: Visitante encontrado', [
+                                            'visitor' => $visitor->toArray(),
+                                            'livewire_data' => $livewire->data
+                                        ]);
+
+                                        // Prepara os dados das fotos para o evento
                                         $photoData = [
-                                            'photo' => $visitor->photo ? '/storage/visitors-photos/' . $visitor->photo : null,
-                                            'doc_photo_front' => $visitor->doc_photo_front ? '/storage/visitors-photos/' . $visitor->doc_photo_front : null,
-                                            'doc_photo_back' => $visitor->doc_photo_back ? '/storage/visitors-photos/' . $visitor->doc_photo_back : null,
+                                            'photo' => $visitor->photo ? route('visitor.photo', ['filename' => $visitor->photo]) : null,
+                                            'doc_photo_front' => null,
+                                            'doc_photo_back' => null,
                                         ];
+                                        
+                                        // Verifica se os nomes dos arquivos das fotos dos documentos são consistentes com o lado
+                                        if ($visitor->doc_photo_front) {
+                                            // Verifica se o nome do arquivo contém '_front.'
+                                            if (strpos($visitor->doc_photo_front, '_front.') !== false) {
+                                                $photoData['doc_photo_front'] = route('visitor.photo', ['filename' => $visitor->doc_photo_front]);
+                                            } else {
+                                                // Extrai as partes do nome do arquivo
+                                                $parts = explode('_', pathinfo($visitor->doc_photo_front, PATHINFO_FILENAME));
+                                                if (count($parts) >= 2) {
+                                                    // Reconstrói o nome do arquivo com o lado correto
+                                                    $correctFilename = $parts[0] . '_' . $parts[1] . '_front.jpg';
+                                                    \Illuminate\Support\Facades\Log::warning("VisitorResource: Nome do arquivo da foto frontal inconsistente", [
+                                                        'original' => $visitor->doc_photo_front,
+                                                        'corrected' => $correctFilename
+                                                    ]);
+                                                    $photoData['doc_photo_front'] = route('visitor.photo', ['filename' => $correctFilename]);
+                                                } else {
+                                                    $photoData['doc_photo_front'] = route('visitor.photo', ['filename' => $visitor->doc_photo_front]);
+                                                }
+                                            }
+                                        }
+                                        
+                                        if ($visitor->doc_photo_back) {
+                                            // Verifica se o nome do arquivo contém '_back.'
+                                            if (strpos($visitor->doc_photo_back, '_back.') !== false) {
+                                                $photoData['doc_photo_back'] = route('visitor.photo', ['filename' => $visitor->doc_photo_back]);
+                                            } else {
+                                                // Extrai as partes do nome do arquivo
+                                                $parts = explode('_', pathinfo($visitor->doc_photo_back, PATHINFO_FILENAME));
+                                                if (count($parts) >= 2) {
+                                                    // Reconstrói o nome do arquivo com o lado correto
+                                                    $correctFilename = $parts[0] . '_' . $parts[1] . '_back.jpg';
+                                                    \Illuminate\Support\Facades\Log::warning("VisitorResource: Nome do arquivo da foto traseira inconsistente", [
+                                                        'original' => $visitor->doc_photo_back,
+                                                        'corrected' => $correctFilename
+                                                    ]);
+                                                    $photoData['doc_photo_back'] = route('visitor.photo', ['filename' => $correctFilename]);
+                                                } else {
+                                                    $photoData['doc_photo_back'] = route('visitor.photo', ['filename' => $visitor->doc_photo_back]);
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Log para depuração
+                                        \Illuminate\Support\Facades\Log::info('VisitorResource: Dados das fotos', [
+                                            'photoData' => $photoData
+                                        ]);
                                         
                                         // Dispara eventos para atualizar os previews das fotos
                                         $component->getLivewire()->dispatch('photo-found', photoData: $photoData);
@@ -322,15 +376,17 @@ class VisitorResource extends Resource
                     ->label('Documento')
                     ->searchable(),
                     
-                Tables\Columns\ImageColumn::make('photo')
+                Tables\Columns\TextColumn::make('photo')
                     ->label('Foto')
-                    ->circular()
-                    ->width(40)
-                    ->height(40)
-                    ->getStateUsing(fn (Visitor $record): ?string => 
-                        $record->photo ? "visitors-photos/{$record->photo}" : null
-                    )
-                    ->disk('public'),
+                    ->formatStateUsing(function (Visitor $record) {
+                        if (!$record->photo_url) {
+                            return '-';
+                        }
+                        
+                        return new \Illuminate\Support\HtmlString(
+                            '<img src="' . $record->photo_url . '" style="height: 40px; width: 40px;" class="max-w-none object-cover object-center rounded-full ring-white dark:ring-gray-900">'
+                        );
+                    }),
 
                 // Tables\Columns\ImageColumn::make('doc_photo_front')
                 //     ->label('Doc. Frente')

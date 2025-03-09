@@ -11,7 +11,7 @@
         init() {
             // Se já existe uma foto, carrega ela como preview
             if (this.state && !this.state.startsWith('data:image')) {
-                this.previewUrl = '/storage/visitors-photos/' + this.state;
+                this.previewUrl = '{{ route('visitor.photo', ['filename' => '__FILENAME__']) }}'.replace('__FILENAME__', this.state);
             } else if (this.state && this.state.startsWith('data:image')) {
                 this.previewUrl = this.state;
             }
@@ -22,7 +22,7 @@
                 if (photoData.photo) {
                     console.log('Atualizando preview da foto do visitante:', photoData.photo);
                     this.previewUrl = photoData.photo;
-                    this.state = photoData.photo;
+                    this.state = photoData.photo.split('/').pop();
                 }
             });
         },

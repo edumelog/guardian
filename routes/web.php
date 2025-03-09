@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PrintTemplateController;
+use App\Http\Controllers\VisitorPhotoController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 
@@ -25,6 +26,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/print-templates/upload', [PrintTemplateController::class, 'upload']);
     Route::get('/print-templates/{name}', [PrintTemplateController::class, 'getTemplate']);
     Route::delete('/print-templates/{name}', [PrintTemplateController::class, 'delete']);
+    
+    // Rota para acessar fotos dos visitantes de forma segura
+    Route::get('/visitor-photo/{filename}', [VisitorPhotoController::class, 'show'])->name('visitor.photo');
 });
 
 Route::prefix('qz')->group(function () {

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 
 class Visitor extends Model
 {
@@ -65,6 +66,48 @@ class Visitor extends Model
         return $this->belongsTo(VisitorLog::class)->latestOfMany();
     }
 
+    /**
+     * Retorna a URL para a foto do visitante
+     * 
+     * @return string|null
+     */
+    public function getPhotoUrlAttribute(): ?string
+    {
+        if (!$this->photo) {
+            return null;
+        }
+
+        return route('visitor.photo', ['filename' => $this->photo]);
+    }
+
+    /**
+     * Retorna a URL para a foto frontal do documento do visitante
+     * 
+     * @return string|null
+     */
+    public function getDocPhotoFrontUrlAttribute(): ?string
+    {
+        if (!$this->doc_photo_front) {
+            return null;
+        }
+
+        return route('visitor.photo', ['filename' => $this->doc_photo_front]);
+    }
+
+    /**
+     * Retorna a URL para a foto traseira do documento do visitante
+     * 
+     * @return string|null
+     */
+    public function getDocPhotoBackUrlAttribute(): ?string
+    {
+        if (!$this->doc_photo_back) {
+            return null;
+        }
+
+        return route('visitor.photo', ['filename' => $this->doc_photo_back]);
+    }
+
     protected static function boot()
     {
         parent::boot();
@@ -74,20 +117,20 @@ class Visitor extends Model
             $visitor->visitorLogs()->create([
                 'in_date' => now(),
                 'destination_id' => $visitor->destination_id,
-                'operator_id' => auth()->id()
+                'operator_id' => Auth::id()
             ]);
         });
 
         static::deleting(function ($visitor) {
             // Remove os arquivos de foto quando o visitante é excluído
             if ($visitor->photo) {
-                Storage::disk('public')->delete('visitors-photos/' . $visitor->photo);
+                Storage::disk('private')->delete('visitors-photos/' . $visitor->photo);
             }
             if ($visitor->doc_photo_front) {
-                Storage::disk('public')->delete('visitors-photos/' . $visitor->doc_photo_front);
+                Storage::disk('private')->delete('visitors-photos/' . $visitor->doc_photo_front);
             }
             if ($visitor->doc_photo_back) {
-                Storage::disk('public')->delete('visitors-photos/' . $visitor->doc_photo_back);
+                Storage::disk('private')->delete('visitors-photos/' . $visitor->doc_photo_back);
             }
         });
     }

@@ -7,28 +7,52 @@
         stream: null,
         capturing: false,
         previewUrl: null,
+        side: '{{ $field->getSide() }}',
         isDisabled: {{ $field->isDisabled() ? 'true' : 'false' }},
         init() {
+            console.log('DocumentPhotoCapture init:', {
+                field: '{{ $getStatePath() }}',
+                side: this.side,
+                state: this.state
+            });
+            
             // Se já existe uma foto, carrega ela como preview
             if (this.state && !this.state.startsWith('data:image')) {
-                this.previewUrl = '/storage/visitors-photos/' + this.state;
+                // Verifica se o nome do arquivo contém o lado correto
+                if (!this.state.includes(`_${this.side}.`)) {
+                    console.warn(`DocumentPhotoCapture: Nome do arquivo inconsistente com o lado (${this.side}): ${this.state}`);
+                }
+                
+                this.previewUrl = '{{ route('visitor.photo', ['filename' => '__FILENAME__']) }}'.replace('__FILENAME__', this.state);
+                console.log('DocumentPhotoCapture: carregando preview existente', {
+                    field: '{{ $getStatePath() }}',
+                    side: this.side,
+                    previewUrl: this.previewUrl
+                });
             } else if (this.state && this.state.startsWith('data:image')) {
                 this.previewUrl = this.state;
             }
 
             // Escuta o evento photo-found
             Livewire.on('photo-found', ({ photoData }) => {
-                const side = '{{ $field->getSide() }}';
                 console.log('DocumentPhotoCapture recebeu evento photo-found:', {
-                    side: side,
+                    side: this.side,
                     data: photoData,
                     fieldName: '{{ $getStatePath() }}'
                 });
                 
-                if (photoData[`doc_photo_${side}`]) {
-                    console.log(`Atualizando preview da foto do documento (${side}):`, photoData[`doc_photo_${side}`]);
-                    this.previewUrl = photoData[`doc_photo_${side}`];
-                    this.state = photoData[`doc_photo_${side}`];
+                const fieldKey = `doc_photo_${this.side}`;
+                if (photoData[fieldKey]) {
+                    console.log(`Atualizando preview da foto do documento (${this.side}):`, photoData[fieldKey]);
+                    
+                    // Verifica se a URL da foto contém o lado correto
+                    const filename = photoData[fieldKey].split('/').pop();
+                    if (!filename.includes(`_${this.side}.`)) {
+                        console.warn(`DocumentPhotoCapture: URL da foto inconsistente com o lado (${this.side}): ${photoData[fieldKey]}`);
+                    }
+                    
+                    this.previewUrl = photoData[fieldKey];
+                    this.state = filename;
                 }
             });
         },
@@ -82,6 +106,8 @@
             // Atualiza preview e input
             this.previewUrl = imageData;
             this.state = imageData;
+            
+            console.log(`DocumentPhotoCapture: foto capturada para o lado ${this.side}`);
             
             // Para a câmera
             this.stopCapture();
@@ -143,7 +169,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        Fotografar Documento
+                        Fotografar Documento <span x-text="side === 'front' ? '(Frente)' : '(Verso)'"></span>
                     </button>
                 </div>
                 

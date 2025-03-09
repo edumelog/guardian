@@ -71,15 +71,13 @@ class EditVisitor extends EditRecord
         if ($visitor->photo) {
             // Verifica se a foto existe
             $photoPath = "visitors-photos/{$visitor->photo}";
-            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($photoPath)) {
-                $photoUrl = url(\Illuminate\Support\Facades\Storage::url($photoPath));
+            if (\Illuminate\Support\Facades\Storage::disk('private')->exists($photoPath)) {
+                $photoUrl = route('visitor.photo', ['filename' => $visitor->photo]);
                 \Illuminate\Support\Facades\Log::info('URL da foto gerada', [
                     'visitor_id' => $visitor->id,
                     'photo_filename' => $visitor->photo,
                     'photo_path' => $photoPath,
                     'photo_url' => $photoUrl,
-                    'storage_path' => \Illuminate\Support\Facades\Storage::disk('public')->path($photoPath),
-                    'storage_url' => \Illuminate\Support\Facades\Storage::url($photoPath),
                 ]);
             } else {
                 \Illuminate\Support\Facades\Log::warning('Foto do visitante não encontrada', [
@@ -302,6 +300,12 @@ class EditVisitor extends EditRecord
     public function beforeSave(): void
     {
         $lastLog = $this->record->visitorLogs()->latest('in_date')->first();
+        
+        // Log para depuração
+        \Illuminate\Support\Facades\Log::info('EditVisitor: Dados do formulário antes de salvar', [
+            'formData' => $this->form->getRawState(),
+            'record' => $this->record->toArray()
+        ]);
         
         // Se o visitante já saiu, não permite salvar alterações
         if ($lastLog && $lastLog->out_date !== null) {
