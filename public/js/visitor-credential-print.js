@@ -486,6 +486,7 @@ function processTemplate(html, visitor) {
         'visitor-destination': visitor.destination || '',
         'visitor-destination-address': visitor.destinationAddress || '',
         'visitor-destination-phone': visitor.destinationPhone || '',
+        'visitor-destination-alias': visitor.destinationAlias || visitor.destinationParentAlias || '',
         
         // Datas de entrada e saída
         'visitor-in-datetime': visitor.inDate ? new Date(visitor.inDate).toLocaleString() : '',

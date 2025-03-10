@@ -13,6 +13,7 @@ class Destination extends Model
 
     protected $fillable = [
         'name',
+        'alias',
         'address',
         'phone',
         'max_visitors',
@@ -97,6 +98,26 @@ class Destination extends Model
         }
 
         return false;
+    }
+
+    /**
+     * Retorna o primeiro alias disponível na hierarquia de destinos
+     */
+    public function getFirstAvailableAlias(): ?string
+    {
+        if (!empty($this->alias)) {
+            return $this->alias;
+        }
+
+        $current = $this->parent;
+        while ($current) {
+            if (!empty($current->alias)) {
+                return $current->alias;
+            }
+            $current = $current->parent;
+        }
+
+        return null;
     }
 
     public function getCurrentVisitorsCount(): int
