@@ -65,7 +65,7 @@ async function processPrintRequest(visitor) {
         
         // Carrega o template
         let response;
-        response = await fetch(`/print-templates/${config.template}`);
+            response = await fetch(`/print-templates/${config.template}`);
         
         if (!response.ok) {
             throw new Error('Erro ao carregar o template');
@@ -470,73 +470,51 @@ async function showTemplateModal(html, visitor, config) {
 // Função para processar o template e substituir as classes tpl-xxx
 function processTemplate(html, visitor) {
     console.log('[CredentialPrint] Processando template com dados do visitante:', visitor);
-    console.log('[CredentialPrint] URL da foto do visitante:', visitor.photo);
     
-    // Verifica se o HTML original contém a classe tpl-photo
-    const hasPhotoClass = html.includes('tpl-photo');
-    console.log('[CredentialPrint] HTML original contém a classe tpl-photo:', hasPhotoClass);
-    
-    // Abordagem alternativa: usar regex para substituir diretamente no HTML
-    // Isso evita problemas com a manipulação do DOM
-    if (visitor.photo) {
-        // Substitui todos os src de imagens com classe tpl-photo
-        const imgRegex = /<img[^>]*class="[^"]*tpl-photo[^"]*"[^>]*>/gi;
-        const matches = html.match(imgRegex) || [];
-        
-        console.log('[CredentialPrint] Encontradas', matches.length, 'tags de imagem com classe tpl-photo via regex');
-        
-        matches.forEach((match, index) => {
-            console.log(`[CredentialPrint] Tag de imagem ${index + 1} original:`, match);
-            
-            // Verifica se a tag já contém a URL da foto
-            const alreadyHasPhoto = match.includes(visitor.photo);
-            console.log(`[CredentialPrint] Tag de imagem ${index + 1} já contém a URL da foto:`, alreadyHasPhoto);
-            
-            if (!alreadyHasPhoto) {
-                // Substitui o src na tag com a URL completa da foto
-                // Certifica-se de que a URL é absoluta para o QZ Tray
-                let photoUrl = visitor.photo;
-                
-                // Se a URL não começar com http ou https, adiciona o domínio atual
-                if (!photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
-                    const origin = window.location.origin;
-                    photoUrl = origin + (photoUrl.startsWith('/') ? '' : '/') + photoUrl;
-                    console.log(`[CredentialPrint] Convertendo URL relativa para absoluta: ${visitor.photo} -> ${photoUrl}`);
-                }
-                
-                // Substitui o src na tag
-                const newTag = match.replace(/src="[^"]*"/i, `src="${photoUrl}"`);
-                
-                console.log(`[CredentialPrint] Tag de imagem ${index + 1} modificada:`, newTag);
-                
-                // Substitui no HTML
-                html = html.replace(match, newTag);
-            }
-        });
-        
-        // Verifica se o HTML após substituição regex contém a URL da foto
-        const hasPhotoUrl = html.includes(visitor.photo);
-        console.log('[CredentialPrint] HTML após substituição regex contém a URL da foto:', hasPhotoUrl);
-    }
-    
-    // Continua com a abordagem DOM para outros elementos
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
     
-    // Dados básicos do visitante
+    // Dados do visitante para substituição no template
     const visitorData = {
-        'visitor-id': visitor.id,
-        'visitor-name': visitor.name,
-        'visitor-doc': visitor.doc,
-        'visitor-doc-type': visitor.docType,
-        'visitor-destination': visitor.destination,
-        'visitor-destination-address': visitor.destinationAddress,
-        'visitor-in-date': visitor.inDate,
-        'visitor-other': visitor.other,
+        // Dados básicos do visitante
+        'visitor-id': visitor.id || '',
+        'visitor-name': visitor.name || '',
+        'visitor-doc-type': visitor.docType || '',
+        'visitor-doc': visitor.doc || '',
+        
+        // Dados do destino
+        'visitor-destination': visitor.destination || '',
+        'visitor-destination-address': visitor.destinationAddress || '',
+        'visitor-destination-phone': visitor.destinationPhone || '',
+        
+        // Datas de entrada e saída
+        'visitor-in-datetime': visitor.inDate ? new Date(visitor.inDate).toLocaleString() : '',
+        'visitor-out-datetime': visitor.outDate ? new Date(visitor.outDate).toLocaleString() : '',
+        
+        // Informações adicionais
+        'visitor-other': visitor.other || '',
+        
+        // Data e hora atual
         'datetime': new Date().toLocaleString(),
         'date': new Date().toLocaleDateString(),
         'time': new Date().toLocaleTimeString(),
     };
+    
+    console.log('[CredentialPrint] Dados processados para substituição:', visitorData);
+    
+    // Processa a foto do visitante (tratamento especial para imagens)
+    if (visitor.photo) {
+        const photoElements = doc.querySelectorAll('img.tpl-visitor-photo');
+        photoElements.forEach(img => {
+            // Certifica-se de que a URL é absoluta para o QZ Tray
+            let photoUrl = visitor.photo;
+            if (!photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
+                const origin = window.location.origin;
+                photoUrl = origin + (photoUrl.startsWith('/') ? '' : '/') + photoUrl;
+            }
+            img.src = photoUrl;
+        });
+    }
     
     // Processa todos os elementos com classes que começam com "tpl-"
     const allElements = doc.querySelectorAll('*[class*="tpl-"]');
@@ -553,97 +531,20 @@ function processTemplate(html, visitor) {
             // Remove o prefixo "tpl-" para obter o nome do campo
             const fieldName = tplClass.substring(4);
             
-            // Pula o processamento de imagens, já que fizemos isso com regex
-            if (fieldName === 'photo' && element.tagName === 'IMG') {
-                console.log('[CredentialPrint] Encontrada imagem com classe tpl-photo no DOM:', element.outerHTML);
+            // Pula o processamento de imagens, já que fizemos isso separadamente
+            if (fieldName === 'visitor-photo' && element.tagName === 'IMG') {
                 return;
             }
             
             // Verifica se temos um valor para este campo
             if (visitorData[fieldName] !== undefined) {
-                // Para elementos de texto, substitui o conteúdo
-                if (element.tagName !== 'IMG') {
-                    element.textContent = visitorData[fieldName] || '';
-                }
-            } else {
-                // Verifica se é um campo composto (com pontos)
-                const parts = fieldName.split('-');
-                if (parts.length > 1) {
-                    // Tenta acessar propriedades aninhadas
-                    let value = visitor;
-                    let valid = true;
-                    
-                    for (const part of parts) {
-                        if (value && value[part] !== undefined) {
-                            value = value[part];
-                        } else {
-                            valid = false;
-                            break;
-                        }
-                    }
-                    
-                    if (valid && element.tagName !== 'IMG') {
-                        element.textContent = value || '';
-                    }
-                }
+                element.textContent = visitorData[fieldName];
             }
         });
     });
     
-    // Verifica se as imagens foram substituídas corretamente
-    const photoElements = doc.querySelectorAll('img.tpl-photo');
-    console.log('[CredentialPrint] Verificando', photoElements.length, 'imagens após processamento DOM');
-    
-    photoElements.forEach((img, index) => {
-        console.log(`[CredentialPrint] Imagem ${index + 1} após processamento DOM:`, img.outerHTML);
-        console.log(`[CredentialPrint] Src da imagem ${index + 1} após processamento DOM:`, img.src);
-        
-        // Verifica se a imagem tem o src correto
-        const hasSrc = img.src === visitor.photo;
-        console.log(`[CredentialPrint] Imagem ${index + 1} tem o src correto:`, hasSrc);
-        
-        // Se não tiver, tenta definir manualmente
-        if (!hasSrc && visitor.photo) {
-            console.log(`[CredentialPrint] Definindo src da imagem ${index + 1} manualmente`);
-            
-            // Certifica-se de que a URL é absoluta para o QZ Tray
-            let photoUrl = visitor.photo;
-            
-            // Se a URL não começar com http ou https, adiciona o domínio atual
-            if (!photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
-                const origin = window.location.origin;
-                photoUrl = origin + (photoUrl.startsWith('/') ? '' : '/') + photoUrl;
-                console.log(`[CredentialPrint] Convertendo URL relativa para absoluta: ${visitor.photo} -> ${photoUrl}`);
-            }
-            
-            img.src = photoUrl;
-        }
-    });
-    
     // Retorna o HTML processado
-    const processedHtml = doc.documentElement.outerHTML;
-    
-    // Verifica se o HTML processado contém a URL da foto
-    if (visitor.photo && !processedHtml.includes(visitor.photo)) {
-        console.warn('[CredentialPrint] A URL da foto não foi encontrada no HTML processado!');
-        console.log('[CredentialPrint] Aplicando substituição direta no HTML final');
-        
-        // Última tentativa: substituição direta no HTML final
-        // Certifica-se de que a URL é absoluta para o QZ Tray
-        let photoUrl = visitor.photo;
-        
-        // Se a URL não começar com http ou https, adiciona o domínio atual
-        if (!photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
-            const origin = window.location.origin;
-            photoUrl = origin + (photoUrl.startsWith('/') ? '' : '/') + photoUrl;
-            console.log(`[CredentialPrint] Convertendo URL relativa para absoluta: ${visitor.photo} -> ${photoUrl}`);
-        }
-        
-        return processedHtml.replace(/<img[^>]*class="[^"]*tpl-photo[^"]*"[^>]*src="[^"]*"/gi, 
-                                    `<img class="tpl-photo" src="${photoUrl}"`);
-    }
-    
-    return processedHtml;
+    return doc.documentElement.outerHTML;
 }
 
 // Função para carregar e conectar ao QZ Tray
