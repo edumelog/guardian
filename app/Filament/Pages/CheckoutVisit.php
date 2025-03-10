@@ -21,11 +21,11 @@ class CheckoutVisit extends Page implements HasTable
     use HasPageShield;
     use InteractsWithTable;
     
-    protected static ?string $navigationIcon = 'heroicon-o-arrow-right-circle';
+    protected static ?string $navigationIcon = 'heroicon-o-arrow-left-circle';
     protected static ?string $navigationLabel = 'Registro de Saída';
     protected static ?string $title = 'Registro de Saída de Visitantes';
     protected static ?string $slug = 'checkout-visit';
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 2;
     protected static ?string $navigationGroup = 'Controle de Acesso';
     protected static string $view = 'filament.pages.checkout-visit';
 
