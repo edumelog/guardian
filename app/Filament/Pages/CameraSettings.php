@@ -15,7 +15,7 @@ class CameraSettings extends Page
     protected static ?string $title = 'Configuração de Câmeras';
     protected static ?string $slug = 'camera-settings';
     protected static ?string $navigationGroup = 'Configurações';
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 3;
 
     protected static string $view = 'filament.pages.camera-setup';
 

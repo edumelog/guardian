@@ -111,6 +111,7 @@ return [
             'PrinterSettings' => 'printer_settings',
             'QzTrayDemo' => 'qz_tray_demo',
             'QZCertificates' => 'qz_certificates',
+            'CheckoutVisit' => 'checkout_visit',
         ],
     ],
 
