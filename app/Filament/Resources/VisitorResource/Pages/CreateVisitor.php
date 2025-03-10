@@ -421,7 +421,11 @@ class CreateVisitor extends CreateRecord
             ->first();
 
         if ($visitor) {
-            // Se o visitante existe, cria apenas um novo log de visita
+            // Se o visitante existe, atualiza as informações adicionais e cria um novo log de visita
+            $visitor->update([
+                'other' => $data['other'] ?? null
+            ]);
+
             $visitor->visitorLogs()->create([
                 'destination_id' => $data['destination_id'],
                 'in_date' => now(),

@@ -97,12 +97,14 @@ class EditVisitor extends EditRecord
             'id' => $visitor->id,
             'name' => $visitor->name,
             'doc' => $visitor->doc,
-            'docType' => $visitor->docType->type,
+            'docType' => $visitor->docType?->type,
+            'destination' => $visitor->destination?->name,
+            'destinationAddress' => $visitor->destination?->address,
+            'destinationPhone' => $visitor->destination?->phone,
+            'destinationAlias' => $visitor->destination?->getFirstAvailableAlias(),
             'photo' => $photoUrl,
-            'destination' => $visitor->destination->name,
-            'destinationAddress' => $visitor->destination->address,
-            'inDate' => $lastLog ? $lastLog->in_date->format('d/m/Y H:i') : null,
-            'outDate' => $lastLog && $lastLog->out_date ? $lastLog->out_date->format('d/m/Y H:i') : null,
+            'inDate' => $lastLog?->in_date,
+            'outDate' => $lastLog?->out_date,
             'other' => $visitor->other,
             // Dados adicionais
             'docTypeName' => $visitor->docType->type,
@@ -110,10 +112,12 @@ class EditVisitor extends EditRecord
             'destinationId' => $visitor->destination->id,
             'destinationName' => $visitor->destination->name,
             'destinationAddress' => $visitor->destination->address,
-            'destinationPhone' => $visitor->destination->phone,
             'createdAt' => $visitor->created_at->format('d/m/Y H:i'),
             'updatedAt' => $visitor->updated_at->format('d/m/Y H:i'),
         ];
+
+        // Log para debug dos dados do visitante
+        \Illuminate\Support\Facades\Log::info('Dados do visitante preparados para impressão:', $visitorData);
 
         // Adiciona um script inline para carregar o script dinamicamente e então executar a função
         $this->js(<<<JS
