@@ -220,6 +220,134 @@ class PrintTemplateController extends Controller
     }
 
     /**
+     * Processa as imagens no HTML, convertendo-as para base64
+     * 
+     * @param string $html Conteúdo HTML
+     * @param string $extractPath Caminho de extração do template
+     * @param string $htmlDir Diretório do arquivo HTML
+     * @return string HTML com imagens em base64
+     */
+    private function processImages($html, $extractPath, $htmlDir)
+    {
+        Log::info('Processando imagens no HTML');
+        
+        // Carrega o HTML em um DOMDocument
+        $doc = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $doc->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'), LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        
+        // Encontra todas as tags de imagem
+        $images = $doc->getElementsByTagName('img');
+        
+        foreach ($images as $img) {
+            $src = $img->getAttribute('src');
+            
+            // Pula se já for base64
+            if (strpos($src, 'data:image') === 0) {
+                continue;
+            }
+            
+            try {
+                // Remove parâmetros de URL se existirem
+                $src = preg_replace('/\?.*$/', '', $src);
+                
+                // Tenta diferentes caminhos para encontrar a imagem
+                $imagePath = null;
+                
+                // Caminho absoluto no sistema de arquivos
+                if (strpos($src, '/') === 0) {
+                    $path = $extractPath . $src;
+                    if (File::exists($path)) {
+                        $imagePath = $path;
+                    }
+                }
+                
+                // Caminho relativo começando com ./
+                if (!$imagePath && strpos($src, './') === 0) {
+                    $path = $htmlDir . '/' . substr($src, 2);
+                    if (File::exists($path)) {
+                        $imagePath = $path;
+                    }
+                }
+                
+                // Caminho relativo sem ./
+                if (!$imagePath) {
+                    $path = $htmlDir . '/' . $src;
+                    if (File::exists($path)) {
+                        $imagePath = $path;
+                    }
+                }
+                
+                // Tenta na raiz do template
+                if (!$imagePath) {
+                    $path = $extractPath . '/' . $src;
+                    if (File::exists($path)) {
+                        $imagePath = $path;
+                    }
+                }
+                
+                // Se for uma URL, tenta fazer o download
+                if (!$imagePath && (strpos($src, 'http://') === 0 || strpos($src, 'https://') === 0)) {
+                    try {
+                        $imageContent = file_get_contents($src);
+                        if ($imageContent !== false) {
+                            $tempFile = tempnam(sys_get_temp_dir(), 'img');
+                            file_put_contents($tempFile, $imageContent);
+                            $imagePath = $tempFile;
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning('Erro ao baixar imagem:', [
+                            'url' => $src,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
+                
+                // Se encontrou a imagem, converte para base64
+                if ($imagePath) {
+                    $imageContent = File::get($imagePath);
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    $mimeType = finfo_file($finfo, $imagePath);
+                    finfo_close($finfo);
+                    
+                    $base64 = base64_encode($imageContent);
+                    $img->setAttribute('src', "data:{$mimeType};base64,{$base64}");
+                    
+                    Log::info('Imagem convertida para base64:', [
+                        'original' => $src,
+                        'mime_type' => $mimeType,
+                        'size' => strlen($base64)
+                    ]);
+                    
+                    // Remove o arquivo temporário se foi criado
+                    if (strpos($imagePath, sys_get_temp_dir()) === 0) {
+                        unlink($imagePath);
+                    }
+                } else {
+                    // Se não encontrou a imagem, limpa o src
+                    $img->setAttribute('src', '');
+                    Log::warning('Imagem não encontrada:', ['src' => $src]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Erro ao processar imagem:', [
+                    'src' => $src,
+                    'error' => $e->getMessage()
+                ]);
+                // Em caso de erro, limpa o src
+                $img->setAttribute('src', '');
+            }
+        }
+        
+        // Converte de volta para string HTML
+        $html = $doc->saveHTML();
+        
+        Log::info('Processamento de imagens concluído');
+        
+        return $html;
+    }
+
+    /**
      * Processa os arquivos HTML para corrigir caminhos relativos
      * 
      * @param string $extractPath Caminho completo para o diretório do template
@@ -283,6 +411,9 @@ class PrintTemplateController extends Controller
             
             // Log do HTML antes das substituições
             Log::info('HTML antes das substituições:', ['html' => $html]);
+            
+            // Processa as imagens antes de processar os caminhos
+            $html = $this->processImages($html, $extractPath, dirname($htmlFile));
             
             // Extrai links para arquivos CSS
             $cssFiles = [];
