@@ -131,25 +131,21 @@ document.addEventListener('alpine:init', () => {
 
             try {
                 // Carrega a configuração salva para pegar o template default
-                const savedConfig = localStorage.getItem('guardian_printer_config');
-                if (!savedConfig) {
-                    throw new Error('Nenhuma configuração encontrada. Configure um template padrão primeiro.');
+                const config = localStorage.getItem('guardian_printer_config');
+                if (!config) {
+                    throw new Error('Nenhuma configuração encontrada. Configure um template primeiro.');
+                }
+                
+                const parsedConfig = JSON.parse(config);
+                if (!parsedConfig.template) {
+                    throw new Error('Nenhum template configurado. Configure um template primeiro.');
                 }
 
-                const config = JSON.parse(savedConfig);
-                if (!config.template) {
-                    throw new Error('Nenhum template padrão configurado. Configure um template padrão primeiro.');
-                }
-
-                console.log('Template configurado:', config.template);
+                console.log('Template configurado:', parsedConfig.template);
 
                 // Carrega o template
                 let response;
-                if (config.template === 'default.zip') {
-                    response = await fetch('/storage/templates/default/index.html');
-                } else {
-                    response = await fetch(`/print-templates/${config.template}`);
-                }
+                response = await fetch(`/print-templates/${parsedConfig.template}`);
                 
                 if (!response.ok) throw new Error('Erro ao carregar template');
                 

@@ -30,39 +30,10 @@ class PrintTemplateController extends Controller
                     'name' => $zipName, // Mantém o nome com .zip para compatibilidade
                     'path' => '/storage/' . $dir . '/index.html',
                     'slug' => $name,
-                    'isDefault' => $name === 'default', // Apenas o template 'default' é marcado como default por padrão
                     'zipExists' => $zipExists
                 ];
             })
             ->values();
-
-        // Verifica se existe um template marcado como default
-        $hasDefault = $templates->contains('isDefault', true);
-
-        // Se não houver um template default, inclui o template padrão do sistema
-        if (!$hasDefault) {
-            // Verifica se o diretório default existe
-            $defaultExists = Storage::disk('public')->exists("templates/default/index.html");
-            
-            if ($defaultExists) {
-                // Se o diretório default existe, marca-o como default
-                $templates = $templates->map(function ($template) {
-                    if ($template['slug'] === 'default') {
-                        $template['isDefault'] = true;
-                    }
-                    return $template;
-                });
-            } else {
-                // Se não existir, adiciona o template padrão do sistema
-                $templates->prepend([
-                    'name' => 'default.zip',
-                    'path' => '/templates/default/index.html',
-                    'slug' => 'default',
-                    'isDefault' => true,
-                    'zipExists' => false
-                ]);
-            }
-        }
 
         // Log para debug
         Log::info('Templates encontrados:', ['templates' => $templates]);
@@ -114,16 +85,6 @@ class PrintTemplateController extends Controller
                 'slug' => $slug,
                 'filename' => $filename
             ]);
-
-            // Impede sobrescrita do template padrão
-            if (strtolower($filename) === 'default.zip') {
-                Log::warning('Tentativa de sobrescrever template padrão');
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Não é permitido sobrescrever o template padrão (default.zip)',
-                    'type' => 'error'
-                ], 403);
-            }
 
             // Verifica se o arquivo já existe
             $isUpdate = Storage::disk('public')->exists("templates/{$filename}");
@@ -589,16 +550,6 @@ class PrintTemplateController extends Controller
         $slug = pathinfo($name, PATHINFO_FILENAME);
         Log::info('Slug extraído:', ['slug' => $slug]);
         
-        // Impede exclusão do template padrão
-        if (strtolower($slug) === 'default') {
-            Log::warning('Tentativa de excluir template padrão');
-            return response()->json([
-                'success' => false,
-                'message' => 'Não é permitido excluir o template padrão (default)',
-                'type' => 'error'
-            ], 403);
-        }
-
         // Verifica se o diretório do template existe
         if (!Storage::disk('public')->exists("templates/{$slug}")) {
             Log::warning('Diretório do template não encontrado:', ['slug' => $slug]);
@@ -661,22 +612,6 @@ class PrintTemplateController extends Controller
     public function getTemplate($name)
     {
         Log::info('Solicitando template:', ['name' => $name]);
-        
-        // Se for o template padrão, retorna do diretório public
-        if ($name === 'default.zip') {
-            $path = public_path("templates/default/index.html");
-            Log::info('Buscando template padrão:', ['path' => $path]);
-            
-            if (!file_exists($path)) {
-                Log::warning('Template padrão não encontrado:', ['path' => $path]);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Template padrão não encontrado',
-                    'type' => 'error'
-                ], 404);
-            }
-            return response()->file($path);
-        }
         
         // Extrai o nome base (sem extensão)
         $slug = pathinfo($name, PATHINFO_FILENAME);
