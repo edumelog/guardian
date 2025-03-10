@@ -1,6 +1,14 @@
 // Log global para verificar se o script está sendo carregado
 console.log('[CredentialPrint] Script de impressão de credencial carregado');
 
+// Carrega a biblioteca QRious para geração de QR Code
+if (!window.QRious) {
+    console.log('[CredentialPrint] Carregando biblioteca QRious...');
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
+    document.head.appendChild(script);
+}
+
 // Função global para impressão de credencial
 window.printVisitorCredential = function(visitor) {
     console.log('[CredentialPrint] Função de impressão de credencial chamada com:', visitor);
@@ -84,7 +92,7 @@ async function processPrintRequest(visitor) {
         }
         
         // Processa o template com os dados do visitante
-        templateHtml = processTemplate(templateHtml, visitor);
+        templateHtml = await processTemplate(templateHtml, visitor);
         
         // Cria um modal para exibir o template
         await showTemplateModal(templateHtml, visitor, config);
@@ -415,7 +423,18 @@ async function showTemplateModal(html, visitor, config) {
                         img.style.maxWidth = '100%';
                         img.style.maxHeight = '100%';
                         
-                        // Força a conversão mesmo se já for base64 (para garantir)
+                        // Pula a conversão se for uma imagem de QR code
+                        if (img.classList.contains('tpl-visitor-qrcode-img')) {
+                            console.log(`[CredentialPrint] Imagem ${index + 1} é um QR code, pulando conversão`);
+                            return;
+                        }
+                        
+                        // Pula se já for base64
+                        if (img.src.startsWith('data:image/')) {
+                            console.log(`[CredentialPrint] Imagem ${index + 1} já está em base64, pulando conversão`);
+                            return;
+                        }
+                        
                         const originalSrc = img.src;
                         
                         // Adiciona um timestamp para evitar cache
@@ -430,6 +449,8 @@ async function showTemplateModal(html, visitor, config) {
                             })
                             .catch(err => {
                                 console.warn(`[CredentialPrint] Erro ao converter imagem ${index + 1} para base64:`, err);
+                                // Limpa o src em caso de erro
+                                img.src = '';
                             });
                         
                         conversionPromises.push(promise);
@@ -468,11 +489,23 @@ async function showTemplateModal(html, visitor, config) {
 }
 
 // Função para processar o template e substituir as classes tpl-xxx
-function processTemplate(html, visitor) {
+async function processTemplate(html, visitor) {
     console.log('[CredentialPrint] Processando template com dados do visitante:', visitor);
     
+    // Garante que a biblioteca QRious está carregada
+    try {
+        await loadQRious();
+    } catch (err) {
+        console.error('[CredentialPrint] Erro ao carregar QRious:', err);
+        throw new Error('Não foi possível carregar a biblioteca para geração de QR code');
+    }
+
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
+    
+    // Gera o QR code primeiro
+    const docNumber = visitor.doc ? visitor.doc.padStart(11, '0') : '';
+    const qrCodeData = docNumber;
     
     // Dados do visitante para substituição no template
     const visitorData = {
@@ -481,6 +514,7 @@ function processTemplate(html, visitor) {
         'visitor-name': visitor.name || '',
         'visitor-doc-type': visitor.docType || '',
         'visitor-doc': visitor.doc || '',
+        'visitor-qrcode': qrCodeData, // Adiciona o QR code aos dados
         
         // Dados do destino
         'visitor-destination': visitor.destination || '',
@@ -502,6 +536,26 @@ function processTemplate(html, visitor) {
     };
     
     console.log('[CredentialPrint] Dados processados para substituição:', visitorData);
+    
+    // Processa o QR code primeiro
+    const qrCodeElements = doc.querySelectorAll('img.tpl-visitor-qrcode-img');
+    qrCodeElements.forEach(img => {
+        // Verifica se a biblioteca QRious está disponível
+        if (typeof QRious === 'undefined') {
+            console.error('[CredentialPrint] Biblioteca QRious não está carregada. O QR code não será gerado.');
+            return;
+        }
+
+        // Gera o QR code como base64
+        const qr = new QRious({
+            value: qrCodeData,
+            size: 200
+        });
+        img.src = qr.toDataURL();
+        // Marca a imagem como processada para evitar conversão posterior
+        img.setAttribute('data-processed', 'true');
+        console.log('[CredentialPrint] QR code gerado e definido na imagem');
+    });
     
     // Processa a foto do visitante (tratamento especial para imagens)
     if (visitor.photo) {
@@ -533,7 +587,7 @@ function processTemplate(html, visitor) {
             const fieldName = tplClass.substring(4);
             
             // Pula o processamento de imagens, já que fizemos isso separadamente
-            if (fieldName === 'visitor-photo' && element.tagName === 'IMG') {
+            if ((fieldName === 'visitor-photo' || fieldName === 'visitor-qrcode-img') && element.tagName === 'IMG') {
                 return;
             }
             
@@ -546,6 +600,29 @@ function processTemplate(html, visitor) {
     
     // Retorna o HTML processado
     return doc.documentElement.outerHTML;
+}
+
+// Função para carregar a biblioteca QRious
+function loadQRious() {
+    return new Promise((resolve, reject) => {
+        if (window.QRious) {
+            resolve();
+            return;
+        }
+
+        console.log('[CredentialPrint] Carregando biblioteca QRious...');
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
+        script.onload = () => {
+            console.log('[CredentialPrint] Biblioteca QRious carregada com sucesso');
+            resolve();
+        };
+        script.onerror = (err) => {
+            console.error('[CredentialPrint] Erro ao carregar biblioteca QRious:', err);
+            reject(new Error('Erro ao carregar biblioteca QRious'));
+        };
+        document.head.appendChild(script);
+    });
 }
 
 // Função para carregar e conectar ao QZ Tray
@@ -720,8 +797,19 @@ function imageToDataURL(url) {
     return new Promise((resolve, reject) => {
         // Se a URL já for um data URL, retorna imediatamente
         if (url.startsWith('data:')) {
+            console.log('[CredentialPrint] URL já é base64, retornando diretamente');
             resolve(url);
             return;
+        }
+
+        // Se a URL contém base64 como parte do caminho (erro), extrai apenas a parte base64
+        if (url.includes('data:image/')) {
+            const base64Match = url.match(/data:image\/[^;]+;base64,[^\\s"]+/);
+            if (base64Match) {
+                console.log('[CredentialPrint] Extraindo base64 da URL incorreta');
+                resolve(base64Match[0]);
+                return;
+            }
         }
         
         console.log('[CredentialPrint] Convertendo imagem para base64:', url);
@@ -753,15 +841,13 @@ function imageToDataURL(url) {
                 resolve(dataURL);
             } catch (err) {
                 console.error('[CredentialPrint] Erro ao converter imagem para base64:', err);
-                // Em caso de erro, tenta retornar a URL original
-                resolve(url);
+                reject(err);
             }
         };
         
         img.onerror = function(err) {
             console.error('[CredentialPrint] Erro ao carregar imagem:', url);
-            // Em caso de erro, retorna a URL original
-            resolve(url);
+            reject(err);
         };
         
         // Define a URL da imagem

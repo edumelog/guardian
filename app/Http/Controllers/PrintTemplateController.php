@@ -220,32 +220,45 @@ class PrintTemplateController extends Controller
     }
 
     /**
-     * Processa as imagens no HTML, convertendo-as para base64
+     * Processa as imagens no HTML, convertendo para base64
      * 
      * @param string $html Conteúdo HTML
-     * @param string $extractPath Caminho de extração do template
-     * @param string $htmlDir Diretório do arquivo HTML
-     * @return string HTML com imagens em base64
+     * @param string $extractPath Caminho do diretório do template
+     * @param string $htmlDir Diretório do arquivo HTML atual
+     * @return string HTML processado
      */
     private function processImages($html, $extractPath, $htmlDir)
     {
-        Log::info('Processando imagens no HTML');
-        
-        // Carrega o HTML em um DOMDocument
+        Log::info('Iniciando processamento de imagens', [
+            'extractPath' => $extractPath,
+            'htmlDir' => $htmlDir
+        ]);
+
+        // Carrega o HTML no DOMDocument
         $doc = new \DOMDocument();
         libxml_use_internal_errors(true);
-        $doc->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'), LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $doc->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
-        
-        // Encontra todas as tags de imagem
+
+        // Processa todas as imagens
         $images = $doc->getElementsByTagName('img');
-        
         foreach ($images as $img) {
             $src = $img->getAttribute('src');
             
             // Pula se já for base64
-            if (strpos($src, 'data:image') === 0) {
+            if (strpos($src, 'data:image/') === 0) {
+                Log::info('Imagem já está em base64, pulando:', ['src' => substr($src, 0, 50) . '...']);
                 continue;
+            }
+
+            // Se a URL contém base64 como parte do caminho (erro), extrai apenas a parte base64
+            if (strpos($src, 'data:image/') !== false) {
+                $base64Match = [];
+                if (preg_match('/(data:image\/[^;]+;base64,[^\\s"]+)/', $src, $base64Match)) {
+                    Log::info('Extraindo base64 da URL incorreta');
+                    $img->setAttribute('src', $base64Match[1]);
+                    continue;
+                }
             }
             
             try {
