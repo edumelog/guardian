@@ -220,6 +220,166 @@ class PrintTemplateController extends Controller
     }
 
     /**
+     * Processa as imagens no HTML, convertendo para base64
+     * 
+     * @param string $html Conteúdo HTML
+     * @param string $extractPath Caminho do diretório do template
+     * @param string $htmlDir Diretório do arquivo HTML atual
+     * @return string HTML processado
+     */
+    private function processImages($html, $extractPath, $htmlDir)
+    {
+        Log::info('Iniciando processamento de imagens', [
+            'extractPath' => $extractPath,
+            'htmlDir' => $htmlDir
+        ]);
+
+        // Carrega o HTML no DOMDocument
+        $doc = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $doc->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+
+        // Processa todas as imagens
+        $images = $doc->getElementsByTagName('img');
+        foreach ($images as $img) {
+            $src = $img->getAttribute('src');
+            
+            // Pula se já for base64
+            if (strpos($src, 'data:image/') === 0) {
+                Log::info('Imagem já está em base64, mantendo:', ['src' => substr($src, 0, 50) . '...']);
+                continue;
+            }
+
+            // Se a URL contém base64 como parte do caminho (erro), extrai apenas a parte base64
+            if (strpos($src, 'data:image/') !== false) {
+                $base64Match = [];
+                if (preg_match('/(data:image\/[^;]+;base64,[^\\s"]+)/', $src, $base64Match)) {
+                    Log::info('Extraindo base64 da URL incorreta');
+                    $img->setAttribute('src', $base64Match[1]);
+                    continue;
+                }
+            }
+            
+            try {
+                // Remove parâmetros de URL se existirem
+                $src = preg_replace('/\?.*$/', '', $src);
+                
+                // Tenta diferentes caminhos para encontrar a imagem
+                $imagePath = null;
+                
+                // Caminho absoluto no sistema de arquivos
+                if (strpos($src, '/') === 0) {
+                    $path = $extractPath . $src;
+                    if (File::exists($path)) {
+                        $imagePath = $path;
+                    }
+                }
+                
+                // Caminho relativo começando com ./
+                if (!$imagePath && strpos($src, './') === 0) {
+                    $path = $htmlDir . '/' . substr($src, 2);
+                    if (File::exists($path)) {
+                        $imagePath = $path;
+                    }
+                }
+                
+                // Caminho relativo sem ./
+                if (!$imagePath) {
+                    $path = $htmlDir . '/' . $src;
+                    if (File::exists($path)) {
+                        $imagePath = $path;
+                    }
+                }
+                
+                // Tenta na raiz do template
+                if (!$imagePath) {
+                    $path = $extractPath . '/' . $src;
+                    if (File::exists($path)) {
+                        $imagePath = $path;
+                    }
+                }
+                
+                // Se for uma URL, tenta fazer o download usando cURL
+                if (!$imagePath && (strpos($src, 'http://') === 0 || strpos($src, 'https://') === 0)) {
+                    try {
+                        $ch = curl_init($src);
+                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                        curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
+                        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+                        
+                        $imageContent = curl_exec($ch);
+                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+                        curl_close($ch);
+                        
+                        if ($imageContent !== false && $httpCode === 200 && strpos($contentType, 'image/') === 0) {
+                            $tempFile = tempnam(sys_get_temp_dir(), 'img');
+                            file_put_contents($tempFile, $imageContent);
+                            $imagePath = $tempFile;
+                            Log::info('Imagem baixada com sucesso:', ['url' => $src, 'content_type' => $contentType]);
+                        } else {
+                            throw new \Exception('Falha ao baixar imagem: HTTP ' . $httpCode);
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning('Erro ao baixar imagem:', [
+                            'url' => $src,
+                            'error' => $e->getMessage()
+                        ]);
+                        // Limpa o src em caso de erro no download
+                        $img->setAttribute('src', '');
+                        continue;
+                    }
+                }
+                
+                // Se encontrou a imagem, converte para base64
+                if ($imagePath) {
+                    $imageContent = File::get($imagePath);
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    $mimeType = finfo_file($finfo, $imagePath);
+                    finfo_close($finfo);
+                    
+                    $base64 = base64_encode($imageContent);
+                    $img->setAttribute('src', "data:{$mimeType};base64,{$base64}");
+                    
+                    Log::info('Imagem convertida para base64:', [
+                        'original' => $src,
+                        'mime_type' => $mimeType,
+                        'size' => strlen($base64)
+                    ]);
+                    
+                    // Remove o arquivo temporário se foi criado
+                    if (strpos($imagePath, sys_get_temp_dir()) === 0) {
+                        unlink($imagePath);
+                    }
+                } else {
+                    // Se não encontrou a imagem, limpa o src
+                    $img->setAttribute('src', '');
+                    Log::warning('Imagem não encontrada, limpando src:', ['src' => $src]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Erro ao processar imagem:', [
+                    'src' => $src,
+                    'error' => $e->getMessage()
+                ]);
+                // Em caso de erro, limpa o src
+                $img->setAttribute('src', '');
+                Log::warning('Limpando src devido ao erro:', ['src' => $src]);
+            }
+        }
+        
+        // Converte de volta para string HTML
+        $html = $doc->saveHTML();
+        
+        Log::info('Processamento de imagens concluído');
+        
+        return $html;
+    }
+
+    /**
      * Processa os arquivos HTML para corrigir caminhos relativos
      * 
      * @param string $extractPath Caminho completo para o diretório do template
@@ -281,8 +441,14 @@ class PrintTemplateController extends Controller
             // Remove qualquer tag base existente
             $html = preg_replace('/<base[^>]*>/', '', $html);
             
-            // Log do HTML antes das substituições
-            Log::info('HTML antes das substituições:', ['html' => $html]);
+            // Log do HTML antes do processamento
+            Log::info('HTML antes do processamento:', ['html' => $html]);
+            
+            // Primeiro processa as imagens para converter para base64
+            $html = $this->processImages($html, $extractPath, dirname($htmlFile));
+            
+            // Log do HTML após processamento de imagens
+            Log::info('HTML após processamento de imagens:', ['html' => $html]);
             
             // Extrai links para arquivos CSS
             $cssFiles = [];
@@ -325,19 +491,21 @@ class PrintTemplateController extends Controller
                 $html = $this->convertCssToInline($html, $cssContent);
             }
             
+            // Agora substitui os caminhos que não foram convertidos para base64
+            
             // Substitui caminhos que começam com ./
             $html = preg_replace('/href=["\']\.\/([^"\']*)["\']/', "href=\"{$absolutePath}/$1\"", $html);
-            $html = preg_replace('/src=["\']\.\/([^"\']*)["\']/', "src=\"{$absolutePath}/$1\"", $html);
+            $html = preg_replace('/src=["\']\.\/([^"\']*)["\'](?![^<>]*base64)/', "src=\"{$absolutePath}/$1\"", $html);
             
             // Substitui caminhos relativos sem ./
-            $html = preg_replace('/href=["\'](?!http|\/\/|\/storage)([^"\'\/][^"\']*)["\']/', "href=\"{$absolutePath}/$1\"", $html);
-            $html = preg_replace('/src=["\'](?!http|\/\/|\/storage)([^"\'\/][^"\']*)["\']/', "src=\"{$absolutePath}/$1\"", $html);
+            $html = preg_replace('/href=["\'](?!http|\/\/|\/storage|data:)([^"\'\/][^"\']*)["\']/', "href=\"{$absolutePath}/$1\"", $html);
+            $html = preg_replace('/src=["\'](?!http|\/\/|\/storage|data:)([^"\'\/][^"\']*)["\'](?![^<>]*base64)/', "src=\"{$absolutePath}/$1\"", $html);
             
             // Substitui caminhos que começam com /
             $html = preg_replace('/href=["\']\/(?!storage|http)([^"\']*)["\']/', "href=\"{$absolutePath}/$1\"", $html);
-            $html = preg_replace('/src=["\']\/(?!storage|http)([^"\']*)["\']/', "src=\"{$absolutePath}/$1\"", $html);
+            $html = preg_replace('/src=["\']\/(?!storage|http)([^"\']*)["\'](?![^<>]*base64)/', "src=\"{$absolutePath}/$1\"", $html);
             
-            // Log do HTML após as substituições
+            // Log do HTML após todas as substituições
             Log::info('HTML após todas as substituições:', ['html' => $html]);
             
             // Salva o arquivo modificado

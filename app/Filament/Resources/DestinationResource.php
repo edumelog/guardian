@@ -15,6 +15,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Collection;
+use Filament\Tables\Columns\TextColumn;
 
 class DestinationResource extends Resource
 {
@@ -45,6 +46,19 @@ class DestinationResource extends Resource
                             ->maxLength(255)
                             ->disabled($hasVisits)
                             ->helperText($hasVisits ? 'O nome não pode ser alterado pois este destino possui visitas registradas.' : null),
+                            
+                        TextInput::make('alias')
+                            ->label('Sigla')
+                            ->maxLength(5)
+                            ->placeholder('Ex: ANEXO')
+                            ->helperText('Máximo de 5 caracteres em maiúsculas')
+                            ->extraInputAttributes(['style' => 'text-transform: uppercase'])
+                            ->live()
+                            ->afterStateUpdated(function ($state, \Filament\Forms\Set $set) {
+                                if ($state) {
+                                    $set('alias', strtoupper($state));
+                                }
+                            }),
                             
                         TextInput::make('address')
                             ->label('Endereço')
@@ -116,6 +130,10 @@ class DestinationResource extends Resource
                     ->label('Nome')
                     ->searchable(),
                     
+                TextColumn::make('alias')
+                    ->label('Sigla')
+                    ->searchable(),
+                    
                 Tables\Columns\TextColumn::make('address')
                     ->label('Endereço')
                     ->searchable(),
@@ -133,6 +151,7 @@ class DestinationResource extends Resource
                     ->label('Criado em')
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),
+
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('is_active')

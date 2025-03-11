@@ -29,7 +29,7 @@ class VisitorResource extends Resource
 {
     protected static ?string $model = Visitor::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-user-group';
+    protected static ?string $navigationIcon = 'heroicon-o-arrow-right-circle';
     
     protected static ?string $navigationGroup = 'Controle de Acesso';
 
@@ -38,6 +38,8 @@ class VisitorResource extends Resource
     protected static ?string $modelLabel = 'Visitante';
     
     protected static ?string $pluralModelLabel = 'Visitantes';
+
+    protected static ?string $navigationLabel = 'Registro de Entrada';
 
     public static function form(Form $form): Form
     {
