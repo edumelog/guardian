@@ -9,6 +9,14 @@ if (!window.QRious) {
     document.head.appendChild(script);
 }
 
+// Carrega a biblioteca JsBarcode para geração de código de barras
+if (!window.JsBarcode) {
+    console.log('[CredentialPrint] Carregando biblioteca JsBarcode...');
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js';
+    document.head.appendChild(script);
+}
+
 // Função global para impressão de credencial
 window.printVisitorCredential = function(visitor) {
     console.log('[CredentialPrint] Função de impressão de credencial chamada com:', visitor);
@@ -423,9 +431,9 @@ async function showTemplateModal(html, visitor, config) {
                         img.style.maxWidth = '100%';
                         img.style.maxHeight = '100%';
                         
-                        // Pula a conversão se for uma imagem de QR code
-                        if (img.classList.contains('tpl-visitor-qrcode-img')) {
-                            console.log(`[CredentialPrint] Imagem ${index + 1} é um QR code, pulando conversão`);
+                        // Pula a conversão se for uma imagem de QR code ou código de barras
+                        if (img.classList.contains('tpl-visitor-qrcode-img') || img.classList.contains('tpl-visitor-barcode-img')) {
+                            console.log(`[CredentialPrint] Imagem ${index + 1} é um código, pulando conversão`);
                             return;
                         }
                         
@@ -492,20 +500,28 @@ async function showTemplateModal(html, visitor, config) {
 async function processTemplate(html, visitor) {
     console.log('[CredentialPrint] Processando template com dados do visitante:', visitor);
     
-    // Garante que a biblioteca QRious está carregada
+    // Garante que as bibliotecas estão carregadas
     try {
-        await loadQRious();
+        await Promise.all([
+            loadQRious(),
+            loadJsBarcode()
+        ]);
     } catch (err) {
-        console.error('[CredentialPrint] Erro ao carregar QRious:', err);
-        throw new Error('Não foi possível carregar a biblioteca para geração de QR code');
+        console.error('[CredentialPrint] Erro ao carregar bibliotecas:', err);
+        throw new Error('Não foi possível carregar as bibliotecas para geração de códigos');
     }
 
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
     
-    // Gera o QR code primeiro
-    const docNumber = visitor.doc ? visitor.doc.padStart(11, '0') : '';
+    // Prepara o número do documento com 16 dígitos
+    const docNumber = visitor.doc ? visitor.doc.padStart(16, '0') : '0000000000000000';
     const qrCodeData = docNumber;
+    
+    // Função para formatar o número com espaços a cada 4 dígitos
+    const formatDocNumber = (num) => {
+        return num.match(/.{1,4}/g).join(' ');
+    };
     
     // Dados do visitante para substituição no template
     const visitorData = {
@@ -514,7 +530,9 @@ async function processTemplate(html, visitor) {
         'visitor-name': visitor.name || '',
         'visitor-doc-type': visitor.docType || '',
         'visitor-doc': visitor.doc || '',
-        'visitor-qrcode': qrCodeData, // Adiciona o QR code aos dados
+        'visitor-doc-formatted': formatDocNumber(docNumber), // Adiciona espaços a cada 4 dígitos
+        'visitor-qrcode': qrCodeData,
+        'visitor-barcode': docNumber,
         
         // Dados do destino
         'visitor-destination': visitor.destination || '',
@@ -549,12 +567,47 @@ async function processTemplate(html, visitor) {
         // Gera o QR code como base64
         const qr = new QRious({
             value: qrCodeData,
-            size: 200
+            size: 200,
+            level: 'H' // Alta correção de erros para melhor leitura
         });
         img.src = qr.toDataURL();
         // Marca a imagem como processada para evitar conversão posterior
         img.setAttribute('data-processed', 'true');
         console.log('[CredentialPrint] QR code gerado e definido na imagem');
+    });
+
+    // Processa o código de barras
+    const barcodeElements = doc.querySelectorAll('img.tpl-visitor-barcode-img');
+    barcodeElements.forEach(img => {
+        // Verifica se a biblioteca JsBarcode está disponível
+        if (typeof JsBarcode === 'undefined') {
+            console.error('[CredentialPrint] Biblioteca JsBarcode não está carregada. O código de barras não será gerado.');
+            return;
+        }
+
+        // Cria um canvas temporário para gerar o código de barras
+        const canvas = document.createElement('canvas');
+        try {
+            // Gera o código de barras (usando Code128 como padrão)
+            JsBarcode(canvas, docNumber, {
+                format: "CODE128",
+                width: 1.5,
+                height: 100,
+                displayValue: true,
+                fontSize: 16,
+                margin: 10,
+                text: formatDocNumber(docNumber) // Usa o número formatado para exibição
+            });
+            
+            // Converte o canvas para base64 e define na imagem
+            img.src = canvas.toDataURL();
+            // Marca a imagem como processada para evitar conversão posterior
+            img.setAttribute('data-processed', 'true');
+            console.log('[CredentialPrint] Código de barras gerado e definido na imagem');
+        } catch (err) {
+            console.error('[CredentialPrint] Erro ao gerar código de barras:', err);
+            img.src = '';
+        }
     });
     
     // Processa a foto do visitante (tratamento especial para imagens)
@@ -587,7 +640,7 @@ async function processTemplate(html, visitor) {
             const fieldName = tplClass.substring(4);
             
             // Pula o processamento de imagens, já que fizemos isso separadamente
-            if ((fieldName === 'visitor-photo' || fieldName === 'visitor-qrcode-img') && element.tagName === 'IMG') {
+            if ((fieldName === 'visitor-photo' || fieldName === 'visitor-qrcode-img' || fieldName === 'visitor-barcode-img') && element.tagName === 'IMG') {
                 return;
             }
             
@@ -622,6 +675,32 @@ function loadQRious() {
             reject(new Error('Erro ao carregar biblioteca QRious'));
         };
         document.head.appendChild(script);
+    });
+}
+
+// Função para carregar a biblioteca JsBarcode
+function loadJsBarcode() {
+    return new Promise((resolve, reject) => {
+        if (window.JsBarcode) {
+            resolve();
+            return;
+        }
+
+        let attempts = 0;
+        const maxAttempts = 10;
+        const interval = setInterval(() => {
+            if (window.JsBarcode) {
+                clearInterval(interval);
+                resolve();
+                return;
+            }
+
+            attempts++;
+            if (attempts >= maxAttempts) {
+                clearInterval(interval);
+                reject(new Error('Timeout ao carregar JsBarcode'));
+            }
+        }, 500);
     });
 }
 
