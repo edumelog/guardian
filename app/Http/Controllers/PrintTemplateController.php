@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use ZipArchive;
 use Illuminate\Support\Facades\File;
+use Symfony\Component\CssSelector\CssSelectorConverter;
 
 class PrintTemplateController extends Controller
 {
@@ -580,11 +581,18 @@ class PrintTemplateController extends Controller
         // Suprime erros de parsing HTML
         libxml_use_internal_errors(true);
         $doc->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
+        $errors = libxml_get_errors();
+        if (!empty($errors)) {
+            Log::warning('Erros ao carregar HTML:', ['errors' => $errors]);
+        }
         libxml_clear_errors();
         
         // Parse o CSS
         $cssRules = $this->parseCssRules($css);
         Log::info('Regras CSS parseadas:', ['count' => count($cssRules)]);
+        
+        // Log das regras CSS para debug
+        Log::debug('Regras CSS detalhadas:', ['rules' => $cssRules]);
         
         // Aplica as regras CSS aos elementos
         foreach ($cssRules as $selector => $styles) {
@@ -593,10 +601,20 @@ class PrintTemplateController extends Controller
                 $xpath = new \DOMXPath($doc);
                 $query = $this->cssToXPath($selector);
                 
+                Log::info('Processando seletor:', [
+                    'seletor_css' => $selector,
+                    'xpath_query' => $query
+                ]);
+                
                 // Encontra os elementos que correspondem ao seletor
                 $elements = $xpath->query($query);
                 
                 if ($elements && $elements->length > 0) {
+                    Log::info('Elementos encontrados para o seletor:', [
+                        'seletor' => $selector,
+                        'quantidade' => $elements->length
+                    ]);
+                    
                     foreach ($elements as $element) {
                         // Certifica-se de que estamos trabalhando com um DOMElement
                         if ($element instanceof \DOMElement) {
@@ -611,6 +629,14 @@ class PrintTemplateController extends Controller
                             
                             // Define o atributo style
                             $element->setAttribute('style', $newStyle);
+                            
+                            Log::debug('Estilo aplicado ao elemento:', [
+                                'elemento' => $element->nodeName,
+                                'classe' => $element->getAttribute('class'),
+                                'id' => $element->getAttribute('id'),
+                                'estilo_anterior' => $currentStyle,
+                                'estilo_novo' => $newStyle
+                            ]);
                         }
                     }
                     
@@ -618,11 +644,17 @@ class PrintTemplateController extends Controller
                         'selector' => $selector, 
                         'elements' => $elements->length
                     ]);
+                } else {
+                    Log::warning('Nenhum elemento encontrado para o seletor:', [
+                        'seletor' => $selector,
+                        'xpath_query' => $query
+                    ]);
                 }
             } catch (\Exception $e) {
                 Log::error('Erro ao aplicar estilo:', [
                     'selector' => $selector,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
                 ]);
             }
         }
@@ -683,31 +715,52 @@ class PrintTemplateController extends Controller
     
     /**
      * Converte um seletor CSS para XPath
-     * Implementação simplificada que suporta seletores básicos
+     * Usando a biblioteca Symfony CSS Selector para melhor compatibilidade
      * 
      * @param string $selector Seletor CSS
      * @return string Expressão XPath
      */
     private function cssToXPath($selector)
     {
-        // Implementação simplificada para seletores básicos
-        $selector = trim($selector);
+        // Usando a biblioteca Symfony CSS Selector
+        $converter = new CssSelectorConverter();
         
-        // Substitui # por [@id='...']
-        $selector = preg_replace('/#([a-zA-Z0-9_-]+)/', "*[@id='$1']", $selector);
-        
-        // Substitui . por [@class='...']
-        $selector = preg_replace('/\.([a-zA-Z0-9_-]+)/', "*[contains(concat(' ', normalize-space(@class), ' '), ' $1 ')]", $selector);
-        
-        // Substitui espaços por /
-        $selector = preg_replace('/\s+/', '//', $selector);
-        
-        // Adiciona // no início se não começar com /
-        if (strpos($selector, '/') !== 0) {
-            $selector = '//' . $selector;
+        try {
+            // Converter o seletor CSS para XPath
+            $xpath = $converter->toXPath($selector);
+            
+            Log::info('Seletor CSS convertido para XPath:', [
+                'seletor_css' => $selector,
+                'xpath' => $xpath
+            ]);
+            
+            return $xpath;
+        } catch (\Exception $e) {
+            // Em caso de erro, registrar e usar a implementação anterior como fallback
+            Log::error('Erro ao converter seletor CSS para XPath:', [
+                'seletor' => $selector,
+                'erro' => $e->getMessage()
+            ]);
+            
+            // Implementação simplificada para seletores básicos (fallback)
+            $selector = trim($selector);
+            
+            // Substitui # por [@id='...']
+            $selector = preg_replace('/#([a-zA-Z0-9_-]+)/', "*[@id='$1']", $selector);
+            
+            // Substitui . por [@class='...']
+            $selector = preg_replace('/\.([a-zA-Z0-9_-]+)/', "*[contains(concat(' ', normalize-space(@class), ' '), ' $1 ')]", $selector);
+            
+            // Substitui espaços por /
+            $selector = preg_replace('/\s+/', '//', $selector);
+            
+            // Adiciona // no início se não começar com /
+            if (strpos($selector, '/') !== 0) {
+                $selector = '//' . $selector;
+            }
+            
+            return $selector;
         }
-        
-        return $selector;
     }
 
     public function delete($name)
