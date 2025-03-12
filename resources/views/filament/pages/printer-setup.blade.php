@@ -104,13 +104,13 @@
                                     <!-- Configurações de Tamanho da Etiqueta -->
                                     <div class="mt-4">
                                         <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Tamanho da Etiqueta
+                                            Tamanho da Etiqueta (em milímetros)
                                         </h4>
                                         
                                         <div class="grid grid-cols-2 gap-4 mb-4">
                                             <div>
                                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                    Largura
+                                                    Largura (mm)
                                                 </label>
                                                 <div class="flex">
                                                     <input 
@@ -126,7 +126,7 @@
 
                                             <div>
                                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                    Altura
+                                                    Altura (mm)
                                                 </label>
                                                 <div class="flex">
                                                     <input 
@@ -142,28 +142,37 @@
                                         </div>
                                         
                                         <div class="mb-2">
+                                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                                Todas as medidas são em milímetros (mm).
+                                            </p>
+                                        </div>
+                                        
+                                        <div class="mb-2">
                                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                Unidade de Medida
+                                                Resolução (DPI)
                                             </label>
-                                            <select 
-                                                x-model="units"
+                                            <input 
+                                                type="number" 
+                                                x-model="dpi"
+                                                min="72"
+                                                max="600"
+                                                step="1"
                                                 @change="hasChanges = true"
                                                 class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
                                             >
-                                                <option value="mm">Milímetros (mm)</option>
-                                                <option value="cm">Centímetros (cm)</option>
-                                                <option value="in">Polegadas (in)</option>
-                                            </select>
+                                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                                Resolução em pontos por polegada (DPI). Valores comuns: 72, 96, 150, 300.
+                                            </p>
                                         </div>
                                         
                                         <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 mt-4">
-                                            Margens
+                                            Margens (em milímetros)
                                         </h4>
                                         
                                         <div class="grid grid-cols-2 gap-4">
                                             <div>
                                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                    Superior
+                                                    Superior (mm)
                                                 </label>
                                                 <input 
                                                     type="number" 
@@ -177,7 +186,7 @@
                                             
                                             <div>
                                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                    Direita
+                                                    Direita (mm)
                                                 </label>
                                                 <input 
                                                     type="number" 
@@ -191,7 +200,7 @@
                                             
                                             <div>
                                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                    Inferior
+                                                    Inferior (mm)
                                                 </label>
                                                 <input 
                                                     type="number" 
@@ -205,7 +214,7 @@
                                             
                                             <div>
                                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                    Esquerda
+                                                    Esquerda (mm)
                                                 </label>
                                                 <input 
                                                     type="number" 

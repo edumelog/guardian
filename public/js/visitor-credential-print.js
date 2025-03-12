@@ -1,6 +1,22 @@
 // Log global para verificar se o script está sendo carregado
 console.log('[CredentialPrint] Script de impressão de credencial carregado');
 
+/**
+ * IMPORTANTE: Sobre o ID da visita (VisitorLog)
+ * 
+ * Este script espera que o objeto 'visitor' contenha uma propriedade 'visitLogId' ou 'visitorLogId'
+ * que representa o ID da visita atual (VisitorLog) do visitante.
+ * 
+ * Este ID é usado para gerar o QR code e o código de barras, e deve ser o ID do registro
+ * na tabela visitor_logs que representa a visita atual do visitante.
+ * 
+ * O ID é sempre crescente conforme novos visitantes entram no sistema, pois é o ID
+ * da tabela visitor_logs, não o ID do visitante.
+ * 
+ * Quando o QR code ou código de barras é lido, o sistema usa este ID para identificar
+ * a visita e registrar a saída do visitante.
+ */
+
 // Carrega a biblioteca QRious para geração de QR Code
 if (!window.QRious) {
     console.log('[CredentialPrint] Carregando biblioteca QRious...');
@@ -44,6 +60,18 @@ window.printVisitorCredential = function(visitor) {
 // Função para processar a requisição de impressão
 async function processPrintRequest(visitor) {
     console.log('[CredentialPrint] Processando solicitação de impressão para visitante:', visitor);
+    
+    // Verifica se o ID da visita (VisitorLog) está presente
+    if (visitor.visitLogId) {
+        console.log('[CredentialPrint] ID da visita (VisitorLog) encontrado:', visitor.visitLogId);
+    } else if (visitor.visitorLogId) {
+        console.log('[CredentialPrint] ID da visita (visitorLogId) encontrado:', visitor.visitorLogId);
+        // Normaliza o nome da propriedade para garantir consistência
+        visitor.visitLogId = visitor.visitorLogId;
+    } else {
+        console.warn('[CredentialPrint] ID da visita não encontrado no objeto visitor. Usando 0 como fallback.');
+        visitor.visitLogId = '0';
+    }
     
     try {
         // Carrega a configuração da impressora
@@ -244,14 +272,17 @@ async function showTemplateModal(html, visitor, config) {
         });
         
         // Ajusta o tamanho do container com base nas unidades
-        if (pageWidth.includes('mm') || pageHeight.includes('mm') || 
-            pageWidth.includes('cm') || pageHeight.includes('cm') || 
-            pageWidth.includes('in') || pageHeight.includes('in')) {
+        if (pageWidth.includes('mm') || pageHeight.includes('mm')) {
             
-            // Fatores de conversão para pixels (baseados em 96 DPI)
-            const mmToPx = 3.779528;  // 1mm = 3.779528px em 96 DPI
-            const cmToPx = 37.79528;  // 1cm = 37.79528px em 96 DPI
-            const inToPx = 96;        // 1in = 96px em 96 DPI
+            // Obtém o valor de DPI das configurações
+            const savedConfig = localStorage.getItem('guardian_printer_config');
+            const configObj = savedConfig ? JSON.parse(savedConfig) : null;
+            const dpi = configObj && configObj.dpi ? parseInt(configObj.dpi) : 96;
+            
+            console.log('[CredentialPrint] Usando DPI para conversão:', dpi);
+            
+            // Fator de conversão para pixels baseado no DPI configurado
+            const mmToPx = dpi / 25.4;     // 1mm = dpi/25.4 pixels (25.4mm = 1in)
             
             // Extrai os valores numéricos e as unidades
             const widthMatch = pageWidth.match(/^([\d.]+)(\w+)$/);
@@ -259,38 +290,24 @@ async function showTemplateModal(html, visitor, config) {
             
             if (widthMatch && heightMatch) {
                 const widthValue = parseFloat(widthMatch[1]);
-                const widthUnit = widthMatch[2];
                 const heightValue = parseFloat(heightMatch[1]);
-                const heightUnit = heightMatch[2];
                 
-                // Aplica a conversão com base na unidade
+                // Aplica a conversão de mm para pixels
                 if (!isNaN(widthValue)) {
-                    if (widthUnit === 'mm') {
-                        contentContainer.style.width = `${widthValue * mmToPx}px`;
-                    } else if (widthUnit === 'cm') {
-                        contentContainer.style.width = `${widthValue * cmToPx}px`;
-                    } else if (widthUnit === 'in') {
-                        contentContainer.style.width = `${widthValue * inToPx}px`;
-                    }
+                    contentContainer.style.width = `${widthValue * mmToPx}px`;
                 }
                 
                 if (!isNaN(heightValue)) {
-                    if (heightUnit === 'mm') {
-                        contentContainer.style.height = `${heightValue * mmToPx}px`;
-                    } else if (heightUnit === 'cm') {
-                        contentContainer.style.height = `${heightValue * cmToPx}px`;
-                    } else if (heightUnit === 'in') {
-                        contentContainer.style.height = `${heightValue * inToPx}px`;
-                    }
+                    contentContainer.style.height = `${heightValue * mmToPx}px`;
                 }
                 
-                console.log('[CredentialPrint] Convertendo dimensões para px:', {
+                console.log('[CredentialPrint] Convertendo dimensões de mm para px:', {
                     originalWidth: pageWidth,
                     originalHeight: pageHeight,
                     convertedWidth: contentContainer.style.width,
                     convertedHeight: contentContainer.style.height,
-                    widthUnit: widthUnit,
-                    heightUnit: heightUnit
+                    dpi: dpi,
+                    mmToPx: mmToPx
                 });
             }
         }
@@ -299,7 +316,7 @@ async function showTemplateModal(html, visitor, config) {
         if (contentContainer.style.width.includes('px') && contentContainer.style.height.includes('px') &&
             (!pageWidth.includes('px') || !pageHeight.includes('px'))) {
             const pixelInfo = document.createElement('div');
-            pixelInfo.textContent = `(${contentContainer.style.width} × ${contentContainer.style.height} em pixels)`;
+            pixelInfo.textContent = `(${contentContainer.style.width} × ${contentContainer.style.height})`;
             pixelInfo.style.fontSize = '0.75rem';
             pixelInfo.style.color = '#9ca3af';
             dimensionsLabel.appendChild(pixelInfo);
@@ -353,30 +370,27 @@ async function showTemplateModal(html, visitor, config) {
         
         // Se as dimensões foram convertidas, ajusta as margens para o novo tamanho em pixels
         if (contentContainer.style.width.includes('px') && contentContainer.style.height.includes('px')) {
-            // Fatores de conversão para pixels (baseados em 96 DPI)
-            const mmToPx = 3.779528;  // 1mm = 3.779528px em 96 DPI
-            const cmToPx = 37.79528;  // 1cm = 37.79528px em 96 DPI
-            const inToPx = 96;        // 1in = 96px em 96 DPI
+            // Obtém o valor de DPI das configurações
+            const savedConfig = localStorage.getItem('guardian_printer_config');
+            const configObj = savedConfig ? JSON.parse(savedConfig) : null;
+            const dpi = configObj && configObj.dpi ? parseInt(configObj.dpi) : 96;
             
-            // Função para converter qualquer unidade para pixels
+            console.log('[CredentialPrint] Usando DPI para conversão de margens:', dpi);
+            
+            // Fator de conversão para pixels baseado no DPI configurado
+            const mmToPx = dpi / 25.4;     // 1mm = dpi/25.4 pixels (25.4mm = 1in)
+            
+            // Função para converter mm para pixels
             const convertToPx = (value) => {
                 const match = value.match(/^([\d.]+)(\w+)$/);
                 if (!match) return value;
                 
                 const numValue = parseFloat(match[1]);
-                const unit = match[2];
                 
                 if (isNaN(numValue)) return value;
                 
-                if (unit === 'mm') {
-                    return `${numValue * mmToPx}px`;
-                } else if (unit === 'cm') {
-                    return `${numValue * cmToPx}px`;
-                } else if (unit === 'in') {
-                    return `${numValue * inToPx}px`;
-                }
-                
-                return value;
+                // Todas as unidades são mm
+                return `${numValue * mmToPx}px`;
             };
             
             // Ajusta as margens para o novo tamanho em pixels
@@ -393,11 +407,13 @@ async function showTemplateModal(html, visitor, config) {
                 marginVisualizer.style.left = convertToPx(margins.left);
             }
             
-            console.log('[CredentialPrint] Margens convertidas para pixels:', {
+            console.log('[CredentialPrint] Margens convertidas de mm para pixels:', {
                 top: marginVisualizer.style.top,
                 right: marginVisualizer.style.right,
                 bottom: marginVisualizer.style.bottom,
-                left: marginVisualizer.style.left
+                left: marginVisualizer.style.left,
+                dpi: dpi,
+                mmToPx: mmToPx
             });
         }
         
@@ -462,7 +478,12 @@ async function showTemplateModal(html, visitor, config) {
 <html>
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        @page {
+            size: ${pageWidth} ${pageHeight};
+            margin: 0;
+        }
         body {
             margin: 0;
             padding: 0;
@@ -473,6 +494,7 @@ async function showTemplateModal(html, visitor, config) {
         img {
             max-width: 100%;
         }
+        /* Nota: Todas as medidas estão em milímetros (mm) */
     </style>
 </head>
 <body>
@@ -713,10 +735,20 @@ async function processTemplate(html, visitor) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
     
-    // Obtém o ID da visita em curso (do último log de visita)
-    // Verifica se há um log de visita com data de entrada (inDate)
-    const visitLogId = visitor.visitLogId || (visitor.inDate ? visitor.visitLogId : '0');
-    const qrCodeData = visitLogId ? visitLogId.toString() : '0';
+    // Obtém o ID da visita atual (VisitorLog)
+    // Prioriza o ID explícito da visita atual, que deve ser fornecido pelo backend
+    const visitLogId = visitor.visitLogId || visitor.visitorLogId || '0';
+    console.log('[CredentialPrint] ID da visita atual (VisitorLog) para códigos:', visitLogId);
+    
+    // Garante que o ID seja uma string e remove espaços em branco
+    const qrCodeData = visitLogId ? visitLogId.toString().trim() : '0';
+    
+    // Adiciona um ponto no final dos dados para os códigos (para disparo automático quando lidos)
+    const qrCodeDataWithDot = qrCodeData + '.';
+    console.log('[CredentialPrint] Dados para QR code e código de barras:', { 
+        original: qrCodeData, 
+        comPonto: qrCodeDataWithDot 
+    });
     
     // Dados do visitante para substituição no template
     const visitorData = {
@@ -725,8 +757,9 @@ async function processTemplate(html, visitor) {
         'visitor-name': visitor.name || '',
         'visitor-doc-type': visitor.docType || '',
         'visitor-doc': visitor.doc || '',
-        'visitor-qrcode': qrCodeData,
-        'visitor-barcode': qrCodeData,
+        'visitor-qrcode': qrCodeData, // Mantém o ID original sem o ponto para exibição em texto
+        'visitor-barcode': qrCodeData, // Mantém o ID original sem o ponto para exibição em texto
+        'visitor-log-id': qrCodeData, // Adiciona explicitamente o ID da visita como um campo
         
         // Dados do destino
         'visitor-destination': visitor.destination || '',
@@ -758,16 +791,16 @@ async function processTemplate(html, visitor) {
             return;
         }
 
-        // Gera o QR code como base64
+        // Gera o QR code como base64 com o ponto no final para disparo automático
         const qr = new QRious({
-            value: qrCodeData,
+            value: qrCodeDataWithDot, // Usa o valor com ponto
             size: 200,
             level: 'H' // Alta correção de erros para melhor leitura
         });
         img.src = qr.toDataURL();
         // Marca a imagem como processada para evitar conversão posterior
         img.setAttribute('data-processed', 'true');
-        console.log('[CredentialPrint] QR code gerado e definido na imagem');
+        console.log('[CredentialPrint] QR code gerado e definido na imagem com ponto para disparo automático');
     });
 
     // Processa o código de barras
@@ -782,22 +815,22 @@ async function processTemplate(html, visitor) {
         // Cria um canvas temporário para gerar o código de barras
         const canvas = document.createElement('canvas');
         try {
-            // Gera o código de barras (usando Code128 como padrão)
-            JsBarcode(canvas, qrCodeData, {
+            // Gera o código de barras (usando Code128 como padrão) com o ponto no final para disparo automático
+            JsBarcode(canvas, qrCodeDataWithDot, { // Usa o valor com ponto
                 format: "CODE128",
                 width: 1.5,
                 height: 100,
                 displayValue: true,
                 fontSize: 16,
                 margin: 10,
-                text: qrCodeData // Usa o ID da visita para exibição
+                text: qrCodeData // Usa o ID da visita original (sem ponto) para exibição
             });
             
             // Converte o canvas para base64 e define na imagem
             img.src = canvas.toDataURL();
             // Marca a imagem como processada para evitar conversão posterior
             img.setAttribute('data-processed', 'true');
-            console.log('[CredentialPrint] Código de barras gerado e definido na imagem');
+            console.log('[CredentialPrint] Código de barras gerado e definido na imagem com ponto para disparo automático');
         } catch (err) {
             console.error('[CredentialPrint] Erro ao gerar código de barras:', err);
             img.src = '';
