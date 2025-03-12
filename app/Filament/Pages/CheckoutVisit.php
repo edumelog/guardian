@@ -33,42 +33,43 @@ class CheckoutVisit extends Page implements HasTable
 
     public function quickCheckout(): void
     {
-        // Padroniza o documento com 16 dígitos
-        $formattedDoc = str_pad($this->quickCheckoutDoc, 16, '0', STR_PAD_LEFT);
-
-        // Busca o visitante pelo documento
-        $visitor = Visitor::where('doc', $formattedDoc)->first();
-
-        if (!$visitor) {
-            // Tenta buscar sem os zeros à esquerda também
-            $visitor = Visitor::where('doc', ltrim($formattedDoc, '0'))->first();
-
-            if (!$visitor) {
-                Notification::make()
-                    ->warning()
-                    ->title('Visitante não encontrado')
-                    ->body('Nenhum visitante encontrado com este documento.')
-                    ->send();
-                return;
-            }
-        }
-
-        // Verifica se há uma visita em andamento
-        $lastVisit = $visitor->visitorLogs()
-            ->latest('in_date')
-            ->first();
-
-        if (!$lastVisit || $lastVisit->out_date !== null) {
+        // Verifica se o valor inserido é um número
+        if (!is_numeric($this->quickCheckoutDoc)) {
             Notification::make()
                 ->warning()
-                ->title('Sem visita em andamento')
-                ->body("Este visitante não possui uma visita em andamento.")
+                ->title('Formato inválido')
+                ->body('Por favor, digite apenas números para o ID da visita.')
                 ->send();
             return;
         }
 
+        // Busca a visita pelo ID
+        $visitorLog = \App\Models\VisitorLog::find($this->quickCheckoutDoc);
+
+        if (!$visitorLog) {
+            Notification::make()
+                ->warning()
+                ->title('Visita não encontrada')
+                ->body('Nenhuma visita encontrada com este ID.')
+                ->send();
+            return;
+        }
+
+        // Verifica se a visita já tem registro de saída
+        if ($visitorLog->out_date !== null) {
+            Notification::make()
+                ->warning()
+                ->title('Saída já registrada')
+                ->body("Esta visita já possui registro de saída em " . $visitorLog->out_date->format('d/m/Y H:i') . ".")
+                ->send();
+            return;
+        }
+
+        // Busca o visitante associado à visita
+        $visitor = $visitorLog->visitor;
+
         // Registra a saída
-        $lastVisit->update([
+        $visitorLog->update([
             'out_date' => now()
         ]);
 
@@ -87,53 +88,53 @@ class CheckoutVisit extends Page implements HasTable
     {
         return $table
             ->query(
-                Visitor::query()
-                    ->whereHas('visitorLogs', function (Builder $query) {
-                        $query->whereNull('out_date');
-                    })
-                    ->with(['visitorLogs' => function ($query) {
-                        $query->whereNull('out_date')
-                            ->latest('in_date')
-                            ->limit(1);
-                    }, 'docType', 'visitorLogs.destination'])
-                    ->latest()
+                \App\Models\VisitorLog::query()
+                    ->whereNull('out_date')
+                    ->with(['visitor', 'visitor.docType', 'destination'])
+                    ->latest('in_date')
             )
             ->columns([
-                TextColumn::make('name')
-                    ->label('Nome')
-                    ->searchable()
-                    ->sortable(),
-                TextColumn::make('doc')
-                    ->label('Documento')
-                    ->formatStateUsing(fn (string $state): string => str_pad($state, 16, '0', STR_PAD_LEFT))
-                    ->searchable()
-                    ->sortable(),
-                TextColumn::make('docType.type')
-                    ->label('Tipo')
-                    ->sortable(),
-                TextColumn::make('visitorLogs.0.destination.name')
-                    ->label('Local')
-                    ->sortable(),
-                TextColumn::make('visitorLogs.0.in_date')
+                TextColumn::make('id')
+                    ->label('ID da Visita'),
+                    // ->searchable()
+                    // ->sortable(),
+                // TextColumn::make('visitor.id')
+                //     ->label('ID Visitante')
+                //     ->searchable()
+                //     ->sortable(),
+                TextColumn::make('visitor.name')
+                    ->label('Nome'),
+                    // ->searchable()
+                    // ->sortable(),
+                TextColumn::make('visitor.doc')
+                    ->label('Documento'),
+                    // ->searchable()
+                    // ->sortable(),
+                TextColumn::make('visitor.docType.type')
+                    ->label('Tipo'),
+                    // ->sortable(),
+                TextColumn::make('destination.name')
+                    ->label('Local'),
+                    // ->sortable(),
+                TextColumn::make('in_date')
                     ->label('Entrada')
-                    ->dateTime('d/m/Y H:i')
-                    ->sortable(),
+                    ->dateTime('d/m/Y H:i'),
+                    // ->sortable(),
             ])
-            ->defaultSort('created_at', 'desc')
+            ->defaultSort('in_date', 'desc')
             ->actions([
                 \Filament\Tables\Actions\Action::make('checkout')
                     ->label('Registrar Saída')
                     ->icon('heroicon-o-arrow-right-circle')
                     ->color('warning')
-                    ->action(function (Visitor $record) {
-                        $lastVisit = $record->visitorLogs()->latest('in_date')->first();
-                        if ($lastVisit && !$lastVisit->out_date) {
-                            $lastVisit->update(['out_date' => now()]);
+                    ->action(function (\App\Models\VisitorLog $record) {
+                        if (!$record->out_date) {
+                            $record->update(['out_date' => now()]);
                             
                             Notification::make()
                                 ->success()
                                 ->title('Saída registrada')
-                                ->body("Saída registrada com sucesso para o visitante {$record->name}.")
+                                ->body("Saída registrada com sucesso para o visitante {$record->visitor->name}.")
                                 ->send();
                         }
                     })

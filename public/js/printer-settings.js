@@ -14,13 +14,14 @@ document.addEventListener('alpine:init', () => {
         hasChanges: false,
         
         // Configurações de tamanho da etiqueta
-        pageWidth: '80',
-        pageHeight: '120',
+        pageWidth: '100',
+        pageHeight: '65',
         marginTop: '5',
         marginRight: '5',
         marginBottom: '5',
         marginLeft: '5',
-        units: 'mm', // Unidade de medida (mm, cm, in)
+        units: 'mm', // Unidade de medida fixa em milímetros (mm)
+        dpi: '96', // Resolução em DPI (dots per inch)
         
         // Parâmetros adicionais de impressão (não exibidos na interface)
         printParams: {
@@ -62,12 +63,12 @@ document.addEventListener('alpine:init', () => {
                         
                         // Carrega as configurações de tamanho da etiqueta
                         if (config.printOptions) {
-                            // Extrai o valor numérico e a unidade da largura
+                            // Extrai o valor numérico da largura
                             if (config.printOptions.pageWidth) {
                                 const match = config.printOptions.pageWidth.match(/^(\d+)(\w+)$/);
                                 if (match) {
                                     this.pageWidth = match[1];
-                                    this.units = match[2]; // Usa a unidade da largura para todas as medidas
+                                    // Mantém a unidade fixa em mm
                                 }
                             }
                             
@@ -122,6 +123,11 @@ document.addEventListener('alpine:init', () => {
                             if (config.printOptions.density) this.printParams.density = config.printOptions.density;
                             if (config.printOptions.altFontRendering !== undefined) this.printParams.altFontRendering = config.printOptions.altFontRendering;
                             if (config.printOptions.ignoreTransparency !== undefined) this.printParams.ignoreTransparency = config.printOptions.ignoreTransparency;
+                        }
+                        
+                        // Carrega o valor de DPI
+                        if (config.dpi) {
+                            this.dpi = config.dpi;
                         }
                     } catch (configErr) {
                         console.error('Erro ao carregar configuração do localStorage:', configErr);
@@ -182,7 +188,7 @@ document.addEventListener('alpine:init', () => {
                 this.$watch('marginRight', () => this.hasChanges = true);
                 this.$watch('marginBottom', () => this.hasChanges = true);
                 this.$watch('marginLeft', () => this.hasChanges = true);
-                this.$watch('units', () => this.hasChanges = true);
+                this.$watch('dpi', () => this.hasChanges = true);
                 
                 console.log('Inicialização concluída');
             } catch (err) {
@@ -396,16 +402,17 @@ document.addEventListener('alpine:init', () => {
                     template: this.selectedTemplate, // Nome do arquivo para compatibilidade
                     templateSlug: selectedTemplate?.slug || 'default', // Slug para uso interno
                     timestamp: new Date().toISOString(),
+                    dpi: this.dpi, // Valor de DPI para conversão de unidades
                     // Configurações de impressão
                     printOptions: {
-                        // Parâmetros de tamanho
-                        pageWidth: this.pageWidth + this.units,
-                        pageHeight: this.pageHeight + this.units,
+                        // Parâmetros de tamanho (sempre em mm)
+                        pageWidth: this.pageWidth + 'mm',
+                        pageHeight: this.pageHeight + 'mm',
                         margins: { 
-                            top: this.marginTop + this.units, 
-                            right: this.marginRight + this.units, 
-                            bottom: this.marginBottom + this.units, 
-                            left: this.marginLeft + this.units 
+                            top: this.marginTop + 'mm', 
+                            right: this.marginRight + 'mm', 
+                            bottom: this.marginBottom + 'mm', 
+                            left: this.marginLeft + 'mm' 
                         },
                         
                         // Parâmetros de formato e tipo
