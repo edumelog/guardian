@@ -26,6 +26,33 @@ class CreateVisitor extends CreateRecord
 
     public bool $showAllFields = false;
 
+    public function mount(): void
+    {
+        parent::mount();
+        
+        // Verifica se há parâmetros na URL para preencher o formulário
+        $doc = request()->query('doc');
+        $docTypeId = request()->query('doc_type_id');
+        
+        if ($doc && $docTypeId) {
+            // Preenche o formulário com os dados da URL
+            $this->form->fill([
+                'doc' => $doc,
+                'doc_type_id' => $docTypeId,
+            ]);
+            
+            // Chama o método de busca para preencher os demais campos
+            $this->searchVisitor();
+            
+            // Exibe uma notificação informativa
+            Notification::make()
+                ->info()
+                ->title('Registrar Nova Entrada')
+                ->body('Selecione o destino e clique em "Imprimir Credencial e Salvar" para registrar a entrada do visitante.')
+                ->send();
+        }
+    }
+
     public function form(Form $form): Form
     {
         return $form
@@ -253,6 +280,11 @@ class CreateVisitor extends CreateRecord
 
     public function searchVisitor(): void
     {
+        // Se o formulário ainda não foi inicializado, retorna
+        if (!$this->form) {
+            return;
+        }
+        
         $formData = $this->form->getState();
         
         if (!isset($formData['doc']) || !isset($formData['doc_type_id'])) {

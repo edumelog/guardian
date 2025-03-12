@@ -7,6 +7,7 @@ use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Notifications\Notification;
 use Filament\Forms\Form;
+use Illuminate\Support\Facades\Auth;
 
 class EditVisitor extends EditRecord
 {
@@ -40,7 +41,10 @@ class EditVisitor extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        return [
+        $lastLog = $this->record->visitorLogs()->latest('in_date')->first();
+        $hasGivenExit = $lastLog && $lastLog->out_date !== null;
+        
+        $actions = [
             Actions\Action::make('previewCredential')
                 ->label('Preview da Credencial')
                 ->color('info')
@@ -49,6 +53,26 @@ class EditVisitor extends EditRecord
                     $this->previewVisitorCredential();
                 }),
         ];
+        
+        // Adiciona o botão de registrar entrada apenas se o visitante já tiver dado saída
+        if ($hasGivenExit) {
+            $actions[] = Actions\Action::make('register_entry')
+                ->label('Registrar Nova Entrada')
+                ->icon('heroicon-o-arrow-left-circle')
+                ->color('success')
+                ->url(function () {
+                    // Obtém os dados do visitante
+                    $visitor = $this->record;
+                    
+                    // Constrói a URL para a página de criação com os parâmetros
+                    return $this->getResource()::getUrl('create', [
+                        'doc' => $visitor->doc,
+                        'doc_type_id' => $visitor->doc_type_id
+                    ]);
+                });
+        }
+        
+        return $actions;
     }
 
     protected function previewVisitorCredential()
@@ -193,6 +217,14 @@ class EditVisitor extends EditRecord
         // Se já deu saída, mostra apenas os botões de cancelar e excluir
         if ($hasGivenExit) {
             return [
+                Actions\Action::make('preview')
+                    ->label('Preview da Credencial')
+                    ->color('info')
+                    ->icon('heroicon-o-eye')
+                    ->action(function () {
+                        $this->previewVisitorCredential();
+                    }),
+
                 Actions\Action::make('cancel')
                     ->label('Cancelar')
                     ->color('gray')
