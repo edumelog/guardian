@@ -52,6 +52,9 @@ class CreateVisitor extends CreateRecord
                             ->step(1)
                             ->dehydrated(true)
                             ->disabled(fn (Get $get): bool => $this->showAllFields)
+                            ->extraInputAttributes([
+                                'x-on:keydown.enter.prevent' => '$wire.call("searchVisitor")'
+                            ])
                             ->suffixAction(
                                 Action::make('search')
                                     ->icon('heroicon-m-magnifying-glass')
@@ -248,7 +251,7 @@ class CreateVisitor extends CreateRecord
         ];
     }
 
-    protected function searchVisitor(): void
+    public function searchVisitor(): void
     {
         $formData = $this->form->getState();
         

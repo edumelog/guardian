@@ -95,31 +95,31 @@ class CheckoutVisit extends Page implements HasTable
             )
             ->columns([
                 TextColumn::make('id')
-                    ->label('ID da Visita')
-                    ->searchable()
-                    ->sortable(),
-                TextColumn::make('visitor.id')
-                    ->label('ID Visitante')
-                    ->searchable()
-                    ->sortable(),
+                    ->label('ID da Visita'),
+                    // ->searchable()
+                    // ->sortable(),
+                // TextColumn::make('visitor.id')
+                //     ->label('ID Visitante')
+                //     ->searchable()
+                //     ->sortable(),
                 TextColumn::make('visitor.name')
-                    ->label('Nome')
-                    ->searchable()
-                    ->sortable(),
+                    ->label('Nome'),
+                    // ->searchable()
+                    // ->sortable(),
                 TextColumn::make('visitor.doc')
-                    ->label('Documento')
-                    ->searchable()
-                    ->sortable(),
+                    ->label('Documento'),
+                    // ->searchable()
+                    // ->sortable(),
                 TextColumn::make('visitor.docType.type')
-                    ->label('Tipo')
-                    ->sortable(),
+                    ->label('Tipo'),
+                    // ->sortable(),
                 TextColumn::make('destination.name')
-                    ->label('Local')
-                    ->sortable(),
+                    ->label('Local'),
+                    // ->sortable(),
                 TextColumn::make('in_date')
                     ->label('Entrada')
-                    ->dateTime('d/m/Y H:i')
-                    ->sortable(),
+                    ->dateTime('d/m/Y H:i'),
+                    // ->sortable(),
             ])
             ->defaultSort('in_date', 'desc')
             ->actions([
