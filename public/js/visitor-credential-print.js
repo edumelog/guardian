@@ -160,15 +160,23 @@ async function showTemplateModal(html, visitor, config) {
         const modalContent = document.createElement('div');
         modalContent.style.cssText = `
             background-color: white;
-            padding: 20px;
+            padding: 20px 20px 10px 20px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            max-width: 90%;
-            max-height: 90%;
-            overflow: auto;
             display: flex;
             flex-direction: column;
+            width: fit-content;
+            max-height: 95vh;
+            overflow-y: auto;
+            align-items: center;
+            box-sizing: border-box;
         `;
+        
+        // Adiciona um log para verificar as dimensões do modal
+        console.log('[CredentialPrint] Dimensões do modal:', {
+            modalWidth: modalContent.style.width,
+            modalMaxHeight: modalContent.style.maxHeight
+        });
         
         // Botão de fechar
         const closeButton = document.createElement('button');
@@ -206,6 +214,7 @@ async function showTemplateModal(html, visitor, config) {
             margin-bottom: 10px;
             font-size: 0.875rem;
             color: #6b7280;
+            width: 100%;
         `;
         
         // Cria um container para o conteúdo com o tamanho exato da etiqueta
@@ -216,10 +225,85 @@ async function showTemplateModal(html, visitor, config) {
             height: ${pageHeight};
             margin: 0 auto;
             border: 2px dashed #3b82f6;
-            box-sizing: content-box;
+            box-sizing: border-box;
             overflow: hidden;
             background-color: white;
+            flex-shrink: 0;
+            transform-origin: top left;
         `;
+        
+        // Adiciona um atributo data com as dimensões originais
+        contentContainer.setAttribute('data-original-width', pageWidth);
+        contentContainer.setAttribute('data-original-height', pageHeight);
+        
+        console.log('[CredentialPrint] Dimensões iniciais do contentContainer:', {
+            width: contentContainer.style.width,
+            height: contentContainer.style.height,
+            originalWidth: pageWidth,
+            originalHeight: pageHeight
+        });
+        
+        // Ajusta o tamanho do container com base nas unidades
+        if (pageWidth.includes('mm') || pageHeight.includes('mm') || 
+            pageWidth.includes('cm') || pageHeight.includes('cm') || 
+            pageWidth.includes('in') || pageHeight.includes('in')) {
+            
+            // Fatores de conversão para pixels (baseados em 96 DPI)
+            const mmToPx = 3.779528;  // 1mm = 3.779528px em 96 DPI
+            const cmToPx = 37.79528;  // 1cm = 37.79528px em 96 DPI
+            const inToPx = 96;        // 1in = 96px em 96 DPI
+            
+            // Extrai os valores numéricos e as unidades
+            const widthMatch = pageWidth.match(/^([\d.]+)(\w+)$/);
+            const heightMatch = pageHeight.match(/^([\d.]+)(\w+)$/);
+            
+            if (widthMatch && heightMatch) {
+                const widthValue = parseFloat(widthMatch[1]);
+                const widthUnit = widthMatch[2];
+                const heightValue = parseFloat(heightMatch[1]);
+                const heightUnit = heightMatch[2];
+                
+                // Aplica a conversão com base na unidade
+                if (!isNaN(widthValue)) {
+                    if (widthUnit === 'mm') {
+                        contentContainer.style.width = `${widthValue * mmToPx}px`;
+                    } else if (widthUnit === 'cm') {
+                        contentContainer.style.width = `${widthValue * cmToPx}px`;
+                    } else if (widthUnit === 'in') {
+                        contentContainer.style.width = `${widthValue * inToPx}px`;
+                    }
+                }
+                
+                if (!isNaN(heightValue)) {
+                    if (heightUnit === 'mm') {
+                        contentContainer.style.height = `${heightValue * mmToPx}px`;
+                    } else if (heightUnit === 'cm') {
+                        contentContainer.style.height = `${heightValue * cmToPx}px`;
+                    } else if (heightUnit === 'in') {
+                        contentContainer.style.height = `${heightValue * inToPx}px`;
+                    }
+                }
+                
+                console.log('[CredentialPrint] Convertendo dimensões para px:', {
+                    originalWidth: pageWidth,
+                    originalHeight: pageHeight,
+                    convertedWidth: contentContainer.style.width,
+                    convertedHeight: contentContainer.style.height,
+                    widthUnit: widthUnit,
+                    heightUnit: heightUnit
+                });
+            }
+        }
+        
+        // Adiciona informação sobre a conversão para pixels, se aplicável
+        if (contentContainer.style.width.includes('px') && contentContainer.style.height.includes('px') &&
+            (!pageWidth.includes('px') || !pageHeight.includes('px'))) {
+            const pixelInfo = document.createElement('div');
+            pixelInfo.textContent = `(${contentContainer.style.width} × ${contentContainer.style.height} em pixels)`;
+            pixelInfo.style.fontSize = '0.75rem';
+            pixelInfo.style.color = '#9ca3af';
+            dimensionsLabel.appendChild(pixelInfo);
+        }
         
         // Cria o container para o conteúdo real
         const contentWrapper = document.createElement('div');
@@ -231,7 +315,27 @@ async function showTemplateModal(html, visitor, config) {
             height: 100%;
             overflow: hidden;
             background-color: white;
+            box-sizing: border-box;
         `;
+        
+        // Se as dimensões foram convertidas, aplica as mesmas dimensões ao contentWrapper
+        if (contentContainer.style.width.includes('px') && contentContainer.style.height.includes('px')) {
+            contentWrapper.style.width = contentContainer.style.width;
+            contentWrapper.style.height = contentContainer.style.height;
+            
+            console.log('[CredentialPrint] Dimensões do contentWrapper ajustadas:', {
+                width: contentWrapper.style.width,
+                height: contentWrapper.style.height,
+                containerWidth: contentContainer.style.width,
+                containerHeight: contentContainer.style.height
+            });
+        } else {
+            // Se não foram convertidas, usa 100% para garantir que ocupe todo o espaço
+            contentWrapper.style.width = '100%';
+            contentWrapper.style.height = '100%';
+            
+            console.log('[CredentialPrint] contentWrapper usando dimensões relativas (100%)');
+        }
         
         // Adiciona uma visualização das margens
         const marginVisualizer = document.createElement('div');
@@ -246,6 +350,63 @@ async function showTemplateModal(html, visitor, config) {
             box-sizing: border-box;
             z-index: 2;
         `;
+        
+        // Se as dimensões foram convertidas, ajusta as margens para o novo tamanho em pixels
+        if (contentContainer.style.width.includes('px') && contentContainer.style.height.includes('px')) {
+            // Fatores de conversão para pixels (baseados em 96 DPI)
+            const mmToPx = 3.779528;  // 1mm = 3.779528px em 96 DPI
+            const cmToPx = 37.79528;  // 1cm = 37.79528px em 96 DPI
+            const inToPx = 96;        // 1in = 96px em 96 DPI
+            
+            // Função para converter qualquer unidade para pixels
+            const convertToPx = (value) => {
+                const match = value.match(/^([\d.]+)(\w+)$/);
+                if (!match) return value;
+                
+                const numValue = parseFloat(match[1]);
+                const unit = match[2];
+                
+                if (isNaN(numValue)) return value;
+                
+                if (unit === 'mm') {
+                    return `${numValue * mmToPx}px`;
+                } else if (unit === 'cm') {
+                    return `${numValue * cmToPx}px`;
+                } else if (unit === 'in') {
+                    return `${numValue * inToPx}px`;
+                }
+                
+                return value;
+            };
+            
+            // Ajusta as margens para o novo tamanho em pixels
+            if (margins.top) {
+                marginVisualizer.style.top = convertToPx(margins.top);
+            }
+            if (margins.right) {
+                marginVisualizer.style.right = convertToPx(margins.right);
+            }
+            if (margins.bottom) {
+                marginVisualizer.style.bottom = convertToPx(margins.bottom);
+            }
+            if (margins.left) {
+                marginVisualizer.style.left = convertToPx(margins.left);
+            }
+            
+            console.log('[CredentialPrint] Margens convertidas para pixels:', {
+                top: marginVisualizer.style.top,
+                right: marginVisualizer.style.right,
+                bottom: marginVisualizer.style.bottom,
+                left: marginVisualizer.style.left
+            });
+        }
+        
+        // Adiciona o HTML ao contentWrapper
+        contentWrapper.innerHTML = html;
+        
+        // Adiciona o contentWrapper e o marginVisualizer ao contentContainer
+        contentContainer.appendChild(contentWrapper);
+        contentContainer.appendChild(marginVisualizer);
         
         // Cria os botões de ação
         const actionButtons = document.createElement('div');
@@ -383,8 +544,6 @@ async function showTemplateModal(html, visitor, config) {
         modalContent.appendChild(closeButton);
         modalContent.appendChild(modalTitle);
         modalContent.appendChild(dimensionsLabel);
-        contentContainer.appendChild(contentWrapper);
-        contentContainer.appendChild(marginVisualizer);
         modalContent.appendChild(contentContainer);
         modalContent.appendChild(actionButtons);
         modal.appendChild(modalContent);
@@ -411,6 +570,40 @@ async function showTemplateModal(html, visitor, config) {
                 
                 console.log('[CredentialPrint] Conteúdo HTML injetado');
                 
+                // Função para verificar se o tamanho do modal é adequado para a tela
+                const adjustModalForScreenSize = () => {
+                    // Obtém o tamanho da janela
+                    const windowWidth = window.innerWidth;
+                    const windowHeight = window.innerHeight;
+                    
+                    // Obtém o tamanho do contentContainer em pixels
+                    const containerWidth = contentContainer.offsetWidth;
+                    const containerHeight = contentContainer.offsetHeight;
+                    
+                    console.log('[CredentialPrint] Verificando tamanho do modal em relação à tela:', {
+                        windowWidth,
+                        windowHeight,
+                        containerWidth,
+                        containerHeight
+                    });
+                    
+                    // Se o container for maior que 90% da tela, ajusta o modal
+                    if (containerWidth > windowWidth * 0.9 || containerHeight > windowHeight * 0.9) {
+                        console.log('[CredentialPrint] Container muito grande para a tela, ajustando escala');
+                        
+                        // Calcula a escala necessária para caber na tela
+                        const scaleX = (windowWidth * 0.9) / containerWidth;
+                        const scaleY = (windowHeight * 0.9) / containerHeight;
+                        const scale = Math.min(scaleX, scaleY);
+                        
+                        // Aplica a escala ao contentContainer
+                        contentContainer.style.transform = `scale(${scale})`;
+                        contentContainer.style.transformOrigin = 'center';
+                        
+                        console.log('[CredentialPrint] Escala aplicada:', scale);
+                    }
+                };
+                
                 // Verifica se todas as imagens estão carregadas
                 const checkAllImagesLoaded = () => {
                     const images = contentWrapper.querySelectorAll('img');
@@ -420,6 +613,8 @@ async function showTemplateModal(html, visitor, config) {
                     if (images.length === 0) {
                         printButton.disabled = false;
                         printButton.style.opacity = '1';
+                        // Ajusta o tamanho do modal
+                        adjustModalForScreenSize();
                         return;
                     }
                     
@@ -471,12 +666,16 @@ async function showTemplateModal(html, visitor, config) {
                             // Habilita o botão de impressão após processar todas as imagens
                             printButton.disabled = false;
                             printButton.style.opacity = '1';
+                            // Ajusta o tamanho do modal
+                            adjustModalForScreenSize();
                         })
                         .catch(err => {
                             console.warn('[CredentialPrint] Erro ao processar imagens:', err);
                             // Habilita o botão mesmo com erro
                             printButton.disabled = false;
                             printButton.style.opacity = '1';
+                            // Ajusta o tamanho do modal mesmo com erro
+                            adjustModalForScreenSize();
                         });
                 };
                 
@@ -514,14 +713,10 @@ async function processTemplate(html, visitor) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
     
-    // Prepara o número do documento com 16 dígitos
-    const docNumber = visitor.doc ? visitor.doc.padStart(16, '0') : '0000000000000000';
-    const qrCodeData = docNumber;
-    
-    // Função para formatar o número com espaços a cada 4 dígitos
-    const formatDocNumber = (num) => {
-        return num.match(/.{1,4}/g).join(' ');
-    };
+    // Obtém o ID da visita em curso (do último log de visita)
+    // Verifica se há um log de visita com data de entrada (inDate)
+    const visitLogId = visitor.visitLogId || (visitor.inDate ? visitor.visitLogId : '0');
+    const qrCodeData = visitLogId ? visitLogId.toString() : '0';
     
     // Dados do visitante para substituição no template
     const visitorData = {
@@ -530,9 +725,8 @@ async function processTemplate(html, visitor) {
         'visitor-name': visitor.name || '',
         'visitor-doc-type': visitor.docType || '',
         'visitor-doc': visitor.doc || '',
-        'visitor-doc-formatted': formatDocNumber(docNumber), // Adiciona espaços a cada 4 dígitos
         'visitor-qrcode': qrCodeData,
-        'visitor-barcode': docNumber,
+        'visitor-barcode': qrCodeData,
         
         // Dados do destino
         'visitor-destination': visitor.destination || '',
@@ -589,14 +783,14 @@ async function processTemplate(html, visitor) {
         const canvas = document.createElement('canvas');
         try {
             // Gera o código de barras (usando Code128 como padrão)
-            JsBarcode(canvas, docNumber, {
+            JsBarcode(canvas, qrCodeData, {
                 format: "CODE128",
                 width: 1.5,
                 height: 100,
                 displayValue: true,
                 fontSize: 16,
                 margin: 10,
-                text: formatDocNumber(docNumber) // Usa o número formatado para exibição
+                text: qrCodeData // Usa o ID da visita para exibição
             });
             
             // Converte o canvas para base64 e define na imagem

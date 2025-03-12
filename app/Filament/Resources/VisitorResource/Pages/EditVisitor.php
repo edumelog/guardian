@@ -105,6 +105,7 @@ class EditVisitor extends EditRecord
             'photo' => $photoUrl,
             'inDate' => $lastLog?->in_date,
             'outDate' => $lastLog?->out_date,
+            'visitLogId' => $lastLog?->id,
             'other' => $visitor->other,
             // Dados adicionais
             'docTypeName' => $visitor->docType->type,
