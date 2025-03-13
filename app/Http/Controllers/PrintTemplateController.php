@@ -14,25 +14,93 @@ class PrintTemplateController extends Controller
 {
     public function index()
     {
+        Log::info('Iniciando listagem de templates');
+        
+        // Lista todos os diretórios no storage/templates
+        $allDirs = Storage::disk('public')->directories('templates');
+        Log::info('Diretórios encontrados em templates:', ['directories' => $allDirs]);
+        
         // Lista todos os diretórios de templates disponíveis
         $templates = collect(Storage::disk('public')->directories('templates'))
             ->filter(function ($dir) {
-                // Filtra apenas diretórios que contêm um arquivo index.html
-                return Storage::disk('public')->exists("{$dir}/index.html");
+                Log::info('Verificando diretório:', ['dir' => $dir]);
+                
+                // Verifica se existe um arquivo index.html no diretório ou em qualquer subdiretório
+                if (Storage::disk('public')->exists("{$dir}/index.html")) {
+                    Log::info('Arquivo index.html encontrado no diretório raiz', ['dir' => $dir]);
+                    return true;
+                }
+                
+                // Verifica em subdiretórios
+                $subdirs = Storage::disk('public')->directories($dir);
+                Log::info('Subdiretórios encontrados:', ['dir' => $dir, 'subdirs' => $subdirs]);
+                
+                foreach ($subdirs as $subdir) {
+                    if (Storage::disk('public')->exists("{$subdir}/index.html")) {
+                        Log::info('Arquivo index.html encontrado no subdiretório', ['subdir' => $subdir]);
+                        return true;
+                    }
+                    
+                    // Verifica em subdiretórios de segundo nível
+                    $subsubdirs = Storage::disk('public')->directories($subdir);
+                    Log::info('Subdiretórios de segundo nível encontrados:', ['subdir' => $subdir, 'subsubdirs' => $subsubdirs]);
+                    
+                    foreach ($subsubdirs as $subsubdir) {
+                        if (Storage::disk('public')->exists("{$subsubdir}/index.html")) {
+                            Log::info('Arquivo index.html encontrado no subdiretório de segundo nível', ['subsubdir' => $subsubdir]);
+                            return true;
+                        }
+                    }
+                }
+                
+                Log::info('Nenhum arquivo index.html encontrado no diretório ou subdiretórios', ['dir' => $dir]);
+                return false;
             })
             ->map(function ($dir) {
                 $name = basename($dir);
-                $zipName = $name . '.zip';
+                $zipName = $name . '.zip'; // Adiciona a extensão .zip ao nome do diretório
                 
-                // Verifica se o arquivo ZIP existe
-                $zipExists = Storage::disk('public')->exists("templates/{$zipName}");
+                Log::info('Processando template:', ['dir' => $dir, 'name' => $name, 'zipName' => $zipName]);
                 
-                return [
-                    'name' => $zipName, // Mantém o nome com .zip para compatibilidade
-                    'path' => '/storage/' . $dir . '/index.html',
+                // Encontra o caminho para o arquivo index.html
+                $indexPath = null;
+                
+                // Verifica no diretório raiz
+                if (Storage::disk('public')->exists("{$dir}/index.html")) {
+                    $indexPath = "/storage/{$dir}/index.html";
+                    Log::info('Arquivo index.html encontrado no diretório raiz', ['dir' => $dir, 'indexPath' => $indexPath]);
+                } else {
+                    // Verifica em subdiretórios
+                    $subdirs = Storage::disk('public')->directories($dir);
+                    foreach ($subdirs as $subdir) {
+                        if (Storage::disk('public')->exists("{$subdir}/index.html")) {
+                            $indexPath = "/storage/{$subdir}/index.html";
+                            Log::info('Arquivo index.html encontrado no subdiretório', ['subdir' => $subdir, 'indexPath' => $indexPath]);
+                            break;
+                        }
+                        
+                        // Verifica em subdiretórios de segundo nível
+                        $subsubdirs = Storage::disk('public')->directories($subdir);
+                        foreach ($subsubdirs as $subsubdir) {
+                            if (Storage::disk('public')->exists("{$subsubdir}/index.html")) {
+                                $indexPath = "/storage/{$subsubdir}/index.html";
+                                Log::info('Arquivo index.html encontrado no subdiretório de segundo nível', ['subsubdir' => $subsubdir, 'indexPath' => $indexPath]);
+                                break 2;
+                            }
+                        }
+                    }
+                }
+                
+                $template = [
+                    'name' => $zipName, // Nome com extensão .zip para compatibilidade
+                    'path' => $indexPath,
                     'slug' => $name,
-                    'zipExists' => $zipExists
+                    'zipExists' => true // Sempre retorna true para compatibilidade
                 ];
+                
+                Log::info('Template processado:', $template);
+                
+                return $template;
             })
             ->values();
 

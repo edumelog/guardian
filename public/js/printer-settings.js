@@ -392,17 +392,102 @@ document.addEventListener('alpine:init', () => {
 
         async saveConfig() {
             try {
+                // Verifica se o localStorage está disponível
+                if (typeof localStorage === 'undefined') {
+                    console.error('localStorage não está disponível');
+                    this.$dispatch('notify', { 
+                        message: 'Erro ao salvar configurações',
+                        description: 'localStorage não está disponível no navegador',
+                        status: 'danger'
+                    });
+                    return;
+                }
+                
+                // Teste de escrita no localStorage
+                try {
+                    localStorage.setItem('guardian_test', 'test');
+                    const testValue = localStorage.getItem('guardian_test');
+                    console.log('Teste de localStorage:', testValue);
+                    localStorage.removeItem('guardian_test');
+                } catch (storageErr) {
+                    console.error('Erro ao testar localStorage:', storageErr);
+                    this.$dispatch('notify', { 
+                        message: 'Erro ao salvar configurações',
+                        description: 'Não foi possível escrever no localStorage: ' + storageErr.message,
+                        status: 'danger'
+                    });
+                    return;
+                }
+                
                 // Encontra o template selecionado
                 const selectedTemplate = this.templates.find(t => t.name === this.selectedTemplate);
                 
+                // Verifica se o template selecionado é válido
+                if (!selectedTemplate && this.selectedTemplate) {
+                    console.error('Template selecionado não encontrado na lista:', this.selectedTemplate);
+                    // Não impede o salvamento, apenas loga o erro
+                }
+                
+                // Verifica se os valores são válidos
+                if (this.pageWidth === undefined || this.pageWidth === null || this.pageWidth === '') {
+                    console.error('Largura da página inválida:', this.pageWidth);
+                    this.pageWidth = '100'; // Valor padrão
+                }
+                
+                if (this.pageHeight === undefined || this.pageHeight === null || this.pageHeight === '') {
+                    console.error('Altura da página inválida:', this.pageHeight);
+                    this.pageHeight = '65'; // Valor padrão
+                }
+                
+                if (this.marginTop === undefined || this.marginTop === null || this.marginTop === '') {
+                    console.error('Margem superior inválida:', this.marginTop);
+                    this.marginTop = '5'; // Valor padrão
+                }
+                
+                if (this.marginRight === undefined || this.marginRight === null || this.marginRight === '') {
+                    console.error('Margem direita inválida:', this.marginRight);
+                    this.marginRight = '5'; // Valor padrão
+                }
+                
+                if (this.marginBottom === undefined || this.marginBottom === null || this.marginBottom === '') {
+                    console.error('Margem inferior inválida:', this.marginBottom);
+                    this.marginBottom = '5'; // Valor padrão
+                }
+                
+                if (this.marginLeft === undefined || this.marginLeft === null || this.marginLeft === '') {
+                    console.error('Margem esquerda inválida:', this.marginLeft);
+                    this.marginLeft = '5'; // Valor padrão
+                }
+                
+                if (this.dpi === undefined || this.dpi === null || this.dpi === '') {
+                    console.error('DPI inválido:', this.dpi);
+                    this.dpi = '96'; // Valor padrão
+                }
+                
+                // Verifica se o objeto printParams é válido
+                if (!this.printParams) {
+                    console.error('Objeto printParams inválido:', this.printParams);
+                    this.printParams = {
+                        type: 'pixel',
+                        format: 'html',
+                        flavor: 'plain',
+                        scaleContent: true,
+                        rasterize: true,
+                        interpolation: 'bicubic',
+                        density: '300',
+                        altFontRendering: true,
+                        ignoreTransparency: true
+                    };
+                }
+                
                 // Salva configuração
                 const config = {
-                    printer: this.selectedPrinter,
-                    orientation: this.orientation,
-                    template: this.selectedTemplate, // Nome do arquivo para compatibilidade
+                    printer: this.selectedPrinter || '',
+                    orientation: this.orientation || 'portrait',
+                    template: this.selectedTemplate || '', // Nome do arquivo para compatibilidade
                     templateSlug: selectedTemplate?.slug || 'default', // Slug para uso interno
                     timestamp: new Date().toISOString(),
-                    dpi: this.dpi, // Valor de DPI para conversão de unidades
+                    dpi: this.dpi || '96', // Valor de DPI para conversão de unidades
                     // Configurações de impressão
                     printOptions: {
                         // Parâmetros de tamanho (sempre em mm)
@@ -416,22 +501,61 @@ document.addEventListener('alpine:init', () => {
                         },
                         
                         // Parâmetros de formato e tipo
-                        type: this.printParams.type,
-                        format: this.printParams.format,
-                        flavor: this.printParams.flavor,
+                        type: this.printParams?.type || 'pixel',
+                        format: this.printParams?.format || 'html',
+                        flavor: this.printParams?.flavor || 'plain',
                         
                         // Parâmetros de qualidade
-                        scaleContent: this.printParams.scaleContent,
-                        rasterize: this.printParams.rasterize,
-                        interpolation: this.printParams.interpolation,
-                        density: this.printParams.density,
-                        altFontRendering: this.printParams.altFontRendering,
-                        ignoreTransparency: this.printParams.ignoreTransparency
+                        scaleContent: this.printParams?.scaleContent !== undefined ? this.printParams.scaleContent : true,
+                        rasterize: this.printParams?.rasterize !== undefined ? this.printParams.rasterize : true,
+                        interpolation: this.printParams?.interpolation || 'bicubic',
+                        density: this.printParams?.density || '300',
+                        altFontRendering: this.printParams?.altFontRendering !== undefined ? this.printParams.altFontRendering : true,
+                        ignoreTransparency: this.printParams?.ignoreTransparency !== undefined ? this.printParams.ignoreTransparency : true
                     }
                 };
                 
                 console.log('Salvando configuração:', config);
-                localStorage.setItem('guardian_printer_config', JSON.stringify(config));
+                try {
+                    const configString = JSON.stringify(config);
+                    console.log('Tamanho da string de configuração:', configString.length, 'bytes');
+                    
+                    // Verifica se o tamanho da string não excede o limite do localStorage
+                    // O limite típico é de 5MB, mas vamos usar um limite seguro de 4MB
+                    const MAX_SIZE = 4 * 1024 * 1024; // 4MB
+                    if (configString.length > MAX_SIZE) {
+                        console.error('Configuração muito grande para o localStorage:', configString.length, 'bytes');
+                        this.$dispatch('notify', { 
+                            message: 'Erro ao salvar configurações',
+                            description: 'A configuração é muito grande para ser salva no localStorage',
+                            status: 'danger'
+                        });
+                        return;
+                    }
+                    
+                    localStorage.setItem('guardian_printer_config', configString);
+                    
+                    // Verifica se a configuração foi salva corretamente
+                    const savedConfig = localStorage.getItem('guardian_printer_config');
+                    if (!savedConfig) {
+                        console.error('Configuração não foi salva no localStorage');
+                        this.$dispatch('notify', { 
+                            message: 'Erro ao salvar configurações',
+                            description: 'A configuração não foi salva no localStorage',
+                            status: 'danger'
+                        });
+                        return;
+                    }
+                    console.log('Configuração salva com sucesso');
+                } catch (saveErr) {
+                    console.error('Erro ao salvar configuração no localStorage:', saveErr);
+                    this.$dispatch('notify', { 
+                        message: 'Erro ao salvar configurações',
+                        description: 'Erro ao salvar no localStorage: ' + saveErr.message,
+                        status: 'danger'
+                    });
+                    return;
+                }
                 
                 // Para monitoramento atual
                 await this.stopMonitoring();
@@ -471,11 +595,16 @@ document.addEventListener('alpine:init', () => {
 
         async loadTemplates() {
             try {
+                console.log('Iniciando carregamento de templates...');
                 const response = await fetch('/print-templates');
+                console.log('Resposta da API:', response.status, response.statusText);
+                
                 const data = await response.json();
+                console.log('Dados recebidos da API:', data);
                 
                 // Se não há templates, não há nada a fazer
                 if (data.length === 0) {
+                    console.log('Nenhum template encontrado');
                     this.templates = [];
                     this.selectedTemplate = null;
                     return;
@@ -483,32 +612,52 @@ document.addEventListener('alpine:init', () => {
                 
                 // Get default template from localStorage
                 const config = localStorage.getItem('guardian_printer_config');
+                console.log('Configuração do localStorage:', config);
                 const defaultTemplate = config ? JSON.parse(config).template : null;
+                console.log('Template default:', defaultTemplate);
                 
                 // Mark templates as default based on localStorage
-                this.templates = data.map(template => ({
-                    ...template,
-                    isDefault: template.name === defaultTemplate
-                }));
+                this.templates = data.map(template => {
+                    const isDefault = template.name === defaultTemplate;
+                    console.log('Template processado:', {
+                        name: template.name,
+                        isDefault: isDefault,
+                        path: template.path,
+                        slug: template.slug
+                    });
+                    return {
+                        ...template,
+                        isDefault: isDefault
+                    };
+                });
+                
+                console.log('Templates processados:', this.templates);
                 
                 // Define o template selecionado
                 if (this.templates.length > 0) {
                     // Se temos um template salvo, verifica se ele existe na lista
                     if (this.savedTemplate) {
+                        console.log('Verificando template salvo:', this.savedTemplate);
                         const templateExists = this.templates.some(t => t.name === this.savedTemplate);
                         if (templateExists) {
+                            console.log('Template salvo encontrado na lista');
                             this.selectedTemplate = this.savedTemplate;
                         } else {
+                            console.log('Template salvo não encontrado na lista, usando o primeiro');
                             // Se o template salvo não existe, usa o primeiro da lista
                             this.selectedTemplate = this.templates[0].name;
                         }
                     } else {
+                        console.log('Nenhum template salvo, usando o primeiro da lista');
                         // Se não temos um template salvo, usa o primeiro da lista
                         this.selectedTemplate = this.templates[0].name;
                     }
                 } else {
+                    console.log('Nenhum template disponível');
                     this.selectedTemplate = null;
                 }
+                
+                console.log('Template selecionado:', this.selectedTemplate);
             } catch (err) {
                 console.error('Erro ao carregar templates:', err);
                 this.templates = [];

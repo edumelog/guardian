@@ -21,15 +21,17 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // Rotas para templates de impressão
-    Route::get('/print-templates', [PrintTemplateController::class, 'index']);
+    // Rotas para templates de impressão que requerem autenticação
     Route::post('/print-templates/upload', [PrintTemplateController::class, 'upload']);
-    Route::get('/print-templates/{name}', [PrintTemplateController::class, 'getTemplate']);
     Route::delete('/print-templates/{name}', [PrintTemplateController::class, 'delete']);
     
     // Rota para acessar fotos dos visitantes de forma segura
     Route::get('/visitor-photo/{filename}', [VisitorPhotoController::class, 'show'])->name('visitor.photo');
 });
+
+// Rotas para templates de impressão que não requerem autenticação
+Route::get('/print-templates', [PrintTemplateController::class, 'index']);
+Route::get('/print-templates/{name}', [PrintTemplateController::class, 'getTemplate']);
 
 Route::prefix('qz')->group(function () {
     Route::post('sign', [App\Http\Controllers\QZSignController::class, 'sign']);
