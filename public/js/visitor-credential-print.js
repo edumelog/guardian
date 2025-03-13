@@ -1,6 +1,22 @@
 // Log global para verificar se o script está sendo carregado
 console.log('[CredentialPrint] Script de impressão de credencial carregado');
 
+/**
+ * IMPORTANTE: Sobre o ID da visita (VisitorLog)
+ * 
+ * Este script espera que o objeto 'visitor' contenha uma propriedade 'visitLogId' ou 'visitorLogId'
+ * que representa o ID da visita atual (VisitorLog) do visitante.
+ * 
+ * Este ID é usado para gerar o QR code e o código de barras, e deve ser o ID do registro
+ * na tabela visitor_logs que representa a visita atual do visitante.
+ * 
+ * O ID é sempre crescente conforme novos visitantes entram no sistema, pois é o ID
+ * da tabela visitor_logs, não o ID do visitante.
+ * 
+ * Quando o QR code ou código de barras é lido, o sistema usa este ID para identificar
+ * a visita e registrar a saída do visitante.
+ */
+
 // Carrega a biblioteca QRious para geração de QR Code
 if (!window.QRious) {
     console.log('[CredentialPrint] Carregando biblioteca QRious...');
@@ -44,6 +60,18 @@ window.printVisitorCredential = function(visitor) {
 // Função para processar a requisição de impressão
 async function processPrintRequest(visitor) {
     console.log('[CredentialPrint] Processando solicitação de impressão para visitante:', visitor);
+    
+    // Verifica se o ID da visita (VisitorLog) está presente
+    if (visitor.visitLogId) {
+        console.log('[CredentialPrint] ID da visita (VisitorLog) encontrado:', visitor.visitLogId);
+    } else if (visitor.visitorLogId) {
+        console.log('[CredentialPrint] ID da visita (visitorLogId) encontrado:', visitor.visitorLogId);
+        // Normaliza o nome da propriedade para garantir consistência
+        visitor.visitLogId = visitor.visitorLogId;
+    } else {
+        console.warn('[CredentialPrint] ID da visita não encontrado no objeto visitor. Usando 0 como fallback.');
+        visitor.visitLogId = '0';
+    }
     
     try {
         // Carrega a configuração da impressora
@@ -160,15 +188,23 @@ async function showTemplateModal(html, visitor, config) {
         const modalContent = document.createElement('div');
         modalContent.style.cssText = `
             background-color: white;
-            padding: 20px;
+            padding: 20px 20px 10px 20px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            max-width: 90%;
-            max-height: 90%;
-            overflow: auto;
             display: flex;
             flex-direction: column;
+            width: fit-content;
+            max-height: 95vh;
+            overflow-y: auto;
+            align-items: center;
+            box-sizing: border-box;
         `;
+        
+        // Adiciona um log para verificar as dimensões do modal
+        console.log('[CredentialPrint] Dimensões do modal:', {
+            modalWidth: modalContent.style.width,
+            modalMaxHeight: modalContent.style.maxHeight
+        });
         
         // Botão de fechar
         const closeButton = document.createElement('button');
@@ -206,6 +242,7 @@ async function showTemplateModal(html, visitor, config) {
             margin-bottom: 10px;
             font-size: 0.875rem;
             color: #6b7280;
+            width: 100%;
         `;
         
         // Cria um container para o conteúdo com o tamanho exato da etiqueta
@@ -216,10 +253,74 @@ async function showTemplateModal(html, visitor, config) {
             height: ${pageHeight};
             margin: 0 auto;
             border: 2px dashed #3b82f6;
-            box-sizing: content-box;
+            box-sizing: border-box;
             overflow: hidden;
             background-color: white;
+            flex-shrink: 0;
+            transform-origin: top left;
         `;
+        
+        // Adiciona um atributo data com as dimensões originais
+        contentContainer.setAttribute('data-original-width', pageWidth);
+        contentContainer.setAttribute('data-original-height', pageHeight);
+        
+        console.log('[CredentialPrint] Dimensões iniciais do contentContainer:', {
+            width: contentContainer.style.width,
+            height: contentContainer.style.height,
+            originalWidth: pageWidth,
+            originalHeight: pageHeight
+        });
+        
+        // Ajusta o tamanho do container com base nas unidades
+        if (pageWidth.includes('mm') || pageHeight.includes('mm')) {
+            
+            // Obtém o valor de DPI das configurações
+            const savedConfig = localStorage.getItem('guardian_printer_config');
+            const configObj = savedConfig ? JSON.parse(savedConfig) : null;
+            const dpi = configObj && configObj.dpi ? parseInt(configObj.dpi) : 96;
+            
+            console.log('[CredentialPrint] Usando DPI para conversão:', dpi);
+            
+            // Fator de conversão para pixels baseado no DPI configurado
+            const mmToPx = dpi / 25.4;     // 1mm = dpi/25.4 pixels (25.4mm = 1in)
+            
+            // Extrai os valores numéricos e as unidades
+            const widthMatch = pageWidth.match(/^([\d.]+)(\w+)$/);
+            const heightMatch = pageHeight.match(/^([\d.]+)(\w+)$/);
+            
+            if (widthMatch && heightMatch) {
+                const widthValue = parseFloat(widthMatch[1]);
+                const heightValue = parseFloat(heightMatch[1]);
+                
+                // Aplica a conversão de mm para pixels
+                if (!isNaN(widthValue)) {
+                    contentContainer.style.width = `${widthValue * mmToPx}px`;
+                }
+                
+                if (!isNaN(heightValue)) {
+                    contentContainer.style.height = `${heightValue * mmToPx}px`;
+                }
+                
+                console.log('[CredentialPrint] Convertendo dimensões de mm para px:', {
+                    originalWidth: pageWidth,
+                    originalHeight: pageHeight,
+                    convertedWidth: contentContainer.style.width,
+                    convertedHeight: contentContainer.style.height,
+                    dpi: dpi,
+                    mmToPx: mmToPx
+                });
+            }
+        }
+        
+        // Adiciona informação sobre a conversão para pixels, se aplicável
+        if (contentContainer.style.width.includes('px') && contentContainer.style.height.includes('px') &&
+            (!pageWidth.includes('px') || !pageHeight.includes('px'))) {
+            const pixelInfo = document.createElement('div');
+            pixelInfo.textContent = `(${contentContainer.style.width} × ${contentContainer.style.height})`;
+            pixelInfo.style.fontSize = '0.75rem';
+            pixelInfo.style.color = '#9ca3af';
+            dimensionsLabel.appendChild(pixelInfo);
+        }
         
         // Cria o container para o conteúdo real
         const contentWrapper = document.createElement('div');
@@ -231,7 +332,27 @@ async function showTemplateModal(html, visitor, config) {
             height: 100%;
             overflow: hidden;
             background-color: white;
+            box-sizing: border-box;
         `;
+        
+        // Se as dimensões foram convertidas, aplica as mesmas dimensões ao contentWrapper
+        if (contentContainer.style.width.includes('px') && contentContainer.style.height.includes('px')) {
+            contentWrapper.style.width = contentContainer.style.width;
+            contentWrapper.style.height = contentContainer.style.height;
+            
+            console.log('[CredentialPrint] Dimensões do contentWrapper ajustadas:', {
+                width: contentWrapper.style.width,
+                height: contentWrapper.style.height,
+                containerWidth: contentContainer.style.width,
+                containerHeight: contentContainer.style.height
+            });
+        } else {
+            // Se não foram convertidas, usa 100% para garantir que ocupe todo o espaço
+            contentWrapper.style.width = '100%';
+            contentWrapper.style.height = '100%';
+            
+            console.log('[CredentialPrint] contentWrapper usando dimensões relativas (100%)');
+        }
         
         // Adiciona uma visualização das margens
         const marginVisualizer = document.createElement('div');
@@ -246,6 +367,62 @@ async function showTemplateModal(html, visitor, config) {
             box-sizing: border-box;
             z-index: 2;
         `;
+        
+        // Se as dimensões foram convertidas, ajusta as margens para o novo tamanho em pixels
+        if (contentContainer.style.width.includes('px') && contentContainer.style.height.includes('px')) {
+            // Obtém o valor de DPI das configurações
+            const savedConfig = localStorage.getItem('guardian_printer_config');
+            const configObj = savedConfig ? JSON.parse(savedConfig) : null;
+            const dpi = configObj && configObj.dpi ? parseInt(configObj.dpi) : 96;
+            
+            console.log('[CredentialPrint] Usando DPI para conversão de margens:', dpi);
+            
+            // Fator de conversão para pixels baseado no DPI configurado
+            const mmToPx = dpi / 25.4;     // 1mm = dpi/25.4 pixels (25.4mm = 1in)
+            
+            // Função para converter mm para pixels
+            const convertToPx = (value) => {
+                const match = value.match(/^([\d.]+)(\w+)$/);
+                if (!match) return value;
+                
+                const numValue = parseFloat(match[1]);
+                
+                if (isNaN(numValue)) return value;
+                
+                // Todas as unidades são mm
+                return `${numValue * mmToPx}px`;
+            };
+            
+            // Ajusta as margens para o novo tamanho em pixels
+            if (margins.top) {
+                marginVisualizer.style.top = convertToPx(margins.top);
+            }
+            if (margins.right) {
+                marginVisualizer.style.right = convertToPx(margins.right);
+            }
+            if (margins.bottom) {
+                marginVisualizer.style.bottom = convertToPx(margins.bottom);
+            }
+            if (margins.left) {
+                marginVisualizer.style.left = convertToPx(margins.left);
+            }
+            
+            console.log('[CredentialPrint] Margens convertidas de mm para pixels:', {
+                top: marginVisualizer.style.top,
+                right: marginVisualizer.style.right,
+                bottom: marginVisualizer.style.bottom,
+                left: marginVisualizer.style.left,
+                dpi: dpi,
+                mmToPx: mmToPx
+            });
+        }
+        
+        // Adiciona o HTML ao contentWrapper
+        contentWrapper.innerHTML = html;
+        
+        // Adiciona o contentWrapper e o marginVisualizer ao contentContainer
+        contentContainer.appendChild(contentWrapper);
+        contentContainer.appendChild(marginVisualizer);
         
         // Cria os botões de ação
         const actionButtons = document.createElement('div');
@@ -301,7 +478,12 @@ async function showTemplateModal(html, visitor, config) {
 <html>
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        @page {
+            size: ${pageWidth} ${pageHeight};
+            margin: 0;
+        }
         body {
             margin: 0;
             padding: 0;
@@ -312,6 +494,7 @@ async function showTemplateModal(html, visitor, config) {
         img {
             max-width: 100%;
         }
+        /* Nota: Todas as medidas estão em milímetros (mm) */
     </style>
 </head>
 <body>
@@ -383,8 +566,6 @@ async function showTemplateModal(html, visitor, config) {
         modalContent.appendChild(closeButton);
         modalContent.appendChild(modalTitle);
         modalContent.appendChild(dimensionsLabel);
-        contentContainer.appendChild(contentWrapper);
-        contentContainer.appendChild(marginVisualizer);
         modalContent.appendChild(contentContainer);
         modalContent.appendChild(actionButtons);
         modal.appendChild(modalContent);
@@ -411,6 +592,40 @@ async function showTemplateModal(html, visitor, config) {
                 
                 console.log('[CredentialPrint] Conteúdo HTML injetado');
                 
+                // Função para verificar se o tamanho do modal é adequado para a tela
+                const adjustModalForScreenSize = () => {
+                    // Obtém o tamanho da janela
+                    const windowWidth = window.innerWidth;
+                    const windowHeight = window.innerHeight;
+                    
+                    // Obtém o tamanho do contentContainer em pixels
+                    const containerWidth = contentContainer.offsetWidth;
+                    const containerHeight = contentContainer.offsetHeight;
+                    
+                    console.log('[CredentialPrint] Verificando tamanho do modal em relação à tela:', {
+                        windowWidth,
+                        windowHeight,
+                        containerWidth,
+                        containerHeight
+                    });
+                    
+                    // Se o container for maior que 90% da tela, ajusta o modal
+                    if (containerWidth > windowWidth * 0.9 || containerHeight > windowHeight * 0.9) {
+                        console.log('[CredentialPrint] Container muito grande para a tela, ajustando escala');
+                        
+                        // Calcula a escala necessária para caber na tela
+                        const scaleX = (windowWidth * 0.9) / containerWidth;
+                        const scaleY = (windowHeight * 0.9) / containerHeight;
+                        const scale = Math.min(scaleX, scaleY);
+                        
+                        // Aplica a escala ao contentContainer
+                        contentContainer.style.transform = `scale(${scale})`;
+                        contentContainer.style.transformOrigin = 'center';
+                        
+                        console.log('[CredentialPrint] Escala aplicada:', scale);
+                    }
+                };
+                
                 // Verifica se todas as imagens estão carregadas
                 const checkAllImagesLoaded = () => {
                     const images = contentWrapper.querySelectorAll('img');
@@ -420,6 +635,8 @@ async function showTemplateModal(html, visitor, config) {
                     if (images.length === 0) {
                         printButton.disabled = false;
                         printButton.style.opacity = '1';
+                        // Ajusta o tamanho do modal
+                        adjustModalForScreenSize();
                         return;
                     }
                     
@@ -471,12 +688,16 @@ async function showTemplateModal(html, visitor, config) {
                             // Habilita o botão de impressão após processar todas as imagens
                             printButton.disabled = false;
                             printButton.style.opacity = '1';
+                            // Ajusta o tamanho do modal
+                            adjustModalForScreenSize();
                         })
                         .catch(err => {
                             console.warn('[CredentialPrint] Erro ao processar imagens:', err);
                             // Habilita o botão mesmo com erro
                             printButton.disabled = false;
                             printButton.style.opacity = '1';
+                            // Ajusta o tamanho do modal mesmo com erro
+                            adjustModalForScreenSize();
                         });
                 };
                 
@@ -514,14 +735,20 @@ async function processTemplate(html, visitor) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
     
-    // Prepara o número do documento com 16 dígitos
-    const docNumber = visitor.doc ? visitor.doc.padStart(16, '0') : '0000000000000000';
-    const qrCodeData = docNumber;
+    // Obtém o ID da visita atual (VisitorLog)
+    // Prioriza o ID explícito da visita atual, que deve ser fornecido pelo backend
+    const visitLogId = visitor.visitLogId || visitor.visitorLogId || '0';
+    console.log('[CredentialPrint] ID da visita atual (VisitorLog) para códigos:', visitLogId);
     
-    // Função para formatar o número com espaços a cada 4 dígitos
-    const formatDocNumber = (num) => {
-        return num.match(/.{1,4}/g).join(' ');
-    };
+    // Garante que o ID seja uma string e remove espaços em branco
+    const qrCodeData = visitLogId ? visitLogId.toString().trim() : '0';
+    
+    // Adiciona um ponto no final dos dados para os códigos (para disparo automático quando lidos)
+    const qrCodeDataWithDot = qrCodeData + '.';
+    console.log('[CredentialPrint] Dados para QR code e código de barras:', { 
+        original: qrCodeData, 
+        comPonto: qrCodeDataWithDot 
+    });
     
     // Dados do visitante para substituição no template
     const visitorData = {
@@ -530,9 +757,9 @@ async function processTemplate(html, visitor) {
         'visitor-name': visitor.name || '',
         'visitor-doc-type': visitor.docType || '',
         'visitor-doc': visitor.doc || '',
-        'visitor-doc-formatted': formatDocNumber(docNumber), // Adiciona espaços a cada 4 dígitos
-        'visitor-qrcode': qrCodeData,
-        'visitor-barcode': docNumber,
+        'visitor-qrcode': qrCodeData, // Mantém o ID original sem o ponto para exibição em texto
+        'visitor-barcode': qrCodeData, // Mantém o ID original sem o ponto para exibição em texto
+        'visitor-log-id': qrCodeData, // Adiciona explicitamente o ID da visita como um campo
         
         // Dados do destino
         'visitor-destination': visitor.destination || '',
@@ -564,16 +791,16 @@ async function processTemplate(html, visitor) {
             return;
         }
 
-        // Gera o QR code como base64
+        // Gera o QR code como base64 com o ponto no final para disparo automático
         const qr = new QRious({
-            value: qrCodeData,
+            value: qrCodeDataWithDot, // Usa o valor com ponto
             size: 200,
             level: 'H' // Alta correção de erros para melhor leitura
         });
         img.src = qr.toDataURL();
         // Marca a imagem como processada para evitar conversão posterior
         img.setAttribute('data-processed', 'true');
-        console.log('[CredentialPrint] QR code gerado e definido na imagem');
+        console.log('[CredentialPrint] QR code gerado e definido na imagem com ponto para disparo automático');
     });
 
     // Processa o código de barras
@@ -588,22 +815,22 @@ async function processTemplate(html, visitor) {
         // Cria um canvas temporário para gerar o código de barras
         const canvas = document.createElement('canvas');
         try {
-            // Gera o código de barras (usando Code128 como padrão)
-            JsBarcode(canvas, docNumber, {
+            // Gera o código de barras (usando Code128 como padrão) com o ponto no final para disparo automático
+            JsBarcode(canvas, qrCodeDataWithDot, { // Usa o valor com ponto
                 format: "CODE128",
                 width: 1.5,
                 height: 100,
                 displayValue: true,
                 fontSize: 16,
                 margin: 10,
-                text: formatDocNumber(docNumber) // Usa o número formatado para exibição
+                text: qrCodeData // Usa o ID da visita original (sem ponto) para exibição
             });
             
             // Converte o canvas para base64 e define na imagem
             img.src = canvas.toDataURL();
             // Marca a imagem como processada para evitar conversão posterior
             img.setAttribute('data-processed', 'true');
-            console.log('[CredentialPrint] Código de barras gerado e definido na imagem');
+            console.log('[CredentialPrint] Código de barras gerado e definido na imagem com ponto para disparo automático');
         } catch (err) {
             console.error('[CredentialPrint] Erro ao gerar código de barras:', err);
             img.src = '';

@@ -7,6 +7,7 @@ use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Notifications\Notification;
 use Filament\Forms\Form;
+use Illuminate\Support\Facades\Auth;
 
 class EditVisitor extends EditRecord
 {
@@ -40,15 +41,42 @@ class EditVisitor extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        return [
-            Actions\Action::make('previewCredential')
+        $lastLog = $this->record->visitorLogs()->latest('in_date')->first();
+        $hasGivenExit = $lastLog && $lastLog->out_date !== null;
+        $hasActiveVisit = $lastLog && $lastLog->out_date === null;
+        
+        $actions = [];
+        
+        // Adiciona o botão de preview apenas se o visitante tiver uma visita em andamento
+        if ($hasActiveVisit) {
+            $actions[] = Actions\Action::make('previewCredential')
                 ->label('Preview da Credencial')
                 ->color('info')
                 ->icon('heroicon-o-eye')
                 ->action(function () {
                     $this->previewVisitorCredential();
-                }),
-        ];
+                });
+        }
+        
+        // Adiciona o botão de registrar entrada apenas se o visitante já tiver dado saída
+        if ($hasGivenExit) {
+            $actions[] = Actions\Action::make('register_entry')
+                ->label('Registrar Nova Entrada')
+                ->icon('heroicon-o-arrow-left-circle')
+                ->color('success')
+                ->url(function () {
+                    // Obtém os dados do visitante
+                    $visitor = $this->record;
+                    
+                    // Constrói a URL para a página de criação com os parâmetros
+                    return $this->getResource()::getUrl('create', [
+                        'doc' => $visitor->doc,
+                        'doc_type_id' => $visitor->doc_type_id
+                    ]);
+                });
+        }
+        
+        return $actions;
     }
 
     protected function previewVisitorCredential()
@@ -105,6 +133,7 @@ class EditVisitor extends EditRecord
             'photo' => $photoUrl,
             'inDate' => $lastLog?->in_date,
             'outDate' => $lastLog?->out_date,
+            'visitLogId' => $lastLog?->id,
             'other' => $visitor->other,
             // Dados adicionais
             'docTypeName' => $visitor->docType->type,
@@ -188,84 +217,20 @@ class EditVisitor extends EditRecord
     {
         $lastLog = $this->record->visitorLogs()->latest('in_date')->first();
         $hasGivenExit = $lastLog && $lastLog->out_date !== null;
+        $hasActiveVisit = $lastLog && $lastLog->out_date === null;
 
         // Se já deu saída, mostra apenas os botões de cancelar e excluir
         if ($hasGivenExit) {
-            return [
-                Actions\Action::make('cancel')
-                    ->label('Cancelar')
-                    ->color('gray')
-                    ->url($this->getResource()::getUrl('index')),
-
-                Actions\DeleteAction::make()
-                    ->label('Excluir')
-                    ->action(function () {
-                        $hasActiveVisit = $this->record->visitorLogs()
-                            ->whereNull('out_date')
-                            ->exists();
-
-                        if ($hasActiveVisit) {
-                            Notification::make()
-                                ->warning()
-                                ->title('Exclusão não permitida')
-                                ->body('Não é possível excluir um visitante com visita em andamento.')
-                                ->send();
-                            return;
-                        }
-
-                        $this->record->delete();
-                        
-                        $this->redirect($this->getResource()::getUrl('index'));
-                    }),
-            ];
-        }
-
-        // Se não deu saída, mostra todos os botões
-        return [
-            Actions\Action::make('preview')
-                ->label('Preview da Credencial')
-                ->color('info')
-                ->icon('heroicon-o-eye')
-                ->action(function () {
-                    $this->previewVisitorCredential();
-                }),
-
-            Actions\Action::make('register_exit')
-                ->label('Registrar Saída')
-                ->icon('heroicon-o-arrow-right-circle')
-                ->color('warning')
-                ->action(function () {
-                    $lastLog = $this->record->visitorLogs()->latest('in_date')->first();
-                    
-                    if (!$lastLog || $lastLog->out_date) {
-                        Notification::make()
-                            ->warning()
-                            ->title('Sem visita em andamento')
-                            ->body('Este visitante não possui uma visita em andamento.')
-                            ->send();
-                        return;
-                    }
-
-                    $lastLog->update(['out_date' => now()]);
-                    
-                    Notification::make()
-                        ->success()
-                        ->title('Saída registrada com sucesso!')
-                        ->send();
-
-                    $this->redirect($this->getResource()::getUrl('index'));
-                })
-                ->requiresConfirmation()
-                ->modalHeading('Registrar Saída')
-                ->modalDescription('Tem certeza que deseja registrar a saída deste visitante?')
-                ->modalSubmitActionLabel('Sim, registrar saída'),
-
-            Actions\Action::make('cancel')
+            $actions = [];
+            
+            // Não exibe o botão de preview para visitantes sem visita em andamento
+            
+            $actions[] = Actions\Action::make('cancel')
                 ->label('Cancelar')
                 ->color('gray')
-                ->url($this->getResource()::getUrl('index')),
-
-            Actions\DeleteAction::make()
+                ->url($this->getResource()::getUrl('index'));
+                
+            $actions[] = Actions\DeleteAction::make()
                 ->label('Excluir')
                 ->action(function () {
                     $hasActiveVisit = $this->record->visitorLogs()
@@ -284,8 +249,82 @@ class EditVisitor extends EditRecord
                     $this->record->delete();
                     
                     $this->redirect($this->getResource()::getUrl('index'));
-                }),
-        ];
+                });
+                
+            return $actions;
+        }
+
+        // Se não deu saída, mostra todos os botões
+        $actions = [];
+        
+        // Adiciona o botão de preview apenas se o visitante tiver uma visita em andamento
+        if ($hasActiveVisit) {
+            $actions[] = Actions\Action::make('preview')
+                ->label('Preview da Credencial')
+                ->color('info')
+                ->icon('heroicon-o-eye')
+                ->action(function () {
+                    $this->previewVisitorCredential();
+                });
+        }
+
+        $actions[] = Actions\Action::make('register_exit')
+            ->label('Registrar Saída')
+            ->icon('heroicon-o-arrow-right-circle')
+            ->color('warning')
+            ->action(function () {
+                $lastLog = $this->record->visitorLogs()->latest('in_date')->first();
+                
+                if (!$lastLog || $lastLog->out_date) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Sem visita em andamento')
+                        ->body('Este visitante não possui uma visita em andamento.')
+                        ->send();
+                    return;
+                }
+
+                $lastLog->update(['out_date' => now()]);
+                
+                Notification::make()
+                    ->success()
+                    ->title('Saída registrada com sucesso!')
+                    ->send();
+
+                $this->redirect($this->getResource()::getUrl('index'));
+            })
+            ->requiresConfirmation()
+            ->modalHeading('Registrar Saída')
+            ->modalDescription('Tem certeza que deseja registrar a saída deste visitante?')
+            ->modalSubmitActionLabel('Sim, registrar saída');
+
+        $actions[] = Actions\Action::make('cancel')
+            ->label('Cancelar')
+            ->color('gray')
+            ->url($this->getResource()::getUrl('index'));
+
+        $actions[] = Actions\DeleteAction::make()
+            ->label('Excluir')
+            ->action(function () {
+                $hasActiveVisit = $this->record->visitorLogs()
+                    ->whereNull('out_date')
+                    ->exists();
+
+                if ($hasActiveVisit) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Exclusão não permitida')
+                        ->body('Não é possível excluir um visitante com visita em andamento.')
+                        ->send();
+                    return;
+                }
+
+                $this->record->delete();
+                
+                $this->redirect($this->getResource()::getUrl('index'));
+            });
+            
+        return $actions;
     }
 
     protected bool $saving = false;
