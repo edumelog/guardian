@@ -1,66 +1,127 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Guardian - Sistema de Gerenciamento de Visitantes
 
 <p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+  <img src="public/images/logo.svg" alt="Guardian Logo" width="300"/>
 </p>
 
-## About Laravel
+## Sobre o Projeto
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+O Guardian é um Sistema de Gerenciamento de Visitantes (VMS - Visitor Management System) desenvolvido pela equipe de Inovação Tecnológica da DTI - Diretoria de Tecnologia da Informação da [Câmara Municipal do Rio de Janeiro](https://camara.rio).
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Este sistema permite o cadastro de visitantes, captura de dados pessoais e fotos para impressão de credenciais em impressoras térmicas, além de gerenciar todo o fluxo de entrada e saída de visitantes nas dependências da instituição.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Principais Funcionalidades
 
-## Learning Laravel
+- Cadastro completo de visitantes
+- Captura de fotos via webcam
+- Geração de QR Codes e códigos de barras para identificação rápida
+- Impressão de credenciais em impressoras térmicas
+- Gerenciamento de templates de credenciais personalizáveis
+- Controle de entrada e saída de visitantes
+- Histórico de visitas
+- Painel administrativo completo
+- Proteção de dados sensíveis dos visitantes
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Tecnologias Utilizadas
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- **[Laravel 11](https://laravel.com/)**: Framework PHP para o backend
+- **[Filament 3](https://filamentphp.com/)**: Framework de administração para Laravel
+- **[Filament Shield](https://github.com/bezhansalleh/filament-shield)**: Gerenciamento de permissões para Filament
+- **[Laravel Breeze](https://laravel.com/docs/11.x/starter-kits#laravel-breeze)**: Kit inicial para autenticação
+- **[Alpine.js](https://alpinejs.dev/)**: Framework JavaScript para interatividade
+- **[QZ Tray](https://qz.io/)**: Biblioteca para impressão
+- **[JsBarcode](https://github.com/lindell/JsBarcode)**: Geração de códigos de barras
+- **[QRious](https://github.com/neocotic/qrious)**: Geração de QR codes
 
-## Laravel Sponsors
+## Requisitos do Sistema
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+- PHP 8.2 ou superior
+- Composer
+- Node.js e NPM
+- Banco de dados compatível com Laravel (MySQL, PostgreSQL, SQLite)
+- Servidor web (Nginx, Apache)
 
-### Premium Partners
+## Histórico de Versões
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+### v1.1.0
+- Implementação de QR code para identificação rápida
+- Implementação de código de barras para leitura com scanner
+- Melhorias na conversão de templates
+- Integração com scanner de mesa para leitura rápida de credenciais
 
-## Contributing
+### v1.0.3
+- Hotfix: Correção das substituições nos templates de credenciais
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### v1.0.2
+- Hotfix: Permite apagar qualquer template de credencial
 
-## Code of Conduct
+### v1.0.1
+- Hotfix: Informações dos visitantes protegidas no disco privado para maior segurança
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### v1.0.0
+- Versão inicial do sistema
+- Cadastro de visitantes
+- Captura de fotos
+- Impressão de credenciais
+- Gerenciamento de templates
 
-## Security Vulnerabilities
+## Instalação e Configuração
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+# Clone o repositório
+git clone https://github.com/camara-rio/guardian.git
 
-## License
+# Entre no diretório do projeto
+cd guardian
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# Instale as dependências do PHP
+composer install
+
+# Instale as dependências do JavaScript
+npm install
+
+# Compile os assets
+npm run build
+
+# Configure o arquivo de ambiente
+cp .env.example .env
+php artisan key:generate
+
+# Execute as migrações
+php artisan migrate
+
+# Crie um usuário administrador
+php artisan shield:super-admin
+```
+
+## Uso
+
+Após a instalação, acesse o sistema através do navegador e faça login com as credenciais do administrador criado.
+
+O sistema permite:
+1. Cadastrar visitantes
+2. Capturar fotos
+3. Gerar credenciais
+4. Controlar entrada e saída
+5. Gerenciar templates de credenciais
+6. Configurar impressoras
+
+## Contribuição
+
+Contribuições são bem-vindas! Para contribuir:
+
+1. Faça um fork do projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/nova-funcionalidade`)
+3. Faça commit das suas alterações (`git commit -m 'Adiciona nova funcionalidade'`)
+4. Faça push para a branch (`git push origin feature/nova-funcionalidade`)
+5. Abra um Pull Request
+
+## Autor
+
+Eduardo Melo - [eduardo.melo@camara.rj.gov.br](mailto:eduardo.melo@camara.rj.gov.br)
+
+## Licença
+
+Este projeto é propriedade da Câmara Municipal do Rio de Janeiro.
