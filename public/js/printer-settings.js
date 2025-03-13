@@ -595,11 +595,16 @@ document.addEventListener('alpine:init', () => {
 
         async loadTemplates() {
             try {
+                console.log('Iniciando carregamento de templates...');
                 const response = await fetch('/print-templates');
+                console.log('Resposta da API:', response.status, response.statusText);
+                
                 const data = await response.json();
+                console.log('Dados recebidos da API:', data);
                 
                 // Se não há templates, não há nada a fazer
                 if (data.length === 0) {
+                    console.log('Nenhum template encontrado');
                     this.templates = [];
                     this.selectedTemplate = null;
                     return;
@@ -607,32 +612,52 @@ document.addEventListener('alpine:init', () => {
                 
                 // Get default template from localStorage
                 const config = localStorage.getItem('guardian_printer_config');
+                console.log('Configuração do localStorage:', config);
                 const defaultTemplate = config ? JSON.parse(config).template : null;
+                console.log('Template default:', defaultTemplate);
                 
                 // Mark templates as default based on localStorage
-                this.templates = data.map(template => ({
-                    ...template,
-                    isDefault: template.name === defaultTemplate
-                }));
+                this.templates = data.map(template => {
+                    const isDefault = template.name === defaultTemplate;
+                    console.log('Template processado:', {
+                        name: template.name,
+                        isDefault: isDefault,
+                        path: template.path,
+                        slug: template.slug
+                    });
+                    return {
+                        ...template,
+                        isDefault: isDefault
+                    };
+                });
+                
+                console.log('Templates processados:', this.templates);
                 
                 // Define o template selecionado
                 if (this.templates.length > 0) {
                     // Se temos um template salvo, verifica se ele existe na lista
                     if (this.savedTemplate) {
+                        console.log('Verificando template salvo:', this.savedTemplate);
                         const templateExists = this.templates.some(t => t.name === this.savedTemplate);
                         if (templateExists) {
+                            console.log('Template salvo encontrado na lista');
                             this.selectedTemplate = this.savedTemplate;
                         } else {
+                            console.log('Template salvo não encontrado na lista, usando o primeiro');
                             // Se o template salvo não existe, usa o primeiro da lista
                             this.selectedTemplate = this.templates[0].name;
                         }
                     } else {
+                        console.log('Nenhum template salvo, usando o primeiro da lista');
                         // Se não temos um template salvo, usa o primeiro da lista
                         this.selectedTemplate = this.templates[0].name;
                     }
                 } else {
+                    console.log('Nenhum template disponível');
                     this.selectedTemplate = null;
                 }
+                
+                console.log('Template selecionado:', this.selectedTemplate);
             } catch (err) {
                 console.error('Erro ao carregar templates:', err);
                 this.templates = [];
