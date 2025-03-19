@@ -5,25 +5,37 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\VisitorResource\Pages;
 use App\Filament\Resources\VisitorResource\RelationManagers;
 use App\Models\Visitor;
+use App\Models\DocType;
+use App\Models\Destination;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Resources\Resource;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Grid;
+use Filament\Forms\Get;
+use App\Filament\Forms\Components\WebcamCapture;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\SelectFilter;
+use App\Filament\Forms\Components\DocumentPhotoCapture;
+use Filament\Resources\Resource;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\HtmlString;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\FileUpload;
-use App\Filament\Forms\Components\WebcamCapture;
 use App\Filament\Forms\Components\DestinationTreeSelect;
-use Filament\Forms\Components\Grid;
-use Illuminate\Support\Facades\Storage;
 use Filament\Forms\Components\Placeholder;
-use App\Filament\Forms\Components\DocumentPhotoCapture;
 use Illuminate\Database\Eloquent\Collection;
 use Filament\Notifications\Notification;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Get;
 
 class VisitorResource extends Resource
 {
@@ -208,22 +220,25 @@ class VisitorResource extends Resource
                                 'numeric' => 'O número do documento deve conter apenas números.'
                             ]),
                             
-                        WebcamCapture::make('photo')
-                            ->label('Foto')
-                            ->required()
-                            ->disabled($hasActiveVisit),
+                        Grid::make(3)
+                            ->schema([
+                                WebcamCapture::make('photo')
+                                    ->label('Foto')
+                                    ->required()
+                                    ->disabled($hasActiveVisit),
 
-                        DocumentPhotoCapture::make('doc_photo_front')
-                            ->label('Documento - Frente')
-                            ->required()
-                            ->side('front')
-                            ->disabled($hasActiveVisit),
+                                DocumentPhotoCapture::make('doc_photo_front')
+                                    ->label('Documento - Frente')
+                                    ->required()
+                                    ->side('front')
+                                    ->disabled($hasActiveVisit),
 
-                        DocumentPhotoCapture::make('doc_photo_back')
-                            ->label('Documento - Verso')
-                            ->required()
-                            ->side('back')
-                            ->disabled($hasActiveVisit),
+                                DocumentPhotoCapture::make('doc_photo_back')
+                                    ->label('Documento - Verso')
+                                    ->required()
+                                    ->side('back')
+                                    ->disabled($hasActiveVisit),
+                            ]),
                             
                         Select::make('destination_id')
                             ->label('Destino')

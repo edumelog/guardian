@@ -95,21 +95,23 @@
         }
     }">
         <div class="space-y-2">
-            <!-- TAMANHO DA FOTO: Altere as classes w-48 h-48 para ajustar o tamanho
+            <!-- TAMANHO DA FOTO: Altere as classes w-full h-48 para ajustar o tamanho
                 Opções comuns:
                 - w-32 h-32 = 128x128 pixels (pequeno)
                 - w-48 h-48 = 192x192 pixels (médio)
                 - w-64 h-64 = 256x256 pixels (grande)
+                - w-full h-48 = largura total e altura fixa (atual - mantém consistência com documentos)
             -->
-            <div class="relative w-32 h-32 mx-auto">
+            {{-- <div class="relative w-full h-48 mx-auto"> --}}
+            <div class="relative w-48 h-64 mx-auto">
                 <!-- Preview da foto ou vídeo ao vivo -->
                 <div x-show="!capturing" class="w-full h-full">
                     <div 
                         x-show="!previewUrl"
                         class="w-full h-full flex items-center justify-center bg-gray-100 border-2 border-gray-200"
                     >
-                        <!-- TAMANHO DO ÍCONE: Ajuste w-12 h-12 proporcionalmente ao tamanho da foto -->
-                        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <!-- TAMANHO DO ÍCONE: Ajuste w-16 h-16 proporcionalmente ao tamanho da foto -->
+                        <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                     </div>
