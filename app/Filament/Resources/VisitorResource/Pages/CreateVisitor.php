@@ -19,6 +19,7 @@ use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\View;
 use Illuminate\Support\Facades\Auth;
 use Filament\Notifications\Notification;
+use Filament\Forms\Components\Grid;
 
 class CreateVisitor extends CreateRecord
 {
@@ -95,20 +96,23 @@ class CreateVisitor extends CreateRecord
                             ->maxLength(255)
                             ->visible(fn (Get $get): bool => $this->showAllFields),
 
-                        WebcamCapture::make('photo')
-                            ->label('Foto')
-                            ->required()
-                            ->visible(fn (Get $get): bool => $this->showAllFields),
+                        Grid::make(3)
+                            ->schema([
+                                WebcamCapture::make('photo')
+                                    ->label('Foto')
+                                    ->required()
+                                    ->visible(fn (Get $get): bool => $this->showAllFields),
 
-                        DocumentPhotoCapture::make('doc_photo_front')
-                            ->label('Foto do Documento (Frente)')
-                            ->required()
-                            ->visible(fn (Get $get): bool => $this->showAllFields),
+                                DocumentPhotoCapture::make('doc_photo_front')
+                                    ->label('Foto do Documento (Frente)')
+                                    ->required()
+                                    ->visible(fn (Get $get): bool => $this->showAllFields),
 
-                        DocumentPhotoCapture::make('doc_photo_back')
-                            ->label('Foto do Documento (Verso)')
-                            ->required()
-                            ->visible(fn (Get $get): bool => $this->showAllFields),
+                                DocumentPhotoCapture::make('doc_photo_back')
+                                    ->label('Foto do Documento (Verso)')
+                                    ->required()
+                                    ->visible(fn (Get $get): bool => $this->showAllFields),
+                            ]),
 
                         Select::make('destination_id')
                             ->label('Destino')
