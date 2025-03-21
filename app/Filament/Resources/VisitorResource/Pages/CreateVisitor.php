@@ -96,7 +96,27 @@ class CreateVisitor extends CreateRecord
                             ->required()
                             ->maxLength(255)
                             ->visible(fn (Get $get): bool => $this->showAllFields)
-                            ->disabled(fn (Get $get): bool => $this->showAllFields),
+                            ->disabled(function (Get $get) {
+                                // Se já existir um visitante com este documento, desabilita o campo
+                                $doc = $get('doc');
+                                $docTypeId = $get('doc_type_id');
+                                if (!$doc || !$docTypeId) return false;
+                                
+                                return \App\Models\Visitor::where('doc', $doc)
+                                    ->where('doc_type_id', $docTypeId)
+                                    ->exists();
+                            })
+                            ->regex('/^[A-Za-zÀ-ÖØ-öø-ÿ\s\.\-\']+$/')
+                            ->extraInputAttributes([
+                                'style' => 'text-transform: uppercase;',
+                                'x-on:keypress' => "if (!/[A-Za-zÀ-ÖØ-öø-ÿ\s\.\-\']/.test(event.key)) { event.preventDefault(); }"
+                            ])
+                            ->afterStateUpdated(function (string $state, callable $set) {
+                                $set('name', mb_strtoupper($state));
+                            })
+                            ->validationMessages([
+                                'regex' => 'O nome deve conter apenas letras, espaços e caracteres especiais (. - \').',
+                            ]),
 
                         TextInput::make('phone')
                             ->label('Telefone')

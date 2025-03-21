@@ -219,7 +219,18 @@ class VisitorResource extends Resource
                             ->label('Nome')
                             ->required()
                             ->maxLength(255)
-                            ->disabled($hasActiveVisit),
+                            ->disabled($hasActiveVisit)
+                            ->regex('/^[A-Za-zÀ-ÖØ-öø-ÿ\s\.\-\']+$/')
+                            ->extraInputAttributes([
+                                'style' => 'text-transform: uppercase;',
+                                'x-on:keypress' => "if (!/[A-Za-zÀ-ÖØ-öø-ÿ\s\.\-\']/.test(event.key)) { event.preventDefault(); }"
+                            ])
+                            ->afterStateUpdated(function (string $state, callable $set) {
+                                $set('name', mb_strtoupper($state));
+                            })
+                            ->validationMessages([
+                                'regex' => 'O nome deve conter apenas letras, espaços e caracteres especiais (. - \').',
+                            ]),
                             
                         Forms\Components\TextInput::make('phone')
                             ->label('Telefone')
