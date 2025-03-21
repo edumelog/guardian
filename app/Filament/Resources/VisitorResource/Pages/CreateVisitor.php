@@ -20,6 +20,7 @@ use Filament\Forms\Components\View;
 use Illuminate\Support\Facades\Auth;
 use Filament\Notifications\Notification;
 use Filament\Forms\Components\Grid;
+use Filament\Support\RawJs;
 
 class CreateVisitor extends CreateRecord
 {
@@ -94,6 +95,18 @@ class CreateVisitor extends CreateRecord
                             ->label('Nome')
                             ->required()
                             ->maxLength(255)
+                            ->visible(fn (Get $get): bool => $this->showAllFields)
+                            ->disabled(fn (Get $get): bool => $this->showAllFields),
+
+                        TextInput::make('phone')
+                            ->label('Telefone')
+                            ->tel()
+                            ->telRegex('/.*/')  // Aceita qualquer formato de telefone
+                            ->mask(RawJs::make(<<<'JS'
+                                '99 (99) 99-999-9999'
+                            JS))
+                            ->default('55 (21) ')
+                            ->placeholder('55 (21) 99-999-9999')
                             ->visible(fn (Get $get): bool => $this->showAllFields),
 
                         Grid::make(3)
@@ -340,6 +353,7 @@ class CreateVisitor extends CreateRecord
             'doc_photo_front' => $visitor->doc_photo_front,
             'doc_photo_back' => $visitor->doc_photo_back,
             'other' => $visitor->other,
+            'phone' => $visitor->phone,
         ]);
 
         // Dispara eventos para atualizar os previews das fotos
@@ -460,9 +474,11 @@ class CreateVisitor extends CreateRecord
             ->first();
 
         if ($visitor) {
-            // Se o visitante existe, atualiza as informações adicionais e cria um novo log de visita
+            // Se o visitante existe, atualiza apenas as informações que devem ser atualizáveis
             $visitor->update([
-                'other' => $data['other'] ?? null
+                'other' => $data['other'] ?? null,
+                'phone' => $data['phone'] ?? null
+                // O nome não é incluído aqui para garantir que não seja alterado
             ]);
 
             $visitor->visitorLogs()->create([

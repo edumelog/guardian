@@ -36,6 +36,7 @@ use App\Filament\Forms\Components\DestinationTreeSelect;
 use Filament\Forms\Components\Placeholder;
 use Illuminate\Database\Eloquent\Collection;
 use Filament\Notifications\Notification;
+use Filament\Support\RawJs;
 
 class VisitorResource extends Resource
 {
@@ -67,12 +68,6 @@ class VisitorResource extends Resource
             ->schema([
                 Section::make('Informações do Visitante')
                     ->schema([
-                        Forms\Components\TextInput::make('name')
-                            ->label('Nome')
-                            ->required()
-                            ->maxLength(255)
-                            ->disabled($hasActiveVisit),
-                            
                         Forms\Components\Select::make('doc_type_id')
                             ->label('Tipo de Documento')
                             ->relationship('docType', 'type')
@@ -219,6 +214,23 @@ class VisitorResource extends Resource
                                 'unique' => 'Já existe um visitante cadastrado com este número de documento para o tipo selecionado.',
                                 'numeric' => 'O número do documento deve conter apenas números.'
                             ]),
+
+                        Forms\Components\TextInput::make('name')
+                            ->label('Nome')
+                            ->required()
+                            ->maxLength(255)
+                            ->disabled($hasActiveVisit),
+                            
+                        Forms\Components\TextInput::make('phone')
+                            ->label('Telefone')
+                            ->tel()
+                            ->telRegex('/.*/')  // Aceita qualquer formato de telefone
+                            ->mask(RawJs::make(<<<'JS'
+                                '99 (99) 99-999-9999'
+                            JS))
+                            ->default('55 (21) ')
+                            ->placeholder('55 (21) 99-999-9999')
+                            ->disabled($hasActiveVisit),
                             
                         Grid::make(3)
                             ->schema([
@@ -391,6 +403,10 @@ class VisitorResource extends Resource
                     
                 Tables\Columns\TextColumn::make('doc')
                     ->label('Documento')
+                    ->searchable(),
+                    
+                Tables\Columns\TextColumn::make('phone')
+                    ->label('Telefone')
                     ->searchable(),
                     
                 Tables\Columns\TextColumn::make('photo')
