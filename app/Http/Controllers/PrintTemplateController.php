@@ -323,56 +323,10 @@ class PrintTemplateController extends Controller
                 // Remove parâmetros de URL se existirem
                 $src = preg_replace('/\?.*$/', '', $src);
                 
-                // Tenta diferentes caminhos para encontrar a imagem
-                $imagePath = null;
-                
-                // Caminho absoluto no sistema de arquivos
-                if (strpos($src, '/') === 0) {
-                    $path = $extractPath . $src;
-                    if (File::exists($path)) {
-                        $imagePath = $path;
-                    }
-                }
-                
-                // Caminho relativo começando com ./
-                if (!$imagePath && strpos($src, './') === 0) {
-                    $path = $htmlDir . '/' . substr($src, 2);
-                    if (File::exists($path)) {
-                        $imagePath = $path;
-                    }
-                }
-                
-                // Caminho relativo sem ./
-                if (!$imagePath) {
-                    $path = $htmlDir . '/' . $src;
-                    if (File::exists($path)) {
-                        $imagePath = $path;
-                    }
-                }
-                
-                // Tenta na raiz do template
-                if (!$imagePath) {
-                    $path = $extractPath . '/' . $src;
-                    if (File::exists($path)) {
-                        $imagePath = $path;
-                    }
-                }
-                
-                // Se encontrou a imagem, atualiza o src para o caminho relativo correto
-                if ($imagePath) {
-                    // Converte o caminho absoluto para relativo ao diretório do template
-                    $relativePath = str_replace($extractPath, '', $imagePath);
-                    $relativePath = ltrim($relativePath, '/');
-                    $img->setAttribute('src', $relativePath);
-                    
-                    Log::info('Caminho da imagem atualizado:', [
-                        'original' => $src,
-                        'novo' => $relativePath
-                    ]);
-                } else {
-                    // Se não encontrou a imagem, mantém o src original
-                    Log::warning('Imagem não encontrada:', ['src' => $src]);
-                }
+                // Log do caminho original da imagem
+                Log::info('Mantendo caminho original da imagem:', [
+                    'src' => $src
+                ]);
             } catch (\Exception $e) {
                 Log::error('Erro ao processar imagem:', [
                     'src' => $src,
@@ -501,6 +455,7 @@ class PrintTemplateController extends Controller
                 $html = $this->convertCssToInline($html, $cssContent);
             }
             
+            /* Comentando as substituições de caminhos para manter os caminhos relativos originais
             // Agora substitui os caminhos que não foram convertidos para base64
             
             // Substitui caminhos que começam com ./
@@ -514,6 +469,7 @@ class PrintTemplateController extends Controller
             // Substitui caminhos que começam com /
             $html = preg_replace('/href=["\']\/(?!storage|http)([^"\']*)["\']/', "href=\"{$absolutePath}/$1\"", $html);
             $html = preg_replace('/src=["\']\/(?!storage|http)([^"\']*)["\'](?![^<>]*base64)/', "src=\"{$absolutePath}/$1\"", $html);
+            */
             
             // Log do HTML após todas as substituições
             Log::info('HTML após todas as substituições:', ['html' => $html]);

@@ -54,8 +54,18 @@ class CredentialPrintService
         $template = File::get($templatePath);
         Log::info('Template carregado', ['size' => strlen($template)]);
 
+        // Log do conteúdo do template antes do processamento:
+        Log::debug('Conteúdo do template antes do processamento:', ['html' => $template]);
+
         $processedHtml = $this->processTemplate($template, $visitor);
         Log::info('Template processado', ['size' => strlen($processedHtml)]);
+
+        // Ajusta os caminhos das imagens
+        $processedHtml = $this->adjustImagePaths($processedHtml, $templatePath);
+        Log::info('Caminhos das imagens ajustados', ['size' => strlen($processedHtml)]);
+
+        // Log do HTML processado para debug
+        Log::debug('HTML após processamento:', ['html' => $processedHtml]);
 
         // Gera um ID único para o arquivo temporário
         $tempId = Str::uuid();
@@ -76,8 +86,15 @@ class CredentialPrintService
             'dpi' => $printerConfig['dpi'] ?? '96'
         ]);
 
+        // Carrega o HTML no DomPDF
         $pdf = DomPDF::loadHtml($processedHtml);
         
+        // Log do diretório atual do DomPDF
+        Log::info('Diretório base do DomPDF:', [
+            'template_dir' => dirname($templatePath),
+            'current_path' => getcwd()
+        ]);
+
         // Configura as dimensões e margens
         $width = $this->convertToPoints($printerConfig['printOptions']['pageWidth'], 'mm');
         $height = $this->convertToPoints($printerConfig['printOptions']['pageHeight'], 'mm');
@@ -103,16 +120,8 @@ class CredentialPrintService
             'left' => $marginLeft
         ]);
 
-        // Define o tamanho do papel e margens
-        $pdf->setPaper([
-            0,
-            0,
-            $width,
-            $height
-        ], $printerConfig['orientation'] ?? 'portrait');
-
         // Define as margens e outras opções
-        $pdf->setOptions([
+        $options = [
             'defaultFont' => 'sans-serif',
             'isRemoteEnabled' => true,
             'dpi' => $printerConfig['dpi'] ?? 96,
@@ -122,7 +131,51 @@ class CredentialPrintService
             'margin_left' => $marginLeft,
             'defaultPaperSize' => [$width, $height],
             'defaultMediaType' => 'Custom',
-            'defaultPageSize' => [$width, $height]
+            'defaultPageSize' => [$width, $height],
+            'chroot' => dirname($templatePath),
+            'fontDir' => storage_path('fonts/'),
+            'fontCache' => storage_path('fonts/'),
+            'isPhpEnabled' => true,
+            'isHtml5ParserEnabled' => true,
+            'isFontSubsettingEnabled' => true,
+            'enable_css_float' => true,
+            'enable_html5_parser' => true,
+            'enable_remote' => true,
+            'font_height_ratio' => 1.0,
+            'adjust_line_height' => true,
+            'pdf_page_limit' => 1
+        ];
+
+        $pdf->setOptions($options);
+
+        // Ajusta o tamanho do papel para ser exatamente o tamanho configurado
+        $pdf->setPaper([
+            0,
+            0,
+            $width,
+            $height
+        ], $printerConfig['orientation'] ?? 'portrait');
+
+        // Adiciona CSS inline para garantir as dimensões corretas em milímetros
+        $processedHtml = str_replace('<body', '<body style="margin:0; padding:0; width:' . $printerConfig['printOptions']['pageWidth'] . 'mm; height:' . $printerConfig['printOptions']['pageHeight'] . 'mm; position:fixed; overflow:hidden;"', $processedHtml);
+
+        // Carrega o HTML com as novas configurações
+        $pdf = DomPDF::loadHtml($processedHtml);
+        $pdf->setOptions($options);
+
+        // Log das opções do DomPDF
+        Log::info('Opções do DomPDF:', [
+            'options' => $options,
+            'chroot' => dirname($templatePath),
+            'template_full_path' => $templatePath,
+            'image_path' => dirname($templatePath) . '/img/CMRJ-horizontal.jpg'
+        ]);
+
+        // Log das dimensões do papel
+        Log::info('Dimensões do papel:', [
+            'width' => $width,
+            'height' => $height,
+            'orientation' => $printerConfig['orientation'] ?? 'portrait'
         ]);
 
         // Desativa temporariamente o output buffering antes de gerar o PDF
@@ -130,10 +183,24 @@ class CredentialPrintService
 
         // Salva o PDF temporário
         $pdf->save($tempPath);
-        Log::info('PDF temporário gerado', [
-            'path' => $tempPath,
-            'size' => File::size($tempPath)
-        ]);
+
+        // Verifica se o PDF foi gerado e suas características
+        if (File::exists($tempPath)) {
+            Log::info('PDF temporário gerado com sucesso', [
+                'path' => $tempPath,
+                'size' => File::size($tempPath),
+                'permissions' => substr(sprintf('%o', fileperms($tempPath)), -4)
+            ]);
+
+            // Tenta ler o conteúdo do PDF para verificar se está correto
+            $pdfContent = File::get($tempPath);
+            Log::info('Conteúdo do PDF verificado', [
+                'size' => strlen($pdfContent),
+                'contains_image' => strpos($pdfContent, '/Image') !== false
+            ]);
+        } else {
+            Log::error('Falha ao gerar o PDF', ['path' => $tempPath]);
+        }
 
         $previewUrl = URL::temporarySignedRoute(
             'credential.preview.pdf',
@@ -319,5 +386,43 @@ class CredentialPrintService
         ]);
 
         return $points;
+    }
+
+    /**
+     * Ajusta os caminhos das imagens no HTML para serem absolutos em relação ao chroot
+     *
+     * @param string $html
+     * @param string $templatePath
+     * @return string
+     */
+    private function adjustImagePaths(string $html, string $templatePath): string
+    {
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+
+        $images = $dom->getElementsByTagName('img');
+        foreach ($images as $img) {
+            $src = $img->getAttribute('src');
+            
+            // Pula se já for base64 ou URL externa
+            if (strpos($src, 'data:image/') === 0 || strpos($src, 'http://') === 0 || strpos($src, 'https://') === 0) {
+                continue;
+            }
+
+            // Converte o caminho relativo para absoluto em relação ao chroot
+            $absolutePath = '/' . ltrim($src, '/');
+            
+            Log::info('Ajustando caminho da imagem:', [
+                'original' => $src,
+                'novo' => $absolutePath,
+                'arquivo_existe' => File::exists(dirname($templatePath) . '/' . $src)
+            ]);
+
+            $img->setAttribute('src', $absolutePath);
+        }
+
+        return $dom->saveHTML();
     }
 } 
