@@ -20,6 +20,8 @@ use Filament\Forms\Components\View;
 use Illuminate\Support\Facades\Auth;
 use Filament\Notifications\Notification;
 use Filament\Forms\Components\Grid;
+use Filament\Support\RawJs;
+use App\Models\Visitor;
 
 class CreateVisitor extends CreateRecord
 {
@@ -81,19 +83,201 @@ class CreateVisitor extends CreateRecord
                             ->dehydrated(true)
                             ->disabled(fn (Get $get): bool => $this->showAllFields)
                             ->extraInputAttributes([
-                                'x-on:keydown.enter.prevent' => '$wire.call("searchVisitor")'
+                                'x-data' => '{ 
+                                    isCpf: false,
+                                    docTypeId: null,
+                                    docValue: null,
+                                    errorMessage: "",
+                                    cpfValid: true,
+                                    
+                                    // Função para validar o CPF
+                                    validateCpf(cpf) {
+                                        if (!cpf) return true;
+                                        
+                                        // Remove caracteres não numéricos
+                                        cpf = cpf.replace(/[^\d]/g, "");
+                                        
+                                        // Verifica se tem 11 dígitos
+                                        if (cpf.length !== 11) return false;
+                                        
+                                        // Verifica se todos os dígitos são iguais
+                                        if (/^(\d)\1+$/.test(cpf)) return false;
+                                        
+                                        // Validação dos dígitos verificadores
+                                        let soma = 0;
+                                        let resto;
+                                        
+                                        // Primeiro dígito verificador
+                                        for (let i = 1; i <= 9; i++) {
+                                            soma = soma + parseInt(cpf.substring(i-1, i)) * (11 - i);
+                                        }
+                                        resto = (soma * 10) % 11;
+                                        if ((resto === 10) || (resto === 11)) resto = 0;
+                                        if (resto !== parseInt(cpf.substring(9, 10))) return false;
+                                        
+                                        // Segundo dígito verificador
+                                        soma = 0;
+                                        for (let i = 1; i <= 10; i++) {
+                                            soma = soma + parseInt(cpf.substring(i-1, i)) * (12 - i);
+                                        }
+                                        resto = (soma * 10) % 11;
+                                        if ((resto === 10) || (resto === 11)) resto = 0;
+                                        if (resto !== parseInt(cpf.substring(10, 11))) return false;
+                                        
+                                        return true;
+                                    },
+                                    
+                                    getDocTypeElement() {
+                                        return document.querySelector(\'select[name="doc_type_id"]\');
+                                    },
+                                    
+                                    isCpfDocument() {
+                                        const cpfSelect = this.getDocTypeElement();
+                                        if (!cpfSelect) return false;
+                                        
+                                        const selectedIndex = cpfSelect.selectedIndex;
+                                        if (selectedIndex === -1) return false;
+                                        
+                                        const selectedOption = cpfSelect.options[selectedIndex];
+                                        return selectedOption && selectedOption.text.toUpperCase().includes("CPF");
+                                    },
+                                    
+                                    checkCpf() {
+                                        // Verifica se o tipo de documento é CPF
+                                        const cpfSelect = this.getDocTypeElement();
+                                        if (!cpfSelect) return; // Se o elemento não existe, não faz nada
+                                        
+                                        this.docTypeId = cpfSelect.value;
+                                        this.isCpf = this.isCpfDocument();
+                                        
+                                        // Se for CPF, valida o documento
+                                        if (this.isCpf && this.docValue) {
+                                            this.cpfValid = this.validateCpf(this.docValue);
+                                            if (!this.cpfValid) {
+                                                this.errorMessage = "CPF inválido! Verifique o número informado.";
+                                                // Desabilitar o botão de busca
+                                                const searchBtn = document.querySelector(\'button[aria-label="Buscar visitante por documento"]\');
+                                                if (searchBtn) {
+                                                    searchBtn.disabled = true;
+                                                    searchBtn.classList.add(\'opacity-50\', \'cursor-not-allowed\');
+                                                }
+                                                // Notificar o usuário sobre o CPF inválido
+                                                const event = new CustomEvent("cpf-invalid", {
+                                                    detail: { message: this.errorMessage }
+                                                });
+                                                window.dispatchEvent(event);
+                                            } else {
+                                                this.errorMessage = "";
+                                                // Habilitar o botão de busca novamente
+                                                const searchBtn = document.querySelector(\'button[aria-label="Buscar visitante por documento"]\');
+                                                if (searchBtn) {
+                                                    searchBtn.disabled = false;
+                                                    searchBtn.classList.remove(\'opacity-50\', \'cursor-not-allowed\');
+                                                }
+                                            }
+                                        } else {
+                                            this.cpfValid = true;
+                                            this.errorMessage = "";
+                                            // Habilitar o botão de busca
+                                            const searchBtn = document.querySelector(\'button[aria-label="Buscar visitante por documento"]\');
+                                            if (searchBtn) {
+                                                searchBtn.disabled = false;
+                                                searchBtn.classList.remove(\'opacity-50\', \'cursor-not-allowed\');
+                                            }
+                                        }
+                                    },
+                                    
+                                    init() {
+                                        // Inicializa com o valor atual do campo
+                                        this.docValue = this.$el.value;
+                                        
+                                        // Monitora alterações nos valores
+                                        this.$watch("docValue", value => { 
+                                            this.checkCpf();
+                                        });
+                                        
+                                        // Verifica o tipo de documento inicial
+                                        this.$nextTick(() => {
+                                            const cpfSelect = this.getDocTypeElement();
+                                            if (cpfSelect) {
+                                                this.docTypeId = cpfSelect.value;
+                                                this.isCpf = this.isCpfDocument();
+                                                
+                                                // Adiciona um event listener para o select
+                                                cpfSelect.addEventListener("change", () => {
+                                                    this.docTypeId = cpfSelect.value;
+                                                    this.isCpf = this.isCpfDocument();
+                                                    this.checkCpf();
+                                                });
+                                            }
+                                        });
+                                    }
+                                }',
+                                'x-init' => 'init()',
+                                'x-on:input' => 'docValue = $event.target.value; checkCpf()',
+                                'x-on:keydown.enter.prevent' => 'if (cpfValid) { $wire.call("searchVisitor") }'
                             ])
                             ->suffixAction(
                                 Action::make('search')
                                     ->icon('heroicon-m-magnifying-glass')
                                     ->tooltip('Buscar visitante por documento')
-                                    ->action(fn () => $this->searchVisitor())
+                                    ->action(function () {
+                                        $this->searchVisitor();
+                                    })
                             ),
+                            
+                        Placeholder::make('cpf_error')
+                            ->label('')
+                            ->content(fn (): string => 'CPF inválido! Verifique o número informado.')
+                            ->extraAttributes([
+                                'class' => 'hidden text-danger-500 dark:text-danger-400 font-medium',
+                                'x-data' => '{}',
+                                'x-init' => '
+                                    window.addEventListener("cpf-invalid", (event) => {
+                                        $el.classList.remove("hidden");
+                                        setTimeout(() => {
+                                            $el.classList.add("hidden");
+                                        }, 5000);
+                                    });
+                                '
+                            ]),
 
                         TextInput::make('name')
                             ->label('Nome')
                             ->required()
                             ->maxLength(255)
+                            ->visible(fn (Get $get): bool => $this->showAllFields)
+                            ->disabled(function (Get $get) {
+                                // Se já existir um visitante com este documento, desabilita o campo
+                                $doc = $get('doc');
+                                $docTypeId = $get('doc_type_id');
+                                if (!$doc || !$docTypeId) return false;
+                                
+                                return \App\Models\Visitor::where('doc', $doc)
+                                    ->where('doc_type_id', $docTypeId)
+                                    ->exists();
+                            })
+                            ->regex('/^[A-Za-zÀ-ÖØ-öø-ÿ\s\.\-\']+$/')
+                            ->extraInputAttributes([
+                                'style' => 'text-transform: uppercase;',
+                                'x-on:keypress' => "if (!/[A-Za-zÀ-ÖØ-öø-ÿ\s\.\-\']/.test(event.key)) { event.preventDefault(); }"
+                            ])
+                            ->afterStateUpdated(function (string $state, callable $set) {
+                                $set('name', mb_strtoupper($state));
+                            })
+                            ->validationMessages([
+                                'regex' => 'O nome deve conter apenas letras, espaços e caracteres especiais (. - \').',
+                            ]),
+
+                        TextInput::make('phone')
+                            ->label('Telefone')
+                            ->tel()
+                            ->telRegex('/.*/')  // Aceita qualquer formato de telefone
+                            ->mask(RawJs::make(<<<'JS'
+                                '99 (99) 99-999-9999'
+                            JS))
+                            ->default('55 (21) ')
+                            ->placeholder('55 (21) 99-999-9999')
                             ->visible(fn (Get $get): bool => $this->showAllFields),
 
                         Grid::make(3)
@@ -295,6 +479,67 @@ class CreateVisitor extends CreateRecord
             return;
         }
 
+        // Verifica se o tipo de documento é CPF e se o formato é válido
+        $docTypeId = $formData['doc_type_id'];
+        $docType = \App\Models\DocType::find($docTypeId);
+        
+        if ($docType && stripos($docType->type, 'CPF') !== false) {
+            // Remove caracteres não numéricos
+            $cpf = preg_replace('/[^0-9]/', '', $formData['doc']);
+            
+            // Verifica se tem 11 dígitos
+            if (strlen($cpf) !== 11) {
+                \Filament\Notifications\Notification::make()
+                    ->danger()
+                    ->title('CPF inválido')
+                    ->body('O número de CPF informado não possui 11 dígitos.')
+                    ->send();
+                return;
+            }
+            
+            // Verifica se todos os dígitos são iguais
+            if (preg_match('/^(\d)\1+$/', $cpf)) {
+                \Filament\Notifications\Notification::make()
+                    ->danger()
+                    ->title('CPF inválido')
+                    ->body('CPF inválido. Todos os dígitos são iguais.')
+                    ->send();
+                return;
+            }
+            
+            // Validação do primeiro dígito verificador
+            $soma = 0;
+            for ($i = 1; $i <= 9; $i++) {
+                $soma += intval(substr($cpf, $i-1, 1)) * (11 - $i);
+            }
+            $resto = ($soma * 10) % 11;
+            if (($resto === 10) || ($resto === 11)) $resto = 0;
+            if ($resto !== intval(substr($cpf, 9, 1))) {
+                \Filament\Notifications\Notification::make()
+                    ->danger()
+                    ->title('CPF inválido')
+                    ->body('O número de CPF informado é inválido.')
+                    ->send();
+                return;
+            }
+            
+            // Validação do segundo dígito verificador
+            $soma = 0;
+            for ($i = 1; $i <= 10; $i++) {
+                $soma += intval(substr($cpf, $i-1, 1)) * (12 - $i);
+            }
+            $resto = ($soma * 10) % 11;
+            if (($resto === 10) || ($resto === 11)) $resto = 0;
+            if ($resto !== intval(substr($cpf, 10, 1))) {
+                \Filament\Notifications\Notification::make()
+                    ->danger()
+                    ->title('CPF inválido')
+                    ->body('O número de CPF informado é inválido.')
+                    ->send();
+                return;
+            }
+        }
+
         $visitor = \App\Models\Visitor::where('doc', $formData['doc'])
             ->where('doc_type_id', $formData['doc_type_id'])
             ->first();
@@ -340,6 +585,7 @@ class CreateVisitor extends CreateRecord
             'doc_photo_front' => $visitor->doc_photo_front,
             'doc_photo_back' => $visitor->doc_photo_back,
             'other' => $visitor->other,
+            'phone' => $visitor->phone,
         ]);
 
         // Dispara eventos para atualizar os previews das fotos
@@ -460,9 +706,11 @@ class CreateVisitor extends CreateRecord
             ->first();
 
         if ($visitor) {
-            // Se o visitante existe, atualiza as informações adicionais e cria um novo log de visita
+            // Se o visitante existe, atualiza apenas as informações que devem ser atualizáveis
             $visitor->update([
-                'other' => $data['other'] ?? null
+                'other' => $data['other'] ?? null,
+                'phone' => $data['phone'] ?? null
+                // O nome não é incluído aqui para garantir que não seja alterado
             ]);
 
             $visitor->visitorLogs()->create([

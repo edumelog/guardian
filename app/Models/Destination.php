@@ -49,7 +49,7 @@ class Destination extends Model
 
     public function visitorLogs()
     {
-        return $this->hasMany(\App\Models\VisitorLog::class);
+        return $this->hasMany(\App\Models\VisitorLog::class, 'destination_id');
     }
 
     /**
@@ -123,7 +123,6 @@ class Destination extends Model
     public function getCurrentVisitorsCount(): int
     {
         return $this->visitorLogs()
-            ->where('destination_id', $this->id)
             ->whereNull('out_date')
             ->whereNotNull('in_date')
             ->where('in_date', '<=', now())

@@ -21,6 +21,7 @@ class Visitor extends Model
         'doc_photo_front',
         'doc_photo_back',
         'other',
+        'phone',
         'destination_id',
         'doc_type_id'
     ];
@@ -41,6 +42,7 @@ class Visitor extends Model
             'doc_photo_front' => ['required', 'string'],
             'doc_photo_back' => ['required', 'string'],
             'other' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:255'],
             'destination_id' => ['required', 'exists:destinations,id'],
             'doc_type_id' => ['required', 'exists:doc_types,id'],
         ];
