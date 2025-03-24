@@ -11,59 +11,44 @@ use Illuminate\Validation\ValidationException;
 
 class CredentialPrintController extends Controller
 {
+    public function __construct(
+        private CredentialPrintService $printService
+    ) {}
+
     /**
      * Gera um preview do PDF da credencial
      */
-    public function preview(
-        Request $request,
-        Visitor $visitor,
-        CredentialPrintService $printService
-    ) {
-        Log::info('Recebida requisição de preview de credencial', [
-            'visitor_id' => $visitor->id,
-            'printer_config' => $request->printer_config
+    public function preview(Visitor $visitor, Request $request)
+    {
+        $validated = $request->validate([
+            'printer_config' => ['required', 'array']
         ]);
 
         try {
-            $validated = $request->validate([
-                'printer_config' => ['required', 'array'],
-                'printer_config.template' => ['required', 'string'],
-                'printer_config.printer' => ['required', 'string'],
-                'printer_config.printOptions' => ['required', 'array'],
-                'printer_config.printOptions.pageWidth' => ['required', 'numeric'],
-                'printer_config.printOptions.pageHeight' => ['required', 'numeric'],
-            ]);
+            // Desativa temporariamente o output buffering
+            while (ob_get_level()) ob_end_clean();
 
-            Log::info('Validação dos dados de impressão OK');
+            // Gera o preview
+            $preview = $this->printService->generatePreview($visitor, $validated['printer_config']);
 
-            $preview = $printService->generatePreview($visitor, $validated['printer_config']);
-            
-            Log::info('Preview gerado com sucesso', [
-                'preview_url' => $preview['preview_url']
-            ]);
+            // Garante que não há nenhum output antes do JSON
+            ob_start();
+            $response = response()->json($preview);
+            $output = ob_get_clean();
 
-            return response()->json($preview);
+            if (!empty($output)) {
+                Log::warning('Output inesperado antes do JSON', ['output' => $output]);
+            }
 
-        } catch (ValidationException $e) {
-            Log::warning('Erro de validação', [
-                'errors' => $e->errors(),
-                'visitor_id' => $visitor->id
-            ]);
-            
-            return response()->json([
-                'message' => 'Dados de impressão inválidos',
-                'errors' => $e->errors()
-            ], 422);
-
+            return $response;
         } catch (\Exception $e) {
             Log::error('Erro ao gerar preview', [
-                'error' => $e->getMessage(),
                 'visitor_id' => $visitor->id,
+                'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
-                'message' => 'Erro ao gerar preview da credencial',
                 'error' => $e->getMessage()
             ], 500);
         }

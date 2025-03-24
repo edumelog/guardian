@@ -70,16 +70,63 @@ class CredentialPrintService
         // Configura o PDF com as dimensões da etiqueta
         Log::info('Configurando dimensões do PDF', [
             'width' => $printerConfig['printOptions']['pageWidth'],
-            'height' => $printerConfig['printOptions']['pageHeight']
+            'height' => $printerConfig['printOptions']['pageHeight'],
+            'margins' => $printerConfig['printOptions']['margins'] ?? [],
+            'orientation' => $printerConfig['orientation'] ?? 'portrait',
+            'dpi' => $printerConfig['dpi'] ?? '96'
         ]);
 
         $pdf = DomPDF::loadHtml($processedHtml);
+        
+        // Configura as dimensões e margens
+        $width = $this->convertToPoints($printerConfig['printOptions']['pageWidth'], 'mm');
+        $height = $this->convertToPoints($printerConfig['printOptions']['pageHeight'], 'mm');
+        
+        Log::info('Dimensões convertidas para pontos', [
+            'original_width_mm' => $printerConfig['printOptions']['pageWidth'],
+            'original_height_mm' => $printerConfig['printOptions']['pageHeight'],
+            'width_points' => $width,
+            'height_points' => $height
+        ]);
+
+        // Configura as margens (em pontos)
+        $margins = $printerConfig['printOptions']['margins'] ?? [];
+        $marginTop = isset($margins['top']) ? $this->convertToPoints($margins['top'], 'mm') : 0;
+        $marginRight = isset($margins['right']) ? $this->convertToPoints($margins['right'], 'mm') : 0;
+        $marginBottom = isset($margins['bottom']) ? $this->convertToPoints($margins['bottom'], 'mm') : 0;
+        $marginLeft = isset($margins['left']) ? $this->convertToPoints($margins['left'], 'mm') : 0;
+
+        Log::info('Margens convertidas para pontos', [
+            'top' => $marginTop,
+            'right' => $marginRight,
+            'bottom' => $marginBottom,
+            'left' => $marginLeft
+        ]);
+
+        // Define o tamanho do papel e margens
         $pdf->setPaper([
             0,
             0,
-            $this->convertToPoints($printerConfig['printOptions']['pageWidth']),
-            $this->convertToPoints($printerConfig['printOptions']['pageHeight'])
+            $width,
+            $height
+        ], $printerConfig['orientation'] ?? 'portrait');
+
+        // Define as margens e outras opções
+        $pdf->setOptions([
+            'defaultFont' => 'sans-serif',
+            'isRemoteEnabled' => true,
+            'dpi' => $printerConfig['dpi'] ?? 96,
+            'margin_top' => $marginTop,
+            'margin_right' => $marginRight,
+            'margin_bottom' => $marginBottom,
+            'margin_left' => $marginLeft,
+            'defaultPaperSize' => [$width, $height],
+            'defaultMediaType' => 'Custom',
+            'defaultPageSize' => [$width, $height]
         ]);
+
+        // Desativa temporariamente o output buffering antes de gerar o PDF
+        while (ob_get_level()) ob_end_clean();
 
         // Salva o PDF temporário
         $pdf->save($tempPath);
@@ -100,18 +147,55 @@ class CredentialPrintService
         ]);
 
         // Retorna as informações necessárias
-        return [
+        $response = [
             'preview_url' => $previewUrl,
             'print_config' => [
                 'printer' => $printerConfig['printer'],
                 'options' => [
-                    'pageWidth' => $printerConfig['printOptions']['pageWidth'],
-                    'pageHeight' => $printerConfig['printOptions']['pageHeight'],
+                    'size' => [
+                        'width' => floatval($printerConfig['printOptions']['pageWidth']),
+                        'height' => floatval($printerConfig['printOptions']['pageHeight']),
+                        'units' => 'mm'
+                    ],
+                    'margins' => [
+                        'top' => floatval($margins['top'] ?? 0),
+                        'right' => floatval($margins['right'] ?? 0),
+                        'bottom' => floatval($margins['bottom'] ?? 0),
+                        'left' => floatval($margins['left'] ?? 0)
+                    ],
+                    'orientation' => $printerConfig['orientation'] ?? 'portrait',
+                    'units' => 'mm',
+                    'dpi' => intval($printerConfig['dpi'] ?? 96),
+                    'colorType' => 'blackwhite',
+                    'scaleContent' => false,
+                    'rasterize' => true,
+                    'interpolation' => 'bicubic',
+                    'density' => 'best',
                     'altFontRendering' => true,
-                    'ignoreTransparency' => true
+                    'ignoreTransparency' => true,
+                    'fitToPage' => false,
+                    'paperSize' => [
+                        'width' => floatval($printerConfig['printOptions']['pageWidth']),
+                        'height' => floatval($printerConfig['printOptions']['pageHeight']),
+                        'units' => 'mm'
+                    ],
+                    'autoRotate' => false,
+                    'forcePageSize' => true,
+                    'zoom' => 1.0
                 ]
             ]
         ];
+
+        // Desativa temporariamente o output buffering
+        while (ob_get_level()) ob_end_clean();
+
+        // Log após limpar o buffer
+        Log::info('Retornando resposta JSON', [
+            'preview_url' => $response['preview_url'],
+            'printer' => $response['print_config']['printer']
+        ]);
+
+        return $response;
     }
 
     /**
@@ -197,18 +281,43 @@ class CredentialPrintService
     }
 
     /**
-     * Converte polegadas para pontos (72 pontos = 1 polegada)
+     * Converte uma medida para pontos (72 pontos = 1 polegada)
      *
-     * @param float $inches
+     * @param string|float $value
+     * @param string $unit
      * @return float
      */
-    private function convertToPoints(float $inches): float
+    private function convertToPoints($value, string $unit = 'mm'): float
     {
-        $points = $inches * 72;
-        Log::info('Convertendo polegadas para pontos', [
-            'inches' => $inches,
+        // Remove a unidade se estiver na string
+        if (is_string($value)) {
+            $value = (float) preg_replace('/[^0-9.]/', '', $value);
+        }
+
+        // Converte para pontos baseado na unidade
+        switch ($unit) {
+            case 'mm':
+                // 1 mm = 2.83465 pontos
+                $points = $value * 2.83465;
+                break;
+            case 'in':
+                // 1 polegada = 72 pontos
+                $points = $value * 72;
+                break;
+            case 'px':
+                // 1 pixel = 0.75 pontos (assumindo 96 DPI)
+                $points = $value * 0.75;
+                break;
+            default:
+                throw new \InvalidArgumentException("Unidade de medida não suportada: {$unit}");
+        }
+
+        Log::info('Convertendo medida para pontos', [
+            'value' => $value,
+            'unit' => $unit,
             'points' => $points
         ]);
+
         return $points;
     }
 } 

@@ -69,11 +69,28 @@ window.printVisitorCredential = async function(visitor) {
         
         if (!response.ok) {
             const error = await response.text();
-            console.error('[CredentialPrint] Resposta do servidor:', error);
-            throw new Error('Erro ao gerar preview da credencial');
+            console.error('[CredentialPrint] Erro na resposta do servidor:', {
+                status: response.status,
+                statusText: response.statusText,
+                body: error
+            });
+            throw new Error(`Erro ao gerar preview da credencial: ${response.status} ${response.statusText}`);
         }
 
-        const data = await response.json();
+        // Log da resposta bruta antes do parse
+        const rawResponse = await response.text();
+        console.log('[CredentialPrint] Resposta bruta do servidor:', rawResponse);
+
+        // Tenta fazer o parse do JSON
+        let data;
+        try {
+            data = JSON.parse(rawResponse);
+        } catch (e) {
+            console.error('[CredentialPrint] Erro ao fazer parse do JSON:', e);
+            console.error('[CredentialPrint] JSON inválido:', rawResponse);
+            throw new Error('Erro ao processar resposta do servidor: JSON inválido');
+        }
+
         console.log('[CredentialPrint] Preview gerado:', data);
 
         const { preview_url, print_config } = data;
@@ -95,27 +112,61 @@ window.printVisitorCredential = async function(visitor) {
         console.log('[CredentialPrint] PDF convertido para base64');
 
         // Configura QZ-Tray para impressão
-        const qzConfig = qz.configs.create(print_config.printer);
+        console.log('[CredentialPrint] Configurando QZ-Tray com:', print_config);
         
+        // Cria a configuração base do QZ-Tray
+        const qzConfig = qz.configs.create(print_config.printer, {
+            size: print_config.options.size,
+            margins: print_config.options.margins,
+            orientation: print_config.options.orientation,
+            units: 'mm',
+            forcePageSize: true,
+            autoRotate: false
+        });
+
+        // Prepara os dados para impressão
         const printData = [{
             type: 'pixel',
             format: 'pdf',
             flavor: 'base64',
             data: pdfBase64,
             options: {
-                ...print_config.options,
-                // Melhora a qualidade do texto em impressoras de baixa DPI
-                altFontRendering: true,
-                // Resolve problemas com transparência em PDFs
-                ignoreTransparency: true,
-                // Não redimensiona o conteúdo automaticamente
+                // Força as dimensões exatas em milímetros
+                size: {
+                    width: print_config.options.size.width,
+                    height: print_config.options.size.height,
+                    units: 'mm'
+                },
+                // Força as margens em milímetros
+                margins: {
+                    top: print_config.options.margins.top,
+                    right: print_config.options.margins.right,
+                    bottom: print_config.options.margins.bottom,
+                    left: print_config.options.margins.left
+                },
+                units: 'mm',
+                orientation: print_config.options.orientation,
+                dpi: print_config.options.dpi,
+                // Configurações para melhor qualidade
                 scaleContent: false,
-                // Usa a melhor densidade disponível para a impressora
-                density: "best",
-                // Força impressão em preto e branco para melhor qualidade em impressoras térmicas
-                colorType: "blackwhite"
+                rasterize: true,
+                interpolation: 'bicubic',
+                density: 'best',
+                altFontRendering: true,
+                ignoreTransparency: true,
+                colorType: 'blackwhite',
+                // Força o tamanho exato do papel
+                fitToPage: false,
+                forcePageSize: true,
+                autoRotate: false,
+                zoom: 1.0
             }
         }];
+
+        console.log('[CredentialPrint] Dados de impressão:', {
+            ...printData[0],
+            data: 'BASE64_DATA' // Não loga o PDF em base64
+        });
 
         // Executa a impressão
         await qz.print(qzConfig, printData);

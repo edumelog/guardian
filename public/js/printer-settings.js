@@ -63,53 +63,34 @@ document.addEventListener('alpine:init', () => {
                         
                         // Carrega as configurações de tamanho da etiqueta
                         if (config.printOptions) {
-                            // Extrai o valor numérico da largura
-                            if (config.printOptions.pageWidth) {
-                                const match = config.printOptions.pageWidth.match(/^(\d+)(\w+)$/);
-                                if (match) {
-                                    this.pageWidth = match[1];
-                                    // Mantém a unidade fixa em mm
-                                }
+                            // Carrega a largura
+                            if (typeof config.printOptions.pageWidth === 'number') {
+                                this.pageWidth = config.printOptions.pageWidth.toString();
                             }
                             
-                            // Extrai o valor numérico da altura
-                            if (config.printOptions.pageHeight) {
-                                const match = config.printOptions.pageHeight.match(/^(\d+)(\w+)$/);
-                                if (match) {
-                                    this.pageHeight = match[1];
-                                }
+                            // Carrega a altura
+                            if (typeof config.printOptions.pageHeight === 'number') {
+                                this.pageHeight = config.printOptions.pageHeight.toString();
                             }
                             
-                            // Extrai os valores das margens
+                            // Carrega as margens
                             if (config.printOptions.margins) {
                                 const margins = config.printOptions.margins;
                                 
-                                if (margins.top) {
-                                    const match = margins.top.match(/^(\d+)(\w+)$/);
-                                    if (match) {
-                                        this.marginTop = match[1];
-                                    }
+                                if (typeof margins.top === 'number') {
+                                    this.marginTop = margins.top.toString();
                                 }
                                 
-                                if (margins.right) {
-                                    const match = margins.right.match(/^(\d+)(\w+)$/);
-                                    if (match) {
-                                        this.marginRight = match[1];
-                                    }
+                                if (typeof margins.right === 'number') {
+                                    this.marginRight = margins.right.toString();
                                 }
                                 
-                                if (margins.bottom) {
-                                    const match = margins.bottom.match(/^(\d+)(\w+)$/);
-                                    if (match) {
-                                        this.marginBottom = match[1];
-                                    }
+                                if (typeof margins.bottom === 'number') {
+                                    this.marginBottom = margins.bottom.toString();
                                 }
                                 
-                                if (margins.left) {
-                                    const match = margins.left.match(/^(\d+)(\w+)$/);
-                                    if (match) {
-                                        this.marginLeft = match[1];
-                                    }
+                                if (typeof margins.left === 'number') {
+                                    this.marginLeft = margins.left.toString();
                                 }
                             }
                             
@@ -418,11 +399,27 @@ document.addEventListener('alpine:init', () => {
                 const config = {
                     printer: selectedPrinter,
                     template: selectedTemplate,
+                    orientation: this.orientation || 'portrait',
+                    dpi: parseInt(this.dpi, 10),
                     printOptions: {
-                        pageWidth: pageWidth,
-                        pageHeight: pageHeight,
+                        pageWidth: parseFloat(this.pageWidth),
+                        pageHeight: parseFloat(this.pageHeight),
+                        margins: {
+                            top: parseFloat(this.marginTop),
+                            right: parseFloat(this.marginRight),
+                            bottom: parseFloat(this.marginBottom),
+                            left: parseFloat(this.marginLeft)
+                        },
+                        type: this.printParams.type,
+                        format: 'pdf',
+                        flavor: 'base64',
+                        scaleContent: false,
+                        rasterize: true,
+                        interpolation: 'bicubic',
+                        density: 'best',
                         altFontRendering: true,
-                        ignoreTransparency: true
+                        ignoreTransparency: true,
+                        colorType: 'blackwhite'
                     }
                 };
 
