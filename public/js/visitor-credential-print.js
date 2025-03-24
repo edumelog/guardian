@@ -51,11 +51,11 @@ window.printVisitorCredential = async function(visitor) {
             throw new Error('ID do visitante não fornecido');
         }
 
-        console.log('[CredentialPrint] Gerando preview para visitante:', visitor.id);
+        console.log('[CredentialPrint] Gerando PDF para visitante:', visitor.id);
         console.log('[CredentialPrint] Configuração da impressora:', printerConfig);
 
-        // Gera o preview no servidor
-        const response = await fetch(`/credentials/${visitor.id}/preview`, {
+        // Gera o PDF no servidor
+        const response = await fetch(`/credentials/${visitor.id}/pdf`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -74,7 +74,7 @@ window.printVisitorCredential = async function(visitor) {
                 statusText: response.statusText,
                 body: error
             });
-            throw new Error(`Erro ao gerar preview da credencial: ${response.status} ${response.statusText}`);
+            throw new Error(`Erro ao gerar PDF da credencial: ${response.status} ${response.statusText}`);
         }
 
         // Log da resposta bruta antes do parse

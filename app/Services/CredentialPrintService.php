@@ -11,254 +11,276 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Barryvdh\DomPDF\Facade\Pdf as DomPDF;
+use chillerlan\QRCode\QRCode;
+use chillerlan\QRCode\QROptions;
+use Picqer\Barcode\BarcodeGeneratorPNG;
 
 class CredentialPrintService
 {
     /**
      * Gera o PDF da credencial para impressão
      *
-     * @param Visitor $visitor
-     * @param array $printerConfig
-     * @return array
+     * @param Visitor $visitor O visitante para gerar a credencial
+     * @param array $printerConfig Configurações da impressora
+     * @return array Array com o PDF em base64 e as configurações de impressão
      */
-    public function generatePreview(Visitor $visitor, array $printerConfig): array
+    public function generatePdf(Visitor $visitor, array $printerConfig): array
     {
         Log::info('Iniciando geração de PDF para impressão', [
             'visitor_id' => $visitor->id,
-            'template' => $printerConfig['template'],
-            'printer' => $printerConfig['printer']
+            'visitor_photo' => $visitor->photo,
+            'printer_config' => $printerConfig
         ]);
 
-        // Recupera o template
-        $templateSlug = pathinfo($printerConfig['template'], PATHINFO_FILENAME);
-        Log::info('Processando template', [
-            'template_name' => $printerConfig['template'],
-            'template_slug' => $templateSlug
-        ]);
-
-        // Procura o arquivo index.html no diretório do template
-        $templatePath = Storage::disk('public')->path("templates/{$templateSlug}/index.html");
-        if (!File::exists($templatePath)) {
-            Log::error('Template não encontrado', [
-                'template_name' => $printerConfig['template'],
+        try {
+            // Carrega o template
+            $templateName = $printerConfig['template'] ?? 'default';
+            // Remove a extensão .zip se existir
+            $templateSlug = pathinfo($templateName, PATHINFO_FILENAME);
+            $templatePath = Storage::disk('public')->path("templates/{$templateSlug}/index.html");
+            
+            Log::info('Carregando template', [
+                'template_name' => $templateName,
                 'template_slug' => $templateSlug,
-                'template_path' => $templatePath,
-                'template_dir' => Storage::disk('public')->path("templates/{$templateSlug}")
+                'template_path' => $templatePath
             ]);
-            throw new \RuntimeException("Template não encontrado: {$templateSlug}");
-        }
+            
+            if (!file_exists($templatePath)) {
+                throw new \Exception("Template não encontrado: {$templatePath}");
+            }
 
-        Log::info('Template encontrado', ['path' => $templatePath]);
+            // Carrega o HTML do template
+            $html = file_get_contents($templatePath);
 
-        // Lê e processa o template
-        $template = File::get($templatePath);
-        $processedHtml = $this->processTemplate($template, $visitor);
-        
-        // Ajusta os caminhos das imagens
-        $processedHtml = $this->adjustImagePaths($processedHtml, $templatePath);
+            // Dados do visitante e relacionamentos
+            $photoBase64 = '';
+            if ($visitor->photo) {
+                $photoBase64 = $this->getPhotoBase64($visitor->photo);
+            }
 
-        // Gera um ID único para o arquivo temporário
-        $tempId = Str::uuid();
-        $tempPath = storage_path("app/private/temp/previews/{$tempId}.pdf");
+            Log::info('Foto processada:', [
+                'photo_attribute' => $visitor->photo,
+                'has_base64' => !empty($photoBase64)
+            ]);
 
-        // Certifica que o diretório existe
-        if (!File::exists(dirname($tempPath))) {
-            Log::info('Criando diretório temporário', ['path' => dirname($tempPath)]);
-            File::makeDirectory(dirname($tempPath), 0755, true);
-        }
+            $data = [
+                'visitor-id' => $visitor->id,
+                'visitor-name' => strtoupper($visitor->name),
+                'visitor-photo' => $photoBase64,
+                'visitor-doc-type' => $visitor->docType->name,
+                'visitor-doc' => $visitor->docType->name === 'CPF' 
+                    ? preg_replace('/(\d{3})(\d{3})(\d{3})(\d{2})/', '$1.$2.$3-$4', $visitor->doc)
+                    : $visitor->doc,
+                'visitor-destination' => $visitor->destination->name,
+                'visitor-destination-alias' => $visitor->destination->alias,
+                'visitor-destination-address' => $visitor->destination->address,
+                'visitor-destination-phone' => $visitor->destination->phone,
+                'visitor-in-datetime' => $visitor->latestLog?->in_date?->format('d/m/Y H:i') ?? '',
+                'visitor-out-datetime' => $visitor->latestLog?->out_date?->format('d/m/Y H:i') ?? '',
+                'visitor-other' => $visitor->other ?? '',
+                'datetime' => now()->format('d/m/Y H:i'),
+                'date' => now()->format('d/m/Y'),
+                'time' => now()->format('H:i'),
+                'visitor-qrcode' => $visitor->latestLog?->id ?? '',
+                'visitor-barcode' => $visitor->latestLog?->id ?? ''
+            ];
 
-        // Configura as dimensões e margens
-        $width = $this->convertToPoints($printerConfig['printOptions']['pageWidth']);
-        $height = $this->convertToPoints($printerConfig['printOptions']['pageHeight']);
-        
-        // Configura as margens (em pontos)
-        $margins = $printerConfig['printOptions']['margins'] ?? [];
-        $marginTop = isset($margins['top']) ? $this->convertToPoints($margins['top']) : 0;
-        $marginRight = isset($margins['right']) ? $this->convertToPoints($margins['right']) : 0;
-        $marginBottom = isset($margins['bottom']) ? $this->convertToPoints($margins['bottom']) : 0;
-        $marginLeft = isset($margins['left']) ? $this->convertToPoints($margins['left']) : 0;
+            Log::info('Dados da foto do visitante:', [
+                'photo_attribute' => $visitor->photo,
+                'has_base64' => !empty($photoBase64)
+            ]);
 
-        // Define as margens e outras opções
-        $options = [
-            'defaultFont' => 'sans-serif',
-            'isRemoteEnabled' => true,
-            'dpi' => $printerConfig['dpi'] ?? 96,
-            'margin_top' => $marginTop,
-            'margin_right' => $marginRight,
-            'margin_bottom' => $marginBottom,
-            'margin_left' => $marginLeft,
-            'defaultPaperSize' => [$width, $height],
-            'defaultMediaType' => 'Custom',
-            'defaultPageSize' => [$width, $height],
-            'chroot' => dirname($templatePath),
-            'fontDir' => storage_path('fonts/'),
-            'fontCache' => storage_path('fonts/'),
-            'isPhpEnabled' => true,
-            'isHtml5ParserEnabled' => true,
-            'isFontSubsettingEnabled' => true,
-            'enable_css_float' => true,
-            'enable_html5_parser' => true,
-            'enable_remote' => true,
-            'font_height_ratio' => 1.0,
-            'adjust_line_height' => true,
-            'pdf_page_limit' => 1
-        ];
+            // Gera os códigos se tivermos um ID de log
+            if (!empty($data['visitor-qrcode'])) {
+                // Gera o QR Code
+                $options = new QROptions([
+                    'outputType' => QRCode::OUTPUT_MARKUP_SVG,
+                    'eccLevel' => QRCode::ECC_L,
+                    'imageBase64' => true,
+                    'addQuietzone' => true,
+                    'quietzoneSize' => 1,
+                    'scale' => 5
+                ]);
 
-        // Carrega o HTML no DomPDF
-        $pdf = DomPDF::loadHtml($processedHtml);
-        $pdf->setOptions($options);
+                $qrcode = new QRCode($options);
+                $qrCodeBase64 = $qrcode->render($data['visitor-qrcode']);
 
-        // Ajusta o tamanho do papel
-        $pdf->setPaper([0, 0, $width, $height], $printerConfig['orientation'] ?? 'portrait');
+                // Gera o código de barras
+                $generator = new BarcodeGeneratorPNG();
+                $barcodeBase64 = base64_encode($generator->getBarcode(
+                    $data['visitor-barcode'],
+                    $generator::TYPE_CODE_128,
+                    3,
+                    100
+                ));
 
-        // Adiciona CSS inline para garantir as dimensões corretas
-        $processedHtml = str_replace('<body', '<body style="margin:0; padding:0; width:' . $printerConfig['printOptions']['pageWidth'] . 'mm; height:' . $printerConfig['printOptions']['pageHeight'] . 'mm; position:fixed; overflow:hidden;"', $processedHtml);
+                // Atualiza os dados com as imagens em base64
+                $data['visitor-qrcode-img'] = $qrCodeBase64;
+                $data['visitor-barcode-img'] = 'data:image/png;base64,' . $barcodeBase64;
+            }
 
-        // Carrega o HTML com as novas configurações
-        $pdf = DomPDF::loadHtml($processedHtml);
-        $pdf->setOptions($options);
+            // Log dos dados que serão substituídos
+            Log::info('Dados para substituição no template:', $data);
 
-        // Desativa temporariamente o output buffering antes de gerar o PDF
-        while (ob_get_level()) ob_end_clean();
+            // Processa o template substituindo os marcadores
+            $html = $this->processTemplate($html, $data);
 
-        // Salva o PDF temporário
-        $pdf->save($tempPath);
+            // Configurações do PDF
+            $options = [
+                'enable_css_float' => true,
+                'enable_html5_parser' => true,
+                'enable_remote' => true,
+                'font_height_ratio' => 1.0,
+                'adjust_line_height' => 1.0,
+                'pdf_page_limit' => 1,
+                'fit_to_page' => true
+            ];
 
-        // Verifica se o PDF foi gerado
-        if (!File::exists($tempPath)) {
-            Log::error('Falha ao gerar o PDF', ['path' => $tempPath]);
-            throw new \RuntimeException('Falha ao gerar o PDF temporário');
-        }
+            // Configurações de página
+            $pageSize = [
+                0, 0,
+                $printerConfig['printOptions']['pageWidth'] ?? 100,
+                $printerConfig['printOptions']['pageHeight'] ?? 65
+            ];
 
-        // Converte o PDF para base64
-        $pdfBase64 = base64_encode(File::get($tempPath));
+            // Gera o PDF
+            $pdf = DomPDF::loadHTML($html)
+                ->setPaper($pageSize)
+                ->setOptions($options);
 
-        // Remove o arquivo temporário imediatamente após a conversão
-        File::delete($tempPath);
+            // Converte para base64
+            $pdfBase64 = base64_encode($pdf->output());
 
-        // Retorna as informações necessárias para impressão
-        $response = [
-            'print_config' => [
-                'printer' => $printerConfig['printer'],
-                'options' => [
-                    'size' => [
-                        'width' => floatval($printerConfig['printOptions']['pageWidth']),
-                        'height' => floatval($printerConfig['printOptions']['pageHeight']),
-                        'units' => 'mm'
-                    ],
-                    'margins' => [
-                        'top' => floatval($margins['top'] ?? 0),
-                        'right' => floatval($margins['right'] ?? 0),
-                        'bottom' => floatval($margins['bottom'] ?? 0),
-                        'left' => floatval($margins['left'] ?? 0)
-                    ],
-                    'orientation' => $printerConfig['orientation'] ?? 'portrait',
-                    'units' => 'mm',
-                    'dpi' => intval($printerConfig['dpi'] ?? 96),
-                    'colorType' => 'blackwhite',
-                    'scaleContent' => false,
-                    'rasterize' => true,
-                    'interpolation' => 'bicubic',
-                    'density' => 'best',
-                    'altFontRendering' => true,
-                    'ignoreTransparency' => true,
-                    'fitToPage' => false,
-                    'paperSize' => [
-                        'width' => floatval($printerConfig['printOptions']['pageWidth']),
-                        'height' => floatval($printerConfig['printOptions']['pageHeight']),
-                        'units' => 'mm'
-                    ],
-                    'autoRotate' => false,
-                    'forcePageSize' => true,
-                    'zoom' => 1.0
+            // Retorna o PDF em base64 e as configurações de impressão
+            return [
+                'pdf_base64' => $pdfBase64,
+                'print_config' => [
+                    'printer' => $printerConfig['printer'] ?? '',
+                    'options' => [
+                        'size' => [
+                            'width' => $printerConfig['printOptions']['pageWidth'] ?? 100,
+                            'height' => $printerConfig['printOptions']['pageHeight'] ?? 65
+                        ],
+                        'margins' => [
+                            'top' => 0,
+                            'right' => 0,
+                            'bottom' => 0,
+                            'left' => 0
+                        ],
+                        'orientation' => 'portrait',
+                        'dpi' => $printerConfig['printOptions']['dpi'] ?? 203,
+                        'scaleContent' => false,
+                        'rasterize' => true,
+                        'interpolation' => 'bicubic',
+                        'density' => 'best',
+                        'altFontRendering' => true,
+                        'ignoreTransparency' => true,
+                        'colorType' => 'blackwhite'
+                    ]
                 ]
-            ],
-            'pdf_base64' => $pdfBase64
-        ];
+            ];
+        } catch (\Exception $e) {
+            Log::error('Erro ao gerar PDF', [
+                'visitor_id' => $visitor->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
 
-        return $response;
+            throw $e;
+        }
     }
 
     /**
-     * Processa o template HTML substituindo as marcações tpl-xxx
+     * Processa o template HTML substituindo os marcadores pelos dados
      *
-     * @param string $template
-     * @param Visitor $visitor
-     * @return string
+     * @param string $html O HTML do template
+     * @param array $data Array com os dados para substituição
+     * @return string O HTML processado
      */
-    private function processTemplate(string $template, Visitor $visitor): string
+    private function processTemplate(string $html, array $data): string
     {
-        Log::info('Iniciando processamento do template', [
-            'visitor_id' => $visitor->id,
-            'template_size' => strlen($template)
-        ]);
+        // Carrega o HTML em um objeto DOMDocument
+        $dom = new \DOMDocument();
+        @$dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $xpath = new \DOMXPath($dom);
 
-        $dom = new DOMDocument();
-        @$dom->loadHTML($template, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-        
-        $xpath = new DOMXPath($dom);
-        $elements = $xpath->query("//*[contains(@class, 'tpl-')]");
-        
-        Log::info('Elementos encontrados para substituição', [
-            'count' => $elements->length
-        ]);
+        // Procura por elementos com classes que começam com 'tpl-'
+        $elements = $xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' tpl-')]");
 
-        $visitorData = $visitor->toArray();
-        $replacedFields = [];
-        
         foreach ($elements as $element) {
             if (!$element instanceof \DOMElement) continue;
-            
+
             $classes = explode(' ', $element->getAttribute('class'));
-            foreach ($classes as $class) {
-                if (strpos($class, 'tpl-') === 0) {
-                    $field = substr($class, 4);
-                    $value = data_get($visitorData, $field);
-                    
-                    if ($value !== null) {
-                        if ($element->nodeName === 'img') {
-                            $value = $this->ensureAbsoluteUrl($value);
-                            $element->setAttribute('src', $value);
-                            $replacedFields[] = "img:{$field}";
-                        } else {
-                            $element->textContent = $value;
-                            $replacedFields[] = $field;
-                        }
-                    }
+            
+            // Encontra a classe que começa com 'tpl-'
+            $tplClass = collect($classes)->first(fn($class) => str_starts_with($class, 'tpl-'));
+            if (!$tplClass) continue;
+
+            // Remove o prefixo 'tpl-' para obter o nome do campo
+            $field = substr($tplClass, 4);
+            
+            Log::info('Processando elemento do template:', [
+                'element' => $element->nodeName,
+                'class' => $tplClass,
+                'field' => $field,
+                'has_value' => isset($data[$field]),
+                'value' => $data[$field] ?? null
+            ]);
+            
+            // Se não existe valor para o campo, continua
+            if (!isset($data[$field])) {
+                Log::warning("Campo não encontrado no template: {$field}");
+                continue;
+            }
+
+            $value = $data[$field];
+
+            // Se é uma imagem, atualiza o src
+            if ($element->nodeName === 'img') {
+                if ($value) {
+                    $element->setAttribute('src', $value);
+                    Log::info('Atualizando src da imagem:', [
+                        'class' => $tplClass,
+                        'old_src' => $element->getAttribute('src'),
+                        'new_src' => $value
+                    ]);
                 }
+            }
+            // Para outros elementos, atualiza o conteúdo
+            else {
+                // Remove qualquer conteúdo existente
+                while ($element->firstChild) {
+                    $element->removeChild($element->firstChild);
+                }
+                // Adiciona o novo conteúdo
+                $element->appendChild($dom->createTextNode($value ?: ''));
             }
         }
 
-        Log::info('Campos substituídos no template', [
-            'fields' => $replacedFields
-        ]);
-        
-        $processedHtml = $dom->saveHTML();
-        Log::info('Template processado com sucesso', [
-            'original_size' => strlen($template),
-            'processed_size' => strlen($processedHtml)
-        ]);
-
-        return $processedHtml;
+        return $dom->saveHTML();
     }
 
     /**
      * Garante que a URL seja absoluta
-     *
-     * @param string $url
-     * @return string
      */
-    private function ensureAbsoluteUrl(string $url): string
+    private function ensureAbsoluteUrl(?string $url): string
     {
-        if (!Str::startsWith($url, ['http://', 'https://'])) {
-            $absoluteUrl = url($url);
-            Log::info('URL convertida para absoluta', [
-                'original' => $url,
-                'absolute' => $absoluteUrl
-            ]);
-            return $absoluteUrl;
+        if (empty($url)) {
+            return '';
         }
-        return $url;
+
+        // Se já é uma URL absoluta (http:// ou https://) ou data URL (data:)
+        if (preg_match('/^(https?:|data:)/i', $url)) {
+            return $url;
+        }
+
+        // Se começa com barra, é relativo à raiz
+        if (str_starts_with($url, '/')) {
+            return config('app.url') . $url;
+        }
+
+        // Caso contrário, adiciona a barra e a URL base
+        return config('app.url') . '/' . $url;
     }
 
     /**
@@ -317,5 +339,37 @@ class CredentialPrintService
         }
 
         return $dom->saveHTML();
+    }
+
+    /**
+     * Obtém o conteúdo da foto em base64
+     */
+    private function getPhotoBase64(string $filename): string
+    {
+        try {
+            $path = Storage::disk('private')->path('visitors-photos/' . $filename);
+            
+            if (!file_exists($path)) {
+                Log::warning('Arquivo de foto não encontrado', ['path' => $path]);
+                return '';
+            }
+
+            $mime = mime_content_type($path);
+            $content = base64_encode(file_get_contents($path));
+            
+            Log::info('Foto carregada com sucesso', [
+                'filename' => $filename,
+                'mime' => $mime,
+                'size' => strlen($content)
+            ]);
+
+            return "data:{$mime};base64,{$content}";
+        } catch (\Exception $e) {
+            Log::error('Erro ao carregar foto', [
+                'filename' => $filename,
+                'error' => $e->getMessage()
+            ]);
+            return '';
+        }
     }
 } 

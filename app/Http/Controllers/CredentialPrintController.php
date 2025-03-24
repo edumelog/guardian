@@ -16,6 +16,45 @@ class CredentialPrintController extends Controller
     ) {}
 
     /**
+     * Gera o PDF da credencial para impressão
+     */
+    public function generatePdf(Visitor $visitor, Request $request)
+    {
+        $validated = $request->validate([
+            'printer_config' => ['required', 'array']
+        ]);
+
+        try {
+            // Desativa temporariamente o output buffering
+            while (ob_get_level()) ob_end_clean();
+
+            // Gera o PDF
+            $result = $this->printService->generatePdf($visitor, $validated['printer_config']);
+
+            // Garante que não há nenhum output antes do JSON
+            ob_start();
+            $response = response()->json($result);
+            $output = ob_get_clean();
+
+            if (!empty($output)) {
+                Log::warning('Output inesperado antes do JSON', ['output' => $output]);
+            }
+
+            return $response;
+        } catch (\Exception $e) {
+            Log::error('Erro ao gerar PDF', [
+                'visitor_id' => $visitor->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Gera um preview do PDF da credencial
      */
     public function preview(Visitor $visitor, Request $request)

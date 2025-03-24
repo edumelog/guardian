@@ -17,10 +17,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // ... existing code ...
-        
-        // Limpa arquivos temporários de preview a cada hora
-        $schedule->command('credentials:clean-previews')->hourly();
+        // Adicione aqui outros agendamentos conforme necessário
         
         // Limpa PDFs temporários a cada hora
         $schedule->command('temp:clean-pdfs')
