@@ -91,25 +91,10 @@ window.printVisitorCredential = async function(visitor) {
             throw new Error('Erro ao processar resposta do servidor: JSON inválido');
         }
 
-        console.log('[CredentialPrint] Preview gerado:', data);
+        console.log('[CredentialPrint] Resposta do servidor:', data);
 
-        const { preview_url, print_config } = data;
+        const { pdf_base64, print_config } = data;
         console.log('[CredentialPrint] Configuração de impressão:', print_config);
-        console.log('[CredentialPrint] URL do preview:', preview_url);
-
-        // Baixa o PDF e converte para base64
-        console.log('[CredentialPrint] Baixando PDF...');
-        const pdfResponse = await fetch(preview_url);
-        if (!pdfResponse.ok) {
-            throw new Error('Erro ao baixar PDF');
-        }
-        const pdfBlob = await pdfResponse.blob();
-        const pdfBase64 = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result.split(',')[1]);
-            reader.readAsDataURL(pdfBlob);
-        });
-        console.log('[CredentialPrint] PDF convertido para base64');
 
         // Configura QZ-Tray para impressão
         console.log('[CredentialPrint] Configurando QZ-Tray com:', print_config);
@@ -129,7 +114,7 @@ window.printVisitorCredential = async function(visitor) {
             type: 'pixel',
             format: 'pdf',
             flavor: 'base64',
-            data: pdfBase64,
+            data: pdf_base64,
             options: {
                 // Força as dimensões exatas em milímetros
                 size: {

@@ -15,7 +15,7 @@ use Barryvdh\DomPDF\Facade\Pdf as DomPDF;
 class CredentialPrintService
 {
     /**
-     * Gera um preview do PDF da credencial
+     * Gera o PDF da credencial para impressão
      *
      * @param Visitor $visitor
      * @param array $printerConfig
@@ -23,7 +23,7 @@ class CredentialPrintService
      */
     public function generatePreview(Visitor $visitor, array $printerConfig): array
     {
-        Log::info('Iniciando geração de preview de credencial', [
+        Log::info('Iniciando geração de PDF para impressão', [
             'visitor_id' => $visitor->id,
             'template' => $printerConfig['template'],
             'printer' => $printerConfig['printer']
@@ -52,24 +52,14 @@ class CredentialPrintService
 
         // Lê e processa o template
         $template = File::get($templatePath);
-        Log::info('Template carregado', ['size' => strlen($template)]);
-
-        // Log do conteúdo do template antes do processamento:
-        Log::debug('Conteúdo do template antes do processamento:', ['html' => $template]);
-
         $processedHtml = $this->processTemplate($template, $visitor);
-        Log::info('Template processado', ['size' => strlen($processedHtml)]);
-
+        
         // Ajusta os caminhos das imagens
         $processedHtml = $this->adjustImagePaths($processedHtml, $templatePath);
-        Log::info('Caminhos das imagens ajustados', ['size' => strlen($processedHtml)]);
-
-        // Log do HTML processado para debug
-        Log::debug('HTML após processamento:', ['html' => $processedHtml]);
 
         // Gera um ID único para o arquivo temporário
         $tempId = Str::uuid();
-        $tempPath = storage_path("app/temp/previews/{$tempId}.pdf");
+        $tempPath = storage_path("app/private/temp/previews/{$tempId}.pdf");
 
         // Certifica que o diretório existe
         if (!File::exists(dirname($tempPath))) {
@@ -77,48 +67,16 @@ class CredentialPrintService
             File::makeDirectory(dirname($tempPath), 0755, true);
         }
 
-        // Configura o PDF com as dimensões da etiqueta
-        Log::info('Configurando dimensões do PDF', [
-            'width' => $printerConfig['printOptions']['pageWidth'],
-            'height' => $printerConfig['printOptions']['pageHeight'],
-            'margins' => $printerConfig['printOptions']['margins'] ?? [],
-            'orientation' => $printerConfig['orientation'] ?? 'portrait',
-            'dpi' => $printerConfig['dpi'] ?? '96'
-        ]);
-
-        // Carrega o HTML no DomPDF
-        $pdf = DomPDF::loadHtml($processedHtml);
-        
-        // Log do diretório atual do DomPDF
-        Log::info('Diretório base do DomPDF:', [
-            'template_dir' => dirname($templatePath),
-            'current_path' => getcwd()
-        ]);
-
         // Configura as dimensões e margens
-        $width = $this->convertToPoints($printerConfig['printOptions']['pageWidth'], 'mm');
-        $height = $this->convertToPoints($printerConfig['printOptions']['pageHeight'], 'mm');
+        $width = $this->convertToPoints($printerConfig['printOptions']['pageWidth']);
+        $height = $this->convertToPoints($printerConfig['printOptions']['pageHeight']);
         
-        Log::info('Dimensões convertidas para pontos', [
-            'original_width_mm' => $printerConfig['printOptions']['pageWidth'],
-            'original_height_mm' => $printerConfig['printOptions']['pageHeight'],
-            'width_points' => $width,
-            'height_points' => $height
-        ]);
-
         // Configura as margens (em pontos)
         $margins = $printerConfig['printOptions']['margins'] ?? [];
-        $marginTop = isset($margins['top']) ? $this->convertToPoints($margins['top'], 'mm') : 0;
-        $marginRight = isset($margins['right']) ? $this->convertToPoints($margins['right'], 'mm') : 0;
-        $marginBottom = isset($margins['bottom']) ? $this->convertToPoints($margins['bottom'], 'mm') : 0;
-        $marginLeft = isset($margins['left']) ? $this->convertToPoints($margins['left'], 'mm') : 0;
-
-        Log::info('Margens convertidas para pontos', [
-            'top' => $marginTop,
-            'right' => $marginRight,
-            'bottom' => $marginBottom,
-            'left' => $marginLeft
-        ]);
+        $marginTop = isset($margins['top']) ? $this->convertToPoints($margins['top']) : 0;
+        $marginRight = isset($margins['right']) ? $this->convertToPoints($margins['right']) : 0;
+        $marginBottom = isset($margins['bottom']) ? $this->convertToPoints($margins['bottom']) : 0;
+        $marginLeft = isset($margins['left']) ? $this->convertToPoints($margins['left']) : 0;
 
         // Define as margens e outras opções
         $options = [
@@ -146,37 +104,19 @@ class CredentialPrintService
             'pdf_page_limit' => 1
         ];
 
+        // Carrega o HTML no DomPDF
+        $pdf = DomPDF::loadHtml($processedHtml);
         $pdf->setOptions($options);
 
-        // Ajusta o tamanho do papel para ser exatamente o tamanho configurado
-        $pdf->setPaper([
-            0,
-            0,
-            $width,
-            $height
-        ], $printerConfig['orientation'] ?? 'portrait');
+        // Ajusta o tamanho do papel
+        $pdf->setPaper([0, 0, $width, $height], $printerConfig['orientation'] ?? 'portrait');
 
-        // Adiciona CSS inline para garantir as dimensões corretas em milímetros
+        // Adiciona CSS inline para garantir as dimensões corretas
         $processedHtml = str_replace('<body', '<body style="margin:0; padding:0; width:' . $printerConfig['printOptions']['pageWidth'] . 'mm; height:' . $printerConfig['printOptions']['pageHeight'] . 'mm; position:fixed; overflow:hidden;"', $processedHtml);
 
         // Carrega o HTML com as novas configurações
         $pdf = DomPDF::loadHtml($processedHtml);
         $pdf->setOptions($options);
-
-        // Log das opções do DomPDF
-        Log::info('Opções do DomPDF:', [
-            'options' => $options,
-            'chroot' => dirname($templatePath),
-            'template_full_path' => $templatePath,
-            'image_path' => dirname($templatePath) . '/img/CMRJ-horizontal.jpg'
-        ]);
-
-        // Log das dimensões do papel
-        Log::info('Dimensões do papel:', [
-            'width' => $width,
-            'height' => $height,
-            'orientation' => $printerConfig['orientation'] ?? 'portrait'
-        ]);
 
         // Desativa temporariamente o output buffering antes de gerar o PDF
         while (ob_get_level()) ob_end_clean();
@@ -184,38 +124,20 @@ class CredentialPrintService
         // Salva o PDF temporário
         $pdf->save($tempPath);
 
-        // Verifica se o PDF foi gerado e suas características
-        if (File::exists($tempPath)) {
-            Log::info('PDF temporário gerado com sucesso', [
-                'path' => $tempPath,
-                'size' => File::size($tempPath),
-                'permissions' => substr(sprintf('%o', fileperms($tempPath)), -4)
-            ]);
-
-            // Tenta ler o conteúdo do PDF para verificar se está correto
-            $pdfContent = File::get($tempPath);
-            Log::info('Conteúdo do PDF verificado', [
-                'size' => strlen($pdfContent),
-                'contains_image' => strpos($pdfContent, '/Image') !== false
-            ]);
-        } else {
+        // Verifica se o PDF foi gerado
+        if (!File::exists($tempPath)) {
             Log::error('Falha ao gerar o PDF', ['path' => $tempPath]);
+            throw new \RuntimeException('Falha ao gerar o PDF temporário');
         }
 
-        $previewUrl = URL::temporarySignedRoute(
-            'credential.preview.pdf',
-            now()->addMinutes(5),
-            ['preview' => $tempId]
-        );
+        // Converte o PDF para base64
+        $pdfBase64 = base64_encode(File::get($tempPath));
 
-        Log::info('Preview gerado com sucesso', [
-            'temp_id' => $tempId,
-            'url_expiration' => now()->addMinutes(5)->toDateTimeString()
-        ]);
+        // Remove o arquivo temporário imediatamente após a conversão
+        File::delete($tempPath);
 
-        // Retorna as informações necessárias
+        // Retorna as informações necessárias para impressão
         $response = [
-            'preview_url' => $previewUrl,
             'print_config' => [
                 'printer' => $printerConfig['printer'],
                 'options' => [
@@ -250,17 +172,9 @@ class CredentialPrintService
                     'forcePageSize' => true,
                     'zoom' => 1.0
                 ]
-            ]
+            ],
+            'pdf_base64' => $pdfBase64
         ];
-
-        // Desativa temporariamente o output buffering
-        while (ob_get_level()) ob_end_clean();
-
-        // Log após limpar o buffer
-        Log::info('Retornando resposta JSON', [
-            'preview_url' => $response['preview_url'],
-            'printer' => $response['print_config']['printer']
-        ]);
 
         return $response;
     }
@@ -348,44 +262,23 @@ class CredentialPrintService
     }
 
     /**
-     * Converte uma medida para pontos (72 pontos = 1 polegada)
-     *
-     * @param string|float $value
-     * @param string $unit
-     * @return float
+     * Converte milímetros para pontos (unidade usada pelo DomPDF)
+     * 1 mm = 2.835 pontos (72/25.4)
+     * 
+     * @param float $value Valor em milímetros
+     * @return float Valor em pontos
      */
-    private function convertToPoints($value, string $unit = 'mm'): float
+    private function convertToPoints($value)
     {
-        // Remove a unidade se estiver na string
-        if (is_string($value)) {
-            $value = (float) preg_replace('/[^0-9.]/', '', $value);
-        }
+        // Conversão direta de mm para pontos (72/25.4 ≈ 2.835)
+        $result = $value * (72/25.4);
 
-        // Converte para pontos baseado na unidade
-        switch ($unit) {
-            case 'mm':
-                // 1 mm = 2.83465 pontos
-                $points = $value * 2.83465;
-                break;
-            case 'in':
-                // 1 polegada = 72 pontos
-                $points = $value * 72;
-                break;
-            case 'px':
-                // 1 pixel = 0.75 pontos (assumindo 96 DPI)
-                $points = $value * 0.75;
-                break;
-            default:
-                throw new \InvalidArgumentException("Unidade de medida não suportada: {$unit}");
-        }
-
-        Log::info('Convertendo medida para pontos', [
-            'value' => $value,
-            'unit' => $unit,
-            'points' => $points
+        Log::info('Conversão mm para pontos:', [
+            'valor_mm' => $value,
+            'valor_pt' => $result
         ]);
 
-        return $points;
+        return $result;
     }
 
     /**

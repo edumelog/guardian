@@ -22,6 +22,12 @@ class Kernel extends ConsoleKernel
         // Limpa arquivos temporários de preview a cada hora
         $schedule->command('credentials:clean-previews')->hourly();
         
+        // Limpa PDFs temporários a cada hora
+        $schedule->command('temp:clean-pdfs')
+                ->hourly()
+                ->withoutOverlapping()
+                ->runInBackground();
+        
         // ... existing code ...
     }
 
