@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PrintTemplateController;
 use App\Http\Controllers\VisitorPhotoController;
+use App\Http\Controllers\CredentialPrintController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 
@@ -27,6 +28,14 @@ Route::middleware('auth')->group(function () {
     
     // Rota para acessar fotos dos visitantes de forma segura
     Route::get('/visitor-photo/{filename}', [VisitorPhotoController::class, 'show'])->name('visitor.photo');
+
+    // Rotas para preview de impressão
+    Route::post('/credentials/{visitor}/preview', [CredentialPrintController::class, 'preview'])
+        ->name('credential.preview');
+        
+    Route::get('/credentials/preview/{preview}', [CredentialPrintController::class, 'showPreview'])
+        ->name('credential.preview.pdf')
+        ->middleware('signed');
 });
 
 // Rotas para templates de impressão que não requerem autenticação
