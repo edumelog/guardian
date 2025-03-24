@@ -9,11 +9,13 @@
         "php": "^8.2",
         "barryvdh/laravel-dompdf": "^3.1",
         "bezhansalleh/filament-shield": "^3.3",
+        "chillerlan/php-qrcode": "^5.0",
         "filament/filament": "^3.2",
         "filament/spatie-laravel-translatable-plugin": "^3.2",
         "laravel-lang/lang": "^12.0",
         "laravel/framework": "^11.31",
         "laravel/tinker": "^2.9",
+        "picqer/php-barcode-generator": "^3.2",
         "symfony/css-selector": "^7.2"
     },
     "require-dev": {

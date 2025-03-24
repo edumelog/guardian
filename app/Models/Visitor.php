@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
@@ -63,9 +64,9 @@ class Visitor extends Model
         return $this->hasMany(VisitorLog::class);
     }
 
-    public function latestLog(): BelongsTo
+    public function latestLog(): HasOne
     {
-        return $this->belongsTo(VisitorLog::class)->latestOfMany();
+        return $this->hasOne(VisitorLog::class)->latestOfMany();
     }
 
     /**

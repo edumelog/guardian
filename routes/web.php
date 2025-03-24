@@ -31,13 +31,15 @@ Route::middleware('auth')->group(function () {
     // Rota para acessar fotos dos visitantes de forma segura
     Route::get('/visitor-photo/{filename}', [VisitorPhotoController::class, 'show'])->name('visitor.photo');
 
-    // Rotas para preview de impressão
-    Route::post('/credentials/{visitor}/preview', [CredentialPrintController::class, 'preview'])
-        ->name('credential.preview');
-        
-    Route::get('/credentials/preview/{preview}', [CredentialPrintController::class, 'showPreview'])
-        ->name('credential.preview.pdf')
-        ->middleware('signed');
+    // Rota para geração de PDF da credencial
+    Route::post('/credentials/{visitor}/pdf', [CredentialPrintController::class, 'generatePdf'])
+        ->name('credential.pdf');
+
+    // Rotas para geração de códigos
+    Route::get('/codes/qr/{id}', [App\Http\Controllers\CodeGeneratorController::class, 'qrcode'])
+        ->name('qrcode');
+    Route::get('/codes/bar/{id}', [App\Http\Controllers\CodeGeneratorController::class, 'barcode'])
+        ->name('barcode');
 });
 
 // Rotas para templates de impressão que não requerem autenticação
