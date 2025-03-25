@@ -21,7 +21,6 @@ document.addEventListener('alpine:init', () => {
         marginBottom: '5',
         marginLeft: '5',
         units: 'mm', // Unidade de medida fixa em milímetros (mm)
-        dpi: '96', // Resolução em DPI (dots per inch)
         
         // Parâmetros adicionais de impressão (não exibidos na interface)
         printParams: {
@@ -31,7 +30,7 @@ document.addEventListener('alpine:init', () => {
             scaleContent: true,
             rasterize: true,
             interpolation: 'bicubic',
-            density: '300',
+            density: 'best',
             altFontRendering: true,
             ignoreTransparency: true
         },
@@ -105,11 +104,6 @@ document.addEventListener('alpine:init', () => {
                             if (config.printOptions.altFontRendering !== undefined) this.printParams.altFontRendering = config.printOptions.altFontRendering;
                             if (config.printOptions.ignoreTransparency !== undefined) this.printParams.ignoreTransparency = config.printOptions.ignoreTransparency;
                         }
-                        
-                        // Carrega o valor de DPI
-                        if (config.dpi) {
-                            this.dpi = config.dpi;
-                        }
                     } catch (configErr) {
                         console.error('Erro ao carregar configuração do localStorage:', configErr);
                     }
@@ -169,7 +163,6 @@ document.addEventListener('alpine:init', () => {
                 this.$watch('marginRight', () => this.hasChanges = true);
                 this.$watch('marginBottom', () => this.hasChanges = true);
                 this.$watch('marginLeft', () => this.hasChanges = true);
-                this.$watch('dpi', () => this.hasChanges = true);
                 
                 console.log('Inicialização concluída');
             } catch (err) {
@@ -397,10 +390,9 @@ document.addEventListener('alpine:init', () => {
 
                 // Monta o objeto de configuração
                 const config = {
-                    printer: selectedPrinter,
-                    template: selectedTemplate,
-                    orientation: this.orientation || 'portrait',
-                    dpi: parseInt(this.dpi, 10),
+                    printer: this.selectedPrinter,
+                    template: this.selectedTemplate,
+                    orientation: this.orientation,
                     printOptions: {
                         pageWidth: parseFloat(this.pageWidth),
                         pageHeight: parseFloat(this.pageHeight),
@@ -411,15 +403,14 @@ document.addEventListener('alpine:init', () => {
                             left: parseFloat(this.marginLeft)
                         },
                         type: this.printParams.type,
-                        format: 'pdf',
-                        flavor: 'base64',
-                        scaleContent: false,
-                        rasterize: true,
-                        interpolation: 'bicubic',
-                        density: 'best',
-                        altFontRendering: true,
-                        ignoreTransparency: true,
-                        colorType: 'blackwhite'
+                        format: this.printParams.format,
+                        flavor: this.printParams.flavor,
+                        scaleContent: this.printParams.scaleContent,
+                        rasterize: this.printParams.rasterize,
+                        interpolation: this.printParams.interpolation,
+                        density: this.printParams.density,
+                        altFontRendering: this.printParams.altFontRendering,
+                        ignoreTransparency: this.printParams.ignoreTransparency
                     }
                 };
 

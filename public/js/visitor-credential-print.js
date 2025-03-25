@@ -131,7 +131,6 @@ window.printVisitorCredential = async function(visitor) {
                 },
                 units: 'mm',
                 orientation: print_config.options.orientation,
-                dpi: print_config.options.dpi,
                 // Configurações para melhor qualidade
                 scaleContent: false,
                 rasterize: true,
@@ -139,7 +138,7 @@ window.printVisitorCredential = async function(visitor) {
                 density: 'best',
                 altFontRendering: true,
                 ignoreTransparency: true,
-                colorType: 'blackwhite',
+                colorType: 'grayscale',
                 // Força o tamanho exato do papel
                 fitToPage: false,
                 forcePageSize: true,
