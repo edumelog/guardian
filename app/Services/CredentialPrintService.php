@@ -67,8 +67,8 @@ class CredentialPrintService
                 'visitor-id' => $visitor->id,
                 'visitor-name' => strtoupper($visitor->name),
                 'visitor-photo' => $photoBase64,
-                'visitor-doc-type' => $visitor->docType->name,
-                'visitor-doc' => $visitor->docType->name === 'CPF' 
+                'visitor-doc-type' => $visitor->docType->type,
+                'visitor-doc' => $visitor->docType->type === 'CPF' 
                     ? preg_replace('/(\d{3})(\d{3})(\d{3})(\d{2})/', '$1.$2.$3-$4', $visitor->doc)
                     : $visitor->doc,
                 'visitor-destination' => $visitor->destination->name,
