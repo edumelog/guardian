@@ -129,7 +129,7 @@ class CredentialPrintService
             $pageWidth = $printerConfig['printOptions']['pageWidth'] ?? 100;
             $pageHeight = $printerConfig['printOptions']['pageHeight'] ?? 65;
 
-            // Converte mm para pixels (assumindo 96 DPI)
+            // Converte mm para pixels (96 pixels por polegada)
             $pixelsPerMm = 96 / 25.4;
             $widthPx = ceil($pageWidth * $pixelsPerMm);
             $heightPx = ceil($pageHeight * $pixelsPerMm);
@@ -148,6 +148,20 @@ class CredentialPrintService
             ]);
 
             try {
+                // Injeta CSS para garantir que o conteúdo fique contido na página
+                $styleTag = "<style>
+                    html, body {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        width: {$widthPx}px !important;
+                        height: {$heightPx}px !important;
+                        max-width: {$widthPx}px !important;
+                        max-height: {$heightPx}px !important;
+                        overflow: hidden !important;
+                    }
+                </style>";
+                $html = str_replace('</head>', $styleTag . '</head>', $html);
+
                 $pdf = Browsershot::html($html)
                     ->setNodeBinary('/usr/bin/node')
                     ->setChromePath('/home/admin/.cache/puppeteer/chrome-headless-shell/linux-134.0.6998.35/chrome-headless-shell-linux64/chrome-headless-shell')
@@ -155,8 +169,13 @@ class CredentialPrintService
                     ->margins(0, 0, 0, 0)
                     ->showBackground()
                     ->landscape(false)
-                    ->scale(2)
+                    ->scale(1)
                     ->noSandbox()
+                    ->deviceScaleFactor(2)
+                    ->windowSize($widthPx, $heightPx)
+                    ->fullPage(false)
+                    ->dismissDialogs()
+                    ->waitUntilNetworkIdle()
                     ->base64pdf();
 
                 Log::info('PDF gerado com sucesso', [
@@ -180,7 +199,6 @@ class CredentialPrintService
                                 'left' => 0
                             ],
                             'orientation' => 'portrait',
-                            'dpi' => $printerConfig['printOptions']['dpi'] ?? 203,
                             'scaleContent' => false,
                             'rasterize' => true,
                             'interpolation' => 'bicubic',

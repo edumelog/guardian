@@ -147,24 +147,6 @@
                                             </p>
                                         </div>
                                         
-                                        <div class="mb-2">
-                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                Resolução (DPI)
-                                            </label>
-                                            <input 
-                                                type="number" 
-                                                x-model="dpi"
-                                                min="72"
-                                                max="600"
-                                                step="1"
-                                                @change="hasChanges = true"
-                                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
-                                            >
-                                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                                Resolução em pontos por polegada (DPI). Valores comuns: 72, 96, 150, 300.
-                                            </p>
-                                        </div>
-                                        
                                         <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 mt-4">
                                             Margens (em milímetros)
                                         </h4>
