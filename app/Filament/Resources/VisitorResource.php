@@ -275,10 +275,10 @@ class VisitorResource extends Resource
                                             }
                                             
                                             // Determina a cor baseada na severidade
-                                            $color = match($restriction->severity_level) {
-                                                'high' => 'danger',
+                                            $notificationType = match ($restriction->severity_level) {
+                                                'low' => 'success',
                                                 'medium' => 'warning',
-                                                'low' => 'warning',
+                                                'high' => 'danger',
                                                 default => 'warning',
                                             };
                                             
@@ -287,45 +287,20 @@ class VisitorResource extends Resource
                                                 ? $restriction->expires_at->format('d M Y') 
                                                 : 'Nunca';
                                             
-                                            // Usa uma notificação simples como a que funciona
+                                            // Usa uma notificação do Filament
                                             \Filament\Notifications\Notification::make()
-                                                ->danger()
+                                                ->$notificationType()
                                                 ->title('ALERTA: Restrição Detectada')
-                                                ->body("O visitante {$visitor->name} possui uma restrição ativa: {$restriction->reason}")
+                                                ->body("O visitante {$visitor->name} possui uma restrição de severidade {$restriction->severity_text}: {$restriction->reason}")
                                                 ->persistent()
                                                 ->icon('heroicon-o-exclamation-triangle')
                                                 ->actions([
                                                     NotificationAction::make('ver_detalhes')
                                                         ->label('Ver Todas Restrições')
                                                         ->url(route('filament.dashboard.resources.visitor-restrictions.index'))
-                                                        ->color('danger')
+                                                        ->color($notificationType)
                                                 ])
                                                 ->send();
-                                                
-                                            // Adiciona uma segunda notificação com mais detalhes
-                                            \Filament\Notifications\Notification::make('restriction_details')
-                                                ->danger()
-                                                ->title('Detalhes da Restrição')
-                                                ->body("Severidade: {$restriction->severity_text}\nMotivo: {$restriction->reason}\nExpira em: {$expiraEm}")
-                                                ->actions([
-                                                    NotificationAction::make('ver_detalhes')
-                                                        ->label('Ver Todas Restrições')
-                                                        ->url(route('filament.dashboard.resources.visitor-restrictions.index'))
-                                                        ->color('danger')
-                                                ])
-                                                ->send();
-                                                
-                                            // Adiciona também um alert JS simples para garantir visualização
-                                            $component->getLivewire()->js("
-                                                alert('⚠️ ALERTA: Visitante com restrição ativa!\\n\\nVisitante: {$visitor->name}\\nMotivo: {$restriction->reason}');
-                                                
-                                                // Destaca o formulário para chamar atenção
-                                                const form = document.querySelector('form');
-                                                if (form) {
-                                                    form.style.border = '2px solid #ef4444';
-                                                    form.style.boxShadow = '0 0 10px rgba(239, 68, 68, 0.5)';
-                                                }
-                                            ");
                                         }
                                     })
                             )

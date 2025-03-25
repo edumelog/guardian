@@ -593,32 +593,26 @@ class CreateVisitor extends CreateRecord
                     ? $restriction->expires_at->format('d M Y') 
                     : 'Nunca';
                 
-                // Mostra um alerta usando JavaScript
-                $this->js("
-                    alert('⚠️ ALERTA: Visitante com restrição ativa!\\n\\nVisitante: {$visitor->name}\\nMotivo: {$restriction->reason}');
-                    
-                    // Destaca o formulário para chamar atenção
-                    setTimeout(() => {
-                        const form = document.querySelector('form');
-                        if (form) {
-                            form.style.border = '2px solid #ef4444';
-                            form.style.boxShadow = '0 0 10px rgba(239, 68, 68, 0.5)';
-                        }
-                    }, 500);
-                ");
-                
+                // Determina o tipo de notificação baseado na severidade
+                $notificationType = match ($restriction->severity_level) {
+                    'low' => 'success',
+                    'medium' => 'warning',
+                    'high' => 'danger',
+                    default => 'warning',
+                };
+
                 // Usa uma notificação do Filament
                 \Filament\Notifications\Notification::make()
-                    ->danger()
+                    ->$notificationType()
                     ->title('ALERTA: Restrição Detectada')
-                    ->body("O visitante {$visitor->name} possui uma restrição ativa: {$restriction->reason}")
+                    ->body("O visitante {$visitor->name} possui uma restrição de severidade {$restriction->severity_text}: {$restriction->reason}")
                     ->persistent()
                     ->icon('heroicon-o-exclamation-triangle')
                     ->actions([
                         \Filament\Notifications\Actions\Action::make('ver_detalhes')
                             ->label('Ver Todas Restrições')
                             ->url(route('filament.dashboard.resources.visitor-restrictions.index'))
-                            ->color('danger')
+                            ->color($notificationType)
                     ])
                     ->send();
             }
