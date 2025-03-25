@@ -34,6 +34,10 @@ class VisitorRestriction extends Model
         'expires_at' => 'datetime',
     ];
 
+    protected $attributes = [
+        'active' => true,
+    ];
+
     /**
      * Retorna o visitante associado à restrição, se houver.
      */

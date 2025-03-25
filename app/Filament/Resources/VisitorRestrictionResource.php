@@ -40,36 +40,61 @@ class VisitorRestrictionResource extends Resource
 
                 Forms\Components\Section::make('Dados do Visitante')
                     ->schema([
-                        Forms\Components\TextInput::make('visitor_name')
-                            ->label('Nome')
-                            ->disabled(),
-
-                        Forms\Components\TextInput::make('visitor_doc')
-                            ->label('Documento')
-                            ->disabled(),
-
                         Forms\Components\TextInput::make('visitor_doc_type')
                             ->label('Tipo de Documento')
-                            ->disabled(),
-
-                        Forms\Components\TextInput::make('visitor_destination')
-                            ->label('Destino')
-                            ->disabled(),
-
-                        Forms\Components\ViewField::make('visitor_photo')
-                            ->label('Foto')
-                            ->view('filament.forms.components.visitor-photo')
+                            ->disabled()
                             ->columnSpan(1),
 
-                        Forms\Components\ViewField::make('visitor_doc_photo_front')
-                            ->label('Documento (Frente)')
-                            ->view('filament.forms.components.visitor-doc-photos')
+                        Forms\Components\TextInput::make('visitor_doc')
+                            ->label('Número do Documento')
+                            ->disabled()
                             ->columnSpan(1),
 
-                        Forms\Components\ViewField::make('visitor_doc_photo_back')
-                            ->label('Documento (Verso)')
-                            ->view('filament.forms.components.visitor-doc-photos')
+                        Forms\Components\TextInput::make('visitor_name')
+                            ->label('Nome')
+                            ->disabled()
                             ->columnSpan(1),
+
+                        Forms\Components\TextInput::make('visitor_phone')
+                            ->label('Telefone')
+                            ->disabled()
+                            ->columnSpan(1),
+
+                        Forms\Components\Section::make()
+                            ->schema([
+                                Forms\Components\ViewField::make('visitor_photo')
+                                    ->label('Foto')
+                                    ->view('filament.forms.components.visitor-photo')
+                                    ->extraAttributes(['style' => 'aspect-ratio: 9/16; height: auto;'])
+                                    ->columnSpan(1),
+
+                                Forms\Components\ViewField::make('visitor_doc_photo_front')
+                                    ->label('Documento - Frente')
+                                    ->view('filament.forms.components.visitor-doc-photos')
+                                    ->columnSpan(1),
+
+                                Forms\Components\ViewField::make('visitor_doc_photo_back')
+                                    ->label('Documento - Verso')
+                                    ->view('filament.forms.components.visitor-doc-photos')
+                                    ->columnSpan(1),
+                            ])
+                            ->columns(3)
+                            ->columnSpan('full'),
+
+                        Forms\Components\Section::make('Última Visita')
+                            ->schema([
+                                Forms\Components\TextInput::make('visitor_destination')
+                                    ->label('Local')
+                                    ->disabled()
+                                    ->columnSpan(1),
+
+                                Forms\Components\TextInput::make('visitor_last_visit')
+                                    ->label('Data e Hora')
+                                    ->disabled()
+                                    ->columnSpan(1),
+                            ])
+                            ->columns(2)
+                            ->columnSpan('full'),
                     ])
                     ->columns(2),
 
@@ -91,12 +116,16 @@ class VisitorRestrictionResource extends Resource
                             ->label('Motivo'),
 
                         Forms\Components\DateTimePicker::make('expires_at')
-                            ->nullable()
-                            ->label('Data de Expiração'),
+                            ->label('Data de Expiração')
+                            ->minDate(now())
+                            ->timezone('America/Sao_Paulo')
+                            ->format('d/m/Y H:i')
+                            ->native(false),
 
                         Forms\Components\Toggle::make('active')
                             ->label('Ativo')
-                            ->default(true),
+                            ->default(true)
+                            ->required(),
 
                         Forms\Components\Hidden::make('created_by')
                             ->default(fn() => Auth::user()->id),

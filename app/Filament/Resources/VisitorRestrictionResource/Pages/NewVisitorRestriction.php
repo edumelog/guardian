@@ -6,6 +6,7 @@ use App\Filament\Resources\VisitorRestrictionResource;
 use App\Models\Visitor;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class NewVisitorRestriction extends CreateRecord
 {
@@ -31,9 +32,12 @@ class NewVisitorRestriction extends CreateRecord
             'visitor_doc' => $visitor->doc,
             'visitor_doc_type' => $visitor->docType->type,
             'visitor_destination' => $visitor->destination->name,
+            'visitor_phone' => $visitor->phone,
+            'visitor_last_visit' => $visitor->created_at->format('d/m/Y H:i'),
             'visitor_photo' => $visitor->photo,
             'visitor_doc_photo_front' => $visitor->doc_photo_front,
             'visitor_doc_photo_back' => $visitor->doc_photo_back,
+            'active' => true,
         ]);
     }
 
@@ -49,6 +53,7 @@ class NewVisitorRestriction extends CreateRecord
             'name' => $visitor->name,
             'doc' => $visitor->doc,
             'doc_type_id' => $visitor->doc_type_id,
+            'created_by' => Auth::id(),
         ]);
 
         Log::info('NewVisitorRestriction::mutateFormDataBeforeCreate - result data', [
