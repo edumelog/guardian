@@ -24,7 +24,13 @@ class Visitor extends Model
         'other',
         'phone',
         'destination_id',
-        'doc_type_id'
+        'doc_type_id',
+        'has_restrictions'
+    ];
+
+    protected $casts = [
+        'other' => 'array',
+        'has_restrictions' => 'boolean',
     ];
 
     public static function validationRules($record = null): array
@@ -69,6 +75,43 @@ class Visitor extends Model
         return $this->hasOne(VisitorLog::class)->latestOfMany();
     }
 
+    public function restrictions(): HasMany
+    {
+        return $this->hasMany(VisitorRestriction::class);
+    }
+
+    public function activeRestrictions(): HasMany
+    {
+        return $this->hasMany(VisitorRestriction::class)->active();
+    }
+
+    /**
+     * Verifica se o visitante possui restrições ativas
+     */
+    public function hasActiveRestrictions(): bool
+    {
+        return $this->activeRestrictions()->exists();
+    }
+
+    /**
+     * Retorna a restrição mais crítica ativa
+     */
+    public function getMostCriticalRestrictionAttribute()
+    {
+        $severityOrder = [
+            'high' => 3,
+            'medium' => 2,
+            'low' => 1,
+        ];
+
+        return $this->activeRestrictions()
+            ->get()
+            ->sortByDesc(function ($restriction) use ($severityOrder) {
+                return $severityOrder[$restriction->severity_level] ?? 0;
+            })
+            ->first();
+    }
+
     /**
      * Retorna a URL para a foto do visitante
      * 
@@ -109,6 +152,15 @@ class Visitor extends Model
         }
 
         return route('visitor.photo', ['filename' => $this->doc_photo_back]);
+    }
+
+    /**
+     * Atualiza o campo has_restrictions baseado nas restrições ativas.
+     */
+    public function updateHasRestrictions(): bool
+    {
+        $this->has_restrictions = $this->hasActiveRestrictions();
+        return $this->save();
     }
 
     protected static function boot()

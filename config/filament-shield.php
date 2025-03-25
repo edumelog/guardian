@@ -57,6 +57,11 @@ return [
         'resources' => true,
         'custom_permissions' => [
             'manage_qz_certificates',
+            'manage_visitor_restrictions',
+            'view_visitor_restrictions',
+            'create_visitor_restrictions',
+            'update_visitor_restrictions',
+            'delete_visitor_restrictions',
         ],
     ],
 

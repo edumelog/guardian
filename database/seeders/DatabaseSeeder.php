@@ -21,6 +21,9 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Seed the super admin user for Filament
-        $this->call(FilamentAdminSeeder::class);
+        $this->call([
+            FilamentAdminSeeder::class,
+            RiskAnalystRoleSeeder::class,
+        ]);
     }
 }
