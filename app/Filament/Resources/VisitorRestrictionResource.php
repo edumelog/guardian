@@ -115,12 +115,14 @@ class VisitorRestrictionResource extends Resource
                             ->maxLength(65535)
                             ->label('Motivo'),
 
-                        Forms\Components\DateTimePicker::make('expires_at')
+                        Forms\Components\DatePicker::make('expires_at')
                             ->label('Data de Expiração')
                             ->minDate(now())
                             ->timezone('America/Sao_Paulo')
-                            ->format('d/m/Y H:i')
-                            ->native(false),
+                            ->displayFormat('d M Y')
+                            ->format('Y-m-d')
+                            ->native(false)
+                            ->dehydrateStateUsing(fn ($state) => $state ? now()->parse($state)->endOfDay() : null),
 
                         Forms\Components\Toggle::make('active')
                             ->label('Ativo')
@@ -175,7 +177,7 @@ class VisitorRestrictionResource extends Resource
                     ->label('Ativo'),
 
                 Tables\Columns\TextColumn::make('expires_at')
-                    ->dateTime('d/m/Y H:i')
+                    ->date('d M Y')
                     ->sortable()
                     ->label('Expira em'),
 
