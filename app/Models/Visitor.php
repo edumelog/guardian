@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class Visitor extends Model
 {
@@ -90,7 +91,15 @@ class Visitor extends Model
      */
     public function hasActiveRestrictions(): bool
     {
-        return $this->activeRestrictions()->exists();
+        $hasRestrictions = $this->activeRestrictions()->exists();
+        
+        Log::info('Visitor::hasActiveRestrictions', [
+            'visitor_id' => $this->id,
+            'has_restrictions' => $hasRestrictions ? 'Sim' : 'Não',
+            'active_restrictions_count' => $this->activeRestrictions()->count(),
+        ]);
+        
+        return $hasRestrictions;
     }
 
     /**
@@ -104,12 +113,21 @@ class Visitor extends Model
             'low' => 1,
         ];
 
-        return $this->activeRestrictions()
+        $restriction = $this->activeRestrictions()
             ->get()
             ->sortByDesc(function ($restriction) use ($severityOrder) {
                 return $severityOrder[$restriction->severity_level] ?? 0;
             })
             ->first();
+            
+        Log::info('Visitor::getMostCriticalRestrictionAttribute', [
+            'visitor_id' => $this->id,
+            'restriction_encontrada' => $restriction ? 'Sim' : 'Não',
+            'restriction_id' => $restriction?->id,
+            'severity_level' => $restriction?->severity_level,
+        ]);
+        
+        return $restriction;
     }
 
     /**

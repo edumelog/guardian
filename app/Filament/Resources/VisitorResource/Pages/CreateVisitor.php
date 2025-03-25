@@ -438,6 +438,7 @@ class CreateVisitor extends CreateRecord
                     
                     $visitor = \App\Models\Visitor::where('doc', $formData['doc'] ?? null)
                         ->where('doc_type_id', $formData['doc_type_id'] ?? null)
+                        ->with(['docType', 'activeRestrictions'])
                         ->first();
 
                     if ($visitor) {
@@ -542,6 +543,7 @@ class CreateVisitor extends CreateRecord
 
         $visitor = \App\Models\Visitor::where('doc', $formData['doc'])
             ->where('doc_type_id', $formData['doc_type_id'])
+            ->with(['docType', 'activeRestrictions'])
             ->first();
             
         if (!$visitor) {
@@ -553,6 +555,73 @@ class CreateVisitor extends CreateRecord
 
             $this->showAllFields = true;
             return;
+        }
+
+        // Verifica se o visitante possui restrições ativas
+        \Illuminate\Support\Facades\Log::info('CreateVisitor: Verificando restrições para visitante', [
+            'visitor_id' => $visitor->id,
+            'doc' => $visitor->doc,
+            'name' => $visitor->name,
+        ]);
+
+        // Verifica diretamente as restrições associadas
+        $activeRestrictions = \App\Models\VisitorRestriction::where('visitor_id', $visitor->id)
+            ->active()
+            ->get();
+
+        \Illuminate\Support\Facades\Log::info('CreateVisitor: Resultado da consulta direta de restrições', [
+            'visitor_id' => $visitor->id,
+            'count' => $activeRestrictions->count(),
+            'restrições' => $activeRestrictions->toArray(),
+        ]);
+
+        if ($visitor->hasActiveRestrictions() || $activeRestrictions->count() > 0) {
+            // Obtém a restrição mais crítica
+            $restriction = $visitor->getMostCriticalRestrictionAttribute();
+            
+            if (!$restriction && $activeRestrictions->count() > 0) {
+                $restriction = $activeRestrictions->first();
+            }
+            
+            \Illuminate\Support\Facades\Log::info('CreateVisitor: Restrição encontrada', [
+                'restriction' => $restriction ? $restriction->toArray() : null,
+            ]);
+            
+            if ($restriction) {
+                // Formata a data de expiração
+                $expiraEm = $restriction->expires_at 
+                    ? $restriction->expires_at->format('d M Y') 
+                    : 'Nunca';
+                
+                // Mostra um alerta usando JavaScript
+                $this->js("
+                    alert('⚠️ ALERTA: Visitante com restrição ativa!\\n\\nVisitante: {$visitor->name}\\nMotivo: {$restriction->reason}');
+                    
+                    // Destaca o formulário para chamar atenção
+                    setTimeout(() => {
+                        const form = document.querySelector('form');
+                        if (form) {
+                            form.style.border = '2px solid #ef4444';
+                            form.style.boxShadow = '0 0 10px rgba(239, 68, 68, 0.5)';
+                        }
+                    }, 500);
+                ");
+                
+                // Usa uma notificação do Filament
+                \Filament\Notifications\Notification::make()
+                    ->danger()
+                    ->title('ALERTA: Restrição Detectada')
+                    ->body("O visitante {$visitor->name} possui uma restrição ativa: {$restriction->reason}")
+                    ->persistent()
+                    ->icon('heroicon-o-exclamation-triangle')
+                    ->actions([
+                        \Filament\Notifications\Actions\Action::make('ver_detalhes')
+                            ->label('Ver Todas Restrições')
+                            ->url(route('filament.dashboard.resources.visitor-restrictions.index'))
+                            ->color('danger')
+                    ])
+                    ->send();
+            }
         }
 
         // Verifica se há uma visita em andamento

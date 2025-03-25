@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Modelo para gerenciar restrições de visitantes.
@@ -67,11 +68,43 @@ class VisitorRestriction extends Model
      */
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where('active', true)
-            ->where(function ($query) {
+        Log::info('VisitorRestriction::scopeActive - Início', [
+            'query_sql' => $query->toSql(),
+            'query_bindings' => $query->getBindings(),
+            'trace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5),
+        ]);
+        
+        $now = Carbon::now();
+        
+        $result = $query->where('active', true)
+            ->where(function ($query) use ($now) {
                 $query->whereNull('expires_at')
-                    ->orWhere('expires_at', '>', Carbon::now());
+                    ->orWhere('expires_at', '>', $now);
             });
+            
+        // Adiciona log detalhado para cada restrição
+        $restrictions = $result->get();
+        foreach ($restrictions as $restriction) {
+            Log::info('VisitorRestriction::scopeActive - Restrição', [
+                'id' => $restriction->id,
+                'visitor_id' => $restriction->visitor_id,
+                'reason' => $restriction->reason,
+                'severity' => $restriction->severity_level,
+                'active' => $restriction->active ? 'Sim' : 'Não',
+                'expires_at' => $restriction->expires_at,
+                'is_expired' => $restriction->isExpired() ? 'Sim' : 'Não',
+                'is_active' => $restriction->isActive() ? 'Sim' : 'Não',
+            ]);
+        }
+            
+        Log::info('VisitorRestriction::scopeActive - Resultado', [
+            'result_sql' => $result->toSql(),
+            'result_bindings' => $result->getBindings(),
+            'count' => $restrictions->count(),
+            'now' => $now->toDateTimeString(),
+        ]);
+        
+        return $result;
     }
 
     /**
