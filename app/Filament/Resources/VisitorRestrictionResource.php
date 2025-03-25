@@ -166,8 +166,8 @@ class VisitorRestrictionResource extends Resource
                 Tables\Columns\TextColumn::make('severity_level')
                     ->badge()
                     ->color(fn (Model $record): string => match ($record->severity_level) {
-                        'low' => 'warning',
-                        'medium' => 'orange',
+                        'low' => 'success',
+                        'medium' => 'warning',
                         'high' => 'danger',
                         default => 'warning',
                     })
