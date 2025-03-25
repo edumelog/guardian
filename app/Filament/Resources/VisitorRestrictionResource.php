@@ -34,6 +34,9 @@ class VisitorRestrictionResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Hidden::make('visitor_id'),
+                Forms\Components\Hidden::make('visitor_photo'),
+                Forms\Components\Hidden::make('visitor_doc_photo_front'),
+                Forms\Components\Hidden::make('visitor_doc_photo_back'),
 
                 Forms\Components\Section::make('Dados do Visitante')
                     ->schema([
@@ -53,47 +56,15 @@ class VisitorRestrictionResource extends Resource
                             ->label('Destino')
                             ->disabled(),
 
-                        Forms\Components\Grid::make()
-                            ->schema([
-                                Forms\Components\Placeholder::make('visitor_photo')
-                                    ->label('Foto')
-                                    ->content(function ($record, $state) {
-                                        if ($record && $record->visitor && $record->visitor->photo) {
-                                            return new HtmlString('<img src="' . route('visitor.photo', ['filename' => $record->visitor->photo]) . '" class="w-32 h-32 object-cover rounded-lg">');
-                                        }
-                                        
-                                        if (!empty($state['visitor_photo'])) {
-                                            return new HtmlString('<img src="' . route('visitor.photo', ['filename' => $state['visitor_photo']]) . '" class="w-32 h-32 object-cover rounded-lg">');
-                                        }
-                                        
-                                        return '-';
-                                    }),
+                        Forms\Components\ViewField::make('visitor_photo')
+                            ->label('Foto')
+                            ->view('filament.forms.components.visitor-photo')
+                            ->columnSpan(1),
 
-                                Forms\Components\Placeholder::make('visitor_doc_photos')
-                                    ->label('Documentos')
-                                    ->content(function ($record, $state) {
-                                        $html = [];
-
-                                        if ($record && $record->visitor) {
-                                            if ($record->visitor->doc_photo_front) {
-                                                $html[] = '<img src="' . route('visitor.photo', ['filename' => $record->visitor->doc_photo_front]) . '" class="w-32 h-32 object-cover rounded-lg" title="Frente do Documento">';
-                                            }
-                                            if ($record->visitor->doc_photo_back) {
-                                                $html[] = '<img src="' . route('visitor.photo', ['filename' => $record->visitor->doc_photo_back]) . '" class="w-32 h-32 object-cover rounded-lg" title="Verso do Documento">';
-                                            }
-                                        } else {
-                                            if (!empty($state['visitor_doc_photo_front'])) {
-                                                $html[] = '<img src="' . route('visitor.photo', ['filename' => $state['visitor_doc_photo_front']]) . '" class="w-32 h-32 object-cover rounded-lg" title="Frente do Documento">';
-                                            }
-                                            if (!empty($state['visitor_doc_photo_back'])) {
-                                                $html[] = '<img src="' . route('visitor.photo', ['filename' => $state['visitor_doc_photo_back']]) . '" class="w-32 h-32 object-cover rounded-lg" title="Verso do Documento">';
-                                            }
-                                        }
-
-                                        return empty($html) ? '-' : new HtmlString('<div class="flex gap-4">' . implode('', $html) . '</div>');
-                                    }),
-                            ])
-                            ->columns(2),
+                        Forms\Components\ViewField::make('visitor_doc_photos')
+                            ->label('Documentos')
+                            ->view('filament.forms.components.visitor-doc-photos')
+                            ->columnSpan(1),
                     ])
                     ->columns(2),
 
