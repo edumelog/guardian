@@ -155,12 +155,20 @@ class CredentialPrintService
                         padding: 0 !important;
                         width: {$widthPx}px !important;
                         height: {$heightPx}px !important;
-                        max-width: {$widthPx}px !important;
-                        max-height: {$heightPx}px !important;
                         overflow: hidden !important;
+                    }
+                    body > * {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        box-sizing: border-box !important;
                     }
                 </style>";
                 $html = str_replace('</head>', $styleTag . '</head>', $html);
+
+                Log::info('Configurações do PDF:', [
+                    'width_px' => $widthPx,
+                    'height_px' => $heightPx
+                ]);
 
                 $pdf = Browsershot::html($html)
                     ->setNodeBinary('/usr/bin/node')
@@ -168,7 +176,6 @@ class CredentialPrintService
                     ->paperSize($widthPx, $heightPx, 'px')
                     ->margins(0, 0, 0, 0)
                     ->showBackground()
-                    ->landscape(false)
                     ->scale(1)
                     ->noSandbox()
                     ->deviceScaleFactor(2)
@@ -182,8 +189,27 @@ class CredentialPrintService
                     'pdf_size' => strlen($pdf)
                 ]);
 
-                // Retorna o PDF em base64 e as configurações de impressão
-                return [
+                // Obtém as configurações de impressão
+                $printOptions = $printerConfig['printOptions'] ?? [];
+                $margins = $printOptions['margins'] ?? [
+                    'top' => 0,
+                    'right' => 0,
+                    'bottom' => 0,
+                    'left' => 0
+                ];
+
+                // Obtém a orientação diretamente da raiz do printerConfig
+                $orientation = $printerConfig['orientation'] ?? 'portrait';
+
+                Log::info('Configurações de impressão:', [
+                    'orientation' => $orientation,
+                    'margins' => $margins,
+                    'print_options' => $printOptions,
+                    'printer_config' => $printerConfig
+                ]);
+
+                // Retorna o PDF em base64 e as configurações de impressão para o QZ-Tray
+                $returnConfig = [
                     'pdf_base64' => $pdf,
                     'print_config' => [
                         'printer' => $printerConfig['printer'] ?? '',
@@ -192,13 +218,8 @@ class CredentialPrintService
                                 'width' => $pageWidth,
                                 'height' => $pageHeight
                             ],
-                            'margins' => [
-                                'top' => 0,
-                                'right' => 0,
-                                'bottom' => 0,
-                                'left' => 0
-                            ],
-                            'orientation' => 'portrait',
+                            'margins' => $margins,
+                            'orientation' => $orientation,
                             'scaleContent' => false,
                             'rasterize' => true,
                             'interpolation' => 'bicubic',
@@ -209,6 +230,12 @@ class CredentialPrintService
                         ]
                     ]
                 ];
+
+                Log::info('Configuração final retornada:', [
+                    'return_config' => $returnConfig['print_config']
+                ]);
+
+                return $returnConfig;
             } catch (\Exception $e) {
                 Log::error('Erro ao gerar PDF com Browsershot', [
                     'error' => $e->getMessage(),
