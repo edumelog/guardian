@@ -61,8 +61,13 @@ class VisitorRestrictionResource extends Resource
                             ->view('filament.forms.components.visitor-photo')
                             ->columnSpan(1),
 
-                        Forms\Components\ViewField::make('visitor_doc_photos')
-                            ->label('Documentos')
+                        Forms\Components\ViewField::make('visitor_doc_photo_front')
+                            ->label('Documento (Frente)')
+                            ->view('filament.forms.components.visitor-doc-photos')
+                            ->columnSpan(1),
+
+                        Forms\Components\ViewField::make('visitor_doc_photo_back')
+                            ->label('Documento (Verso)')
                             ->view('filament.forms.components.visitor-doc-photos')
                             ->columnSpan(1),
                     ])
