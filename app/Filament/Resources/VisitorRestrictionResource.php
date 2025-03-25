@@ -122,6 +122,15 @@ class VisitorRestrictionResource extends Resource
                             ->displayFormat('d M Y')
                             ->format('Y-m-d')
                             ->native(false)
+                            ->nullable()
+                            ->placeholder('Nunca')
+                            ->suffixAction(
+                                Forms\Components\Actions\Action::make('clear')
+                                    ->icon('heroicon-m-x-mark')
+                                    ->action(function (Forms\Set $set) {
+                                        $set('expires_at', null);
+                                    })
+                            )
                             ->dehydrateStateUsing(fn ($state) => $state ? now()->parse($state)->endOfDay() : null),
 
                         Forms\Components\Toggle::make('active')
@@ -178,6 +187,7 @@ class VisitorRestrictionResource extends Resource
 
                 Tables\Columns\TextColumn::make('expires_at')
                     ->date('d M Y')
+                    ->placeholder('Nunca')
                     ->sortable()
                     ->label('Expira em'),
 
