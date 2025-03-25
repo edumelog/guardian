@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
-use Barryvdh\DomPDF\Facade\Pdf as DomPDF;
+use Spatie\Browsershot\Browsershot;
 use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
 use Picqer\Barcode\BarcodeGeneratorPNG;
@@ -67,8 +67,8 @@ class CredentialPrintService
                 'visitor-id' => $visitor->id,
                 'visitor-name' => strtoupper($visitor->name),
                 'visitor-photo' => $photoBase64,
-                'visitor-doc-type' => $visitor->docType->name,
-                'visitor-doc' => $visitor->docType->name === 'CPF' 
+                'visitor-doc-type' => $visitor->docType->type,
+                'visitor-doc' => $visitor->docType->type === 'CPF' 
                     ? preg_replace('/(\d{3})(\d{3})(\d{3})(\d{2})/', '$1.$2.$3-$4', $visitor->doc)
                     : $visitor->doc,
                 'visitor-destination' => $visitor->destination->name,
@@ -126,59 +126,78 @@ class CredentialPrintService
             $html = $this->processTemplate($html, $data);
 
             // Configurações do PDF
-            $options = [
-                'enable_css_float' => true,
-                'enable_html5_parser' => true,
-                'enable_remote' => true,
-                'font_height_ratio' => 1.0,
-                'adjust_line_height' => 1.0,
-                'pdf_page_limit' => 1,
-                'fit_to_page' => true
-            ];
+            $pageWidth = $printerConfig['printOptions']['pageWidth'] ?? 100;
+            $pageHeight = $printerConfig['printOptions']['pageHeight'] ?? 65;
 
-            // Configurações de página
-            $pageSize = [
-                0, 0,
-                $printerConfig['printOptions']['pageWidth'] ?? 100,
-                $printerConfig['printOptions']['pageHeight'] ?? 65
-            ];
+            // Converte mm para pixels (assumindo 96 DPI)
+            $pixelsPerMm = 96 / 25.4;
+            $widthPx = ceil($pageWidth * $pixelsPerMm);
+            $heightPx = ceil($pageHeight * $pixelsPerMm);
 
-            // Gera o PDF
-            $pdf = DomPDF::loadHTML($html)
-                ->setPaper($pageSize)
-                ->setOptions($options);
+            Log::info('Dimensões do PDF:', [
+                'width_mm' => $pageWidth,
+                'height_mm' => $pageHeight,
+                'width_px' => $widthPx,
+                'height_px' => $heightPx
+            ]);
 
-            // Converte para base64
-            $pdfBase64 = base64_encode($pdf->output());
+            // Gera o PDF usando Browsershot
+            Log::info('Iniciando geração do PDF com Browsershot', [
+                'width_px' => $widthPx,
+                'height_px' => $heightPx
+            ]);
 
-            // Retorna o PDF em base64 e as configurações de impressão
-            return [
-                'pdf_base64' => $pdfBase64,
-                'print_config' => [
-                    'printer' => $printerConfig['printer'] ?? '',
-                    'options' => [
-                        'size' => [
-                            'width' => $printerConfig['printOptions']['pageWidth'] ?? 100,
-                            'height' => $printerConfig['printOptions']['pageHeight'] ?? 65
-                        ],
-                        'margins' => [
-                            'top' => 0,
-                            'right' => 0,
-                            'bottom' => 0,
-                            'left' => 0
-                        ],
-                        'orientation' => 'portrait',
-                        'dpi' => $printerConfig['printOptions']['dpi'] ?? 203,
-                        'scaleContent' => false,
-                        'rasterize' => true,
-                        'interpolation' => 'bicubic',
-                        'density' => 'best',
-                        'altFontRendering' => true,
-                        'ignoreTransparency' => true,
-                        'colorType' => 'blackwhite'
+            try {
+                $pdf = Browsershot::html($html)
+                    ->setNodeBinary('/usr/bin/node')
+                    ->setChromePath('/home/admin/.cache/puppeteer/chrome-headless-shell/linux-134.0.6998.35/chrome-headless-shell-linux64/chrome-headless-shell')
+                    ->paperSize($widthPx, $heightPx, 'px')
+                    ->margins(0, 0, 0, 0)
+                    ->showBackground()
+                    ->landscape(false)
+                    ->scale(2)
+                    ->noSandbox()
+                    ->base64pdf();
+
+                Log::info('PDF gerado com sucesso', [
+                    'pdf_size' => strlen($pdf)
+                ]);
+
+                // Retorna o PDF em base64 e as configurações de impressão
+                return [
+                    'pdf_base64' => $pdf,
+                    'print_config' => [
+                        'printer' => $printerConfig['printer'] ?? '',
+                        'options' => [
+                            'size' => [
+                                'width' => $pageWidth,
+                                'height' => $pageHeight
+                            ],
+                            'margins' => [
+                                'top' => 0,
+                                'right' => 0,
+                                'bottom' => 0,
+                                'left' => 0
+                            ],
+                            'orientation' => 'portrait',
+                            'dpi' => $printerConfig['printOptions']['dpi'] ?? 203,
+                            'scaleContent' => false,
+                            'rasterize' => true,
+                            'interpolation' => 'bicubic',
+                            'density' => 'best',
+                            'altFontRendering' => true,
+                            'ignoreTransparency' => true,
+                            'colorType' => 'blackwhite'
+                        ]
                     ]
-                ]
-            ];
+                ];
+            } catch (\Exception $e) {
+                Log::error('Erro ao gerar PDF com Browsershot', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                throw $e;
+            }
         } catch (\Exception $e) {
             Log::error('Erro ao gerar PDF', [
                 'visitor_id' => $visitor->id,
