@@ -15,7 +15,7 @@ class VisitorRestrictionPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->can('view_visitor_restrictions');
+        return $user->can('view_any_visitor::restriction');
     }
 
     /**
@@ -23,7 +23,7 @@ class VisitorRestrictionPolicy
      */
     public function view(User $user, VisitorRestriction $visitorRestriction): bool
     {
-        return $user->can('view_visitor_restrictions');
+        return $user->can('view_visitor::restriction');
     }
 
     /**
@@ -31,7 +31,7 @@ class VisitorRestrictionPolicy
      */
     public function create(User $user): bool
     {
-        return $user->can('create_visitor_restrictions');
+        return $user->can('create_visitor::restriction');
     }
 
     /**
@@ -39,7 +39,7 @@ class VisitorRestrictionPolicy
      */
     public function update(User $user, VisitorRestriction $visitorRestriction): bool
     {
-        return $user->can('update_visitor_restrictions');
+        return $user->can('update_visitor::restriction');
     }
 
     /**
@@ -47,7 +47,7 @@ class VisitorRestrictionPolicy
      */
     public function delete(User $user, VisitorRestriction $visitorRestriction): bool
     {
-        return $user->can('delete_visitor_restrictions');
+        return $user->can('delete_visitor::restriction');
     }
 
     /**
@@ -55,7 +55,7 @@ class VisitorRestrictionPolicy
      */
     public function deleteAny(User $user): bool
     {
-        return $user->can('delete_visitor_restrictions');
+        return $user->can('delete_any_visitor::restriction');
     }
 
     /**
@@ -63,7 +63,7 @@ class VisitorRestrictionPolicy
      */
     public function forceDelete(User $user, VisitorRestriction $visitorRestriction): bool
     {
-        return $user->can('delete_visitor_restrictions');
+        return $user->can('force_delete_visitor::restriction');
     }
 
     /**
@@ -71,7 +71,7 @@ class VisitorRestrictionPolicy
      */
     public function forceDeleteAny(User $user): bool
     {
-        return $user->can('delete_visitor_restrictions');
+        return $user->can('force_delete_any_visitor::restriction');
     }
 
     /**
@@ -79,7 +79,7 @@ class VisitorRestrictionPolicy
      */
     public function restore(User $user, VisitorRestriction $visitorRestriction): bool
     {
-        return $user->can('update_visitor_restrictions');
+        return $user->can('restore_visitor::restriction');
     }
 
     /**
@@ -87,7 +87,7 @@ class VisitorRestrictionPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('update_visitor_restrictions');
+        return $user->can('restore_any_visitor::restriction');
     }
 
     /**
@@ -95,7 +95,7 @@ class VisitorRestrictionPolicy
      */
     public function replicate(User $user, VisitorRestriction $visitorRestriction): bool
     {
-        return $user->can('create_visitor_restrictions');
+        return $user->can('replicate_visitor::restriction');
     }
 
     /**
@@ -103,6 +103,6 @@ class VisitorRestrictionPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('update_visitor_restrictions');
+        return $user->can('reorder_visitor::restriction');
     }
-} 
+}

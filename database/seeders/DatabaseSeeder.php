@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             FilamentAdminSeeder::class,
             RiskAnalystRoleSeeder::class,
+            RiskApprovalPermissionsSeeder::class,
         ]);
     }
 }

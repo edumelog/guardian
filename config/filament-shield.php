@@ -62,6 +62,9 @@ return [
             'create_visitor_restrictions',
             'update_visitor_restrictions',
             'delete_visitor_restrictions',
+            'low_risk_approval',
+            'medium_risk_approval',
+            'high_risk_approval',
         ],
     ],
 
