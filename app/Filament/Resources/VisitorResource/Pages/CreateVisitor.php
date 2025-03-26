@@ -99,9 +99,9 @@ class CreateVisitor extends CreateRecord
                                 // Determina a cor do texto baseada na severidade
                                 $colorClass = match ($this->visitorRestriction->severity_level) {
                                     'low' => 'text-green-600 dark:text-success-400',
-                                    'medium' => 'text-amber-600 dark:text-warning-400',
+                                    'medium' => 'text-amber-600 dark:text-amber-400',
                                     'high' => 'text-red-600 dark:text-danger-400',
-                                    default => 'text-graywarning-600 dark:text-warning-400',
+                                    default => 'text-gray-600 dark:text-gray-400',
                                 };
                                 
                                 $expirationInfo = '';
@@ -111,7 +111,7 @@ class CreateVisitor extends CreateRecord
                                 
                                 return new \Illuminate\Support\HtmlString(
                                     "<div class='p-4 rounded-lg border-2 {$colorClass}' style='border-color: currentColor;'>
-                                        <p class='mt-2 text-red-500'>{$this->visitorRestriction->reason}</p>
+                                        <p class='mt-2 {$colorClass}'>{$this->visitorRestriction->reason}</p>
                                         {$expirationInfo}
                                     </div>"
                                 );
