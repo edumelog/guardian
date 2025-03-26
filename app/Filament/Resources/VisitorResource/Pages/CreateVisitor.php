@@ -29,13 +29,15 @@ class CreateVisitor extends CreateRecord
 
     public bool $showAllFields = false;
     public $visitorRestriction = null; // Nova propriedade para armazenar a restrição
+    public $authorization_granted = false; // Nova propriedade para controlar autorização
 
     public function mount(): void
     {
         parent::mount();
         
-        // Reinicia a propriedade visitorRestriction
+        // Reinicia as propriedades
         $this->visitorRestriction = null;
+        $this->authorization_granted = false;
         
         // Verifica se há parâmetros na URL para preencher o formulário
         $doc = request()->query('doc');
@@ -85,7 +87,7 @@ class CreateVisitor extends CreateRecord
                                     'low' => 'text-green-600 dark:text-success-400 font-bold',
                                     'medium' => 'text-amber-600 dark:text-warning-400 font-bold',
                                     'high' => 'text-red-600 dark:text-danger-400 font-bold',
-                                    default => 'text-warning-600 dark:text-warning-400 font-bold',
+                                    default => 'text-amber-600 dark:text-warning-400 font-bold',
                                 };
                                 return new \Illuminate\Support\HtmlString(
                                     "<span class='{$colorClass}'>ALERTA: Restrição de Severidade {$severityText}</span>"
@@ -299,43 +301,48 @@ class CreateVisitor extends CreateRecord
                                 '
                             ]),
 
-                        TextInput::make('name')
-                            ->label('Nome')
-                            ->required()
-                            ->maxLength(255)
-                            ->visible(fn (Get $get): bool => $this->showAllFields)
-                            ->disabled(function (Get $get) {
-                                // Se já existir um visitante com este documento, desabilita o campo
-                                $doc = $get('doc');
-                                $docTypeId = $get('doc_type_id');
-                                if (!$doc || !$docTypeId) return false;
-                                
-                                return \App\Models\Visitor::where('doc', $doc)
-                                    ->where('doc_type_id', $docTypeId)
-                                    ->exists();
-                            })
-                            ->regex('/^[A-Za-zÀ-ÖØ-öø-ÿ\s\.\-\']+$/')
-                            ->extraInputAttributes([
-                                'style' => 'text-transform: uppercase;',
-                                'x-on:keypress' => "if (!/[A-Za-zÀ-ÖØ-öø-ÿ\s\.\-\']/.test(event.key)) { event.preventDefault(); }"
-                            ])
-                            ->afterStateUpdated(function (string $state, callable $set) {
-                                $set('name', mb_strtoupper($state));
-                            })
-                            ->validationMessages([
-                                'regex' => 'O nome deve conter apenas letras, espaços e caracteres especiais (. - \').',
-                            ]),
+                        Grid::make(2)
+                            ->schema([
+                                TextInput::make('name')
+                                    ->label('Nome')
+                                    ->required()
+                                    ->maxLength(255)
+                                    ->visible(fn (Get $get): bool => $this->showAllFields)
+                                    ->disabled(function (Get $get) {
+                                        // Se já existir um visitante com este documento, desabilita o campo
+                                        $doc = $get('doc');
+                                        $docTypeId = $get('doc_type_id');
+                                        if (!$doc || !$docTypeId) return false;
+                                        
+                                        return \App\Models\Visitor::where('doc', $doc)
+                                            ->where('doc_type_id', $docTypeId)
+                                            ->exists();
+                                    })
+                                    ->regex('/^[A-Za-zÀ-ÖØ-öø-ÿ\s\.\-\']+$/')
+                                    ->extraInputAttributes([
+                                        'style' => 'text-transform: uppercase;',
+                                        'x-on:keypress' => "if (!/[A-Za-zÀ-ÖØ-öø-ÿ\s\.\-\']/.test(event.key)) { event.preventDefault(); }"
+                                    ])
+                                    ->afterStateUpdated(function (string $state, callable $set) {
+                                        $set('name', mb_strtoupper($state));
+                                    })
+                                    ->validationMessages([
+                                        'regex' => 'O nome deve conter apenas letras, espaços e caracteres especiais (. - \').',
+                                    ])
+                                    ->columnSpan(1),
 
-                        TextInput::make('phone')
-                            ->label('Telefone')
-                            ->tel()
-                            ->telRegex('/.*/')  // Aceita qualquer formato de telefone
-                            ->mask(RawJs::make(<<<'JS'
-                                '99 (99) 99-999-9999'
-                            JS))
-                            ->default('55 (21) ')
-                            ->placeholder('55 (21) 99-999-9999')
-                            ->visible(fn (Get $get): bool => $this->showAllFields),
+                                TextInput::make('phone')
+                                    ->label('Telefone')
+                                    ->tel()
+                                    ->telRegex('/.*/')  // Aceita qualquer formato de telefone
+                                    ->mask(RawJs::make(<<<'JS'
+                                        '99 (99) 99-999-9999'
+                                    JS))
+                                    ->default('55 (21) ')
+                                    ->placeholder('55 (21) 99-999-9999')
+                                    ->visible(fn (Get $get): bool => $this->showAllFields)
+                                    ->columnSpan(1),
+                            ]),
 
                         Grid::make(3)
                             ->schema([
@@ -471,9 +478,19 @@ class CreateVisitor extends CreateRecord
                     
                 // Mensagem de aviso sobre restrição no rodapé
                 Placeholder::make('restriction_warning')
+                    ->label('Visitante com Restrição')
                     ->content(function() {
                         if (!$this->visitorRestriction) {
                             return null;
+                        }
+                        
+                        // Se já foi autorizado, mostra mensagem de autorização concedida
+                        if ($this->authorization_granted) {
+                            return new \Illuminate\Support\HtmlString(
+                                "<div>
+                                    <p class='text-green-600 dark:text-success-400 font-medium text-sm'>Autorização concedida. Pode prosseguir com o registro.</p>
+                                </div>"
+                            );
                         }
                         
                         $colorClass = match ($this->visitorRestriction->severity_level) {
@@ -484,7 +501,9 @@ class CreateVisitor extends CreateRecord
                         };
                         
                         return new \Illuminate\Support\HtmlString(
-                            "<p class='{$colorClass} font-medium text-sm'>Visitante com Restrição. Necessita de autorização para prosseguir.</p>"
+                            "<div>
+                                <p class='{$colorClass} font-medium text-sm'>Necessita de autorização para prosseguir.</p>
+                            </div>"
                         );
                     })
                     ->visible(fn() => $this->visitorRestriction !== null)
@@ -510,7 +529,7 @@ class CreateVisitor extends CreateRecord
                 ->label('Imprimir Credencial e Salvar')
                 ->color('success')
                 ->icon('heroicon-o-printer')
-                ->disabled(fn() => $this->visitorRestriction !== null)
+                ->disabled(fn() => $this->visitorRestriction !== null && !$this->authorization_granted)
                 ->action(function () {
                     // Verifica se há visita em andamento
                     $formData = $this->form->getState();
@@ -537,6 +556,177 @@ class CreateVisitor extends CreateRecord
                     }
 
                     $this->create();
+                }),
+
+            Actions\Action::make('authorize_restriction')
+                ->label('Autorizar Restrição')
+                ->color('warning')
+                ->icon('heroicon-o-key')
+                ->visible(fn() => $this->visitorRestriction !== null && !$this->authorization_granted)
+                ->form(function () {
+                    $restrictionInfo = '';
+                    $expirationInfo = '';
+                    
+                    if ($this->visitorRestriction) {
+                        $restrictionInfo = "Restrição: {$this->visitorRestriction->reason}";
+                        
+                        if ($this->visitorRestriction->expires_at) {
+                            $expirationInfo = "Expira em: " . $this->visitorRestriction->expires_at->format('d/m/Y');
+                        }
+                    }
+                    
+                    return [
+                        \Filament\Forms\Components\Section::make('Detalhes da Restrição')
+                            ->schema([
+                                \Filament\Forms\Components\Placeholder::make('severity_level')
+                                    ->label('Nível de Severidade')
+                                    ->content(function () {
+                                        if (!$this->visitorRestriction) {
+                                            return '-';
+                                        }
+                                        
+                                        $severityClass = match ($this->visitorRestriction->severity_level) {
+                                            'low' => 'text-green-600',
+                                            'medium' => 'text-amber-600',
+                                            'high' => 'text-red-600',
+                                            default => 'text-gray-600',
+                                        };
+                                        
+                                        $severityText = match ($this->visitorRestriction->severity_level) {
+                                            'low' => 'Baixa',
+                                            'medium' => 'Média',
+                                            'high' => 'Alta',
+                                            default => 'Desconhecida',
+                                        };
+                                        
+                                        return new \Illuminate\Support\HtmlString(
+                                            "<span class='{$severityClass} font-medium'>{$severityText}</span>"
+                                        );
+                                    }),
+                                    
+                                \Filament\Forms\Components\Placeholder::make('restriction_reason')
+                                    ->label('Motivo da Restrição')
+                                    ->content(function () {
+                                        if (!$this->visitorRestriction) {
+                                            return '-';
+                                        }
+
+                                        $severityClass = match ($this->visitorRestriction->severity_level) {
+                                            'low' => 'text-green-600',
+                                            'medium' => 'text-amber-600',
+                                            'high' => 'text-red-600',
+                                            default => 'text-gray-600',
+                                        };
+
+                                        return new \Illuminate\Support\HtmlString(
+                                            "<span class='{$severityClass}'>{$this->visitorRestriction->reason}</span>"
+                                        );
+                                    }),
+                                    
+                                \Filament\Forms\Components\Placeholder::make('restriction_expiration')
+                                    ->label('Data de Expiração')
+                                    ->content(function () {
+                                        if (!$this->visitorRestriction) {
+                                            return '-';
+                                        }
+
+                                        $severityClass = match ($this->visitorRestriction->severity_level) {
+                                            'low' => 'text-green-600',
+                                            'medium' => 'text-amber-600',
+                                            'high' => 'text-red-600',
+                                            default => 'text-gray-600',
+                                        };
+
+                                        $expirationText = $this->visitorRestriction->expires_at 
+                                            ? $this->visitorRestriction->expires_at->format('d/m/Y')
+                                            : 'Sem data de expiração';
+
+                                        return new \Illuminate\Support\HtmlString(
+                                            "<span class='{$severityClass}'>{$expirationText}</span>"
+                                        );
+                                    }),
+                            ]),
+                            
+                        \Filament\Forms\Components\Section::make('Credenciais para Autorização')
+                            ->schema([
+                                \Filament\Forms\Components\TextInput::make('login')
+                                    ->label('Login')
+                                    ->email()
+                                    ->required()
+                                    ->extraInputAttributes(['autocomplete' => 'username']),
+                                    
+                                \Filament\Forms\Components\TextInput::make('password')
+                                    ->label('Senha')
+                                    ->password()
+                                    ->required()
+                                    ->extraInputAttributes(['autocomplete' => 'current-password']),
+                            ]),
+                    ];
+                })
+                ->action(function (array $data) {
+                    // Tenta autenticar o usuário com as credenciais fornecidas
+                    if (!\Illuminate\Support\Facades\Auth::validate([
+                        'email' => $data['login'], 
+                        'password' => $data['password']
+                    ])) {
+                        \Filament\Notifications\Notification::make()
+                            ->danger()
+                            ->title('Falha na Autorização')
+                            ->body('Credenciais inválidas.')
+                            ->send();
+                        return;
+                    }
+                    
+                    // Obtém o usuário para verificar permissões
+                    $user = \App\Models\User::where('email', $data['login'])->first();
+                    
+                    if (!$user) {
+                        \Filament\Notifications\Notification::make()
+                            ->danger()
+                            ->title('Falha na Autorização')
+                            ->body('Usuário não encontrado.')
+                            ->send();
+                        return;
+                    }
+                    
+                    // Determina a permissão necessária com base na severidade
+                    $requiredPermission = match ($this->visitorRestriction->severity_level) {
+                        'low' => 'low_risk_approval',
+                        'medium' => 'medium_risk_approval',
+                        'high' => 'high_risk_approval',
+                        default => 'high_risk_approval',
+                    };
+                    
+                    // Verifica se o usuário tem a permissão necessária
+                    $hasPermission = false;
+                    
+                    // Usa o método adequado dependendo do sistema de permissões
+                    if (method_exists($user, 'hasPermissionTo')) {
+                        $hasPermission = $user->hasPermissionTo($requiredPermission);
+                    } elseif (method_exists($user, 'can')) {
+                        $hasPermission = $user->can($requiredPermission);
+                    } else {
+                        // Fallback para sistemas sem verificação específica
+                        $hasPermission = $user->hasRole('admin');
+                    }
+                    
+                    if (!$hasPermission) {
+                        \Filament\Notifications\Notification::make()
+                            ->danger()
+                            ->title('Permissão Negada')
+                            ->body('Usuário não possui permissão para autorizar este nível de restrição.')
+                            ->send();
+                        return;
+                    }
+                    
+                    // Se chegou até aqui, tem permissão
+                    $this->authorization_granted = true;
+                    
+                    \Filament\Notifications\Notification::make()
+                        ->success()
+                        ->title('Autorização Concedida')
+                        ->body('A restrição foi autorizada com sucesso!')
+                        ->send();
                 }),
 
             Actions\Action::make('cancel')
