@@ -1242,8 +1242,12 @@ class CreateVisitor extends CreateRecord
                 $pattern = $this->wildcardToRegex($restrictionDoc);
                 \Illuminate\Support\Facades\Log::info('CreateVisitor: Verificando documento', [
                     'pattern' => $pattern,
-                    'visitorDoc' => $visitorDoc
+                    'visitorDoc' => $visitorDoc,
+                    'restriction_doc' => $restrictionDoc,
+                    'exact_match' => (!str_contains($restrictionDoc, '*') && !str_contains($restrictionDoc, '?'))
                 ]);
+                
+                // Se não há wildcards, a correspondência deve ser exata (não parcial)
                 if (preg_match($pattern, $visitorDoc)) {
                     $matches = true;
                     $matchReason[] = 'documento';
@@ -1256,8 +1260,13 @@ class CreateVisitor extends CreateRecord
                 $pattern = $this->wildcardToRegex($restrictionName);
                 \Illuminate\Support\Facades\Log::info('CreateVisitor: Verificando nome', [
                     'pattern' => $pattern,
-                    'visitorName' => $visitorName
+                    'visitorName' => $visitorName,
+                    'restriction_name' => $restrictionName,
+                    'exact_match' => (!str_contains($restrictionName, '*') && !str_contains($restrictionName, '?'))
                 ]);
+                
+                // Se não há wildcards, a correspondência deve ser exata (não parcial)
+                // Ex: "EDUARDO MELO" só corresponde a "EDUARDO MELO", não a "JUCA MELO"
                 if (preg_match($pattern, $visitorName)) {
                     $matches = true;
                     $matchReason[] = 'nome';
@@ -1270,8 +1279,12 @@ class CreateVisitor extends CreateRecord
                 $pattern = $this->wildcardToRegex($restrictionPhone);
                 \Illuminate\Support\Facades\Log::info('CreateVisitor: Verificando telefone', [
                     'pattern' => $pattern,
-                    'visitorPhone' => $visitorPhone
+                    'visitorPhone' => $visitorPhone,
+                    'restriction_phone' => $restrictionPhone,
+                    'exact_match' => (!str_contains($restrictionPhone, '*') && !str_contains($restrictionPhone, '?'))
                 ]);
+                
+                // Se não há wildcards, a correspondência deve ser exata (não parcial)
                 if (preg_match($pattern, $visitorPhone)) {
                     $matches = true;
                     $matchReason[] = 'telefone';
@@ -1343,29 +1356,56 @@ class CreateVisitor extends CreateRecord
     
     /**
      * Converte padrões com wildcards (* e ?) para regex
+     * Segue as regras de conversão:
+     * - * (asterisco): representa qualquer quantidade de caracteres (inclusive zero)
+     * - ? (interrogação): representa exatamente um caractere
+     * 
+     * Exemplos:
+     * - "EDUARDO MELO" => "^EDUARDO MELO$" (correspondência exata)
+     * - "EDUARDO * MELO" => "^EDUARDO .* MELO$" (começa com EDUARDO, termina com MELO)
+     * - "* MELO" => ".* MELO$" (termina com MELO)
+     * - "EDUARDO *" => "^EDUARDO .*" (começa com EDUARDO)
+     * - "*" => ".*" (corresponde a qualquer coisa)
+     * - "EDUARDO M?LO" => "^EDUARDO M.LO$" (? = um caractere qualquer)
      */
     protected function wildcardToRegex(string $pattern): string
     {
         $originalPattern = $pattern;
         
-        // Se o padrão não contém wildcards, tratamos como uma correspondência parcial
-        $containsWildcard = str_contains($pattern, '*') || str_contains($pattern, '?');
+        // Escapar caracteres especiais do regex, exceto * e ?
+        $pattern = preg_quote($pattern, '/');
         
-        // Se não contém wildcard, consideramos como substring (equivalente a *TEXTO*)
-        if (!$containsWildcard) {
-            $pattern = '*' . $pattern . '*';
+        // Reverter o escape dos * e ? que queremos processar
+        $pattern = str_replace(['\*', '\?'], ['*', '?'], $pattern);
+        
+        // Converter * para .* (qualquer quantidade de caracteres)
+        $pattern = str_replace('*', '.*', $pattern);
+        
+        // Converter ? para . (exatamente um caractere)
+        $pattern = str_replace('?', '.', $pattern);
+        
+        // Aplicar âncoras de início e fim apenas se o padrão não começa ou termina com *
+        $needsStartAnchor = !str_starts_with($originalPattern, '*');
+        $needsEndAnchor = !str_ends_with($originalPattern, '*');
+        
+        $finalPattern = '/';
+        if ($needsStartAnchor) {
+            $finalPattern .= '^';
         }
         
-        $pattern = preg_quote($pattern, '/');
-        $pattern = str_replace('\*', '.*', $pattern);
-        $pattern = str_replace('\?', '.', $pattern);
-        $finalPattern = '/^' . $pattern . '$/i';
+        $finalPattern .= $pattern;
+        
+        if ($needsEndAnchor) {
+            $finalPattern .= '$';
+        }
+        
+        $finalPattern .= '/i'; // case insensitive
         
         \Illuminate\Support\Facades\Log::info('CreateVisitor: Conversão de wildcard para regex', [
             'original' => $originalPattern,
-            'contains_wildcard' => $containsWildcard,
-            'pattern_modificado' => $containsWildcard ? $originalPattern : '*' . $originalPattern . '*',
-            'final' => $finalPattern
+            'final' => $finalPattern,
+            'needs_start' => $needsStartAnchor,
+            'needs_end' => $needsEndAnchor
         ]);
         
         return $finalPattern;

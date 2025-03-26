@@ -32,7 +32,7 @@ class PartialVisitorRestrictionResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Section::make('Dados do Visitante')
-                    ->description('Use * para substituir qualquer sequência de caracteres e ? para substituir um único caractere. Preencha pelo menos um dos campos: Nome, Documento ou Telefone.')
+                    ->description('Preencha pelo menos um dos campos: Nome, Documento ou Telefone. Use * (asterisco) para substituir qualquer quantidade de caracteres e ? (interrogação) para substituir um caractere único.')
                     ->schema([
                         Forms\Components\Select::make('doc_type_id')
                             ->label('Tipo de Documento')
@@ -51,20 +51,41 @@ class PartialVisitorRestrictionResource extends Resource
                         Forms\Components\TextInput::make('partial_doc')
                             ->label('Documento (Parcial)')
                             ->placeholder('Ex: 123*.4??.*56')
-                            ->helperText('Use * para qualquer sequência de caracteres e ? para um único caractere')
-                            ->nullable(),
+                            ->helperText('Exemplos: "123" = exatamente 123; "123*" = começa com 123; "*123" = termina com 123; "*123*" = contém 123')
+                            ->nullable()
+                            ->regex('/^[A-Z0-9\.\-\*\?\s]+$/')
+                            ->validationMessages([
+                                'regex' => 'Use apenas números, letras maiúsculas, pontos, traços, asteriscos (*), interrogações (?) e espaços.',
+                            ])
+                            ->dehydrateStateUsing(fn ($state) => $state ? mb_strtoupper($state) : null)
+                            ->afterStateUpdated(fn (callable $set, $state) => $set('partial_doc', $state ? mb_strtoupper($state) : null))
+                            ->extraInputAttributes(['style' => 'text-transform: uppercase;'])
+                            ->live(),
                             
                         Forms\Components\TextInput::make('partial_name')
                             ->label('Nome (Parcial)')
                             ->placeholder('Ex: JOÃO* ou *SILVA')
-                            ->helperText('Use * para qualquer sequência de caracteres e ? para um único caractere')
-                            ->nullable(),
+                            ->helperText('Exemplos: "MELO" = exatamente MELO; "MELO*" = começa com MELO; "*MELO" = termina com MELO; "*MELO*" = contém MELO')
+                            ->nullable()
+                            ->regex('/^[A-Z\.\-\'\*\?\s]+$/')
+                            ->validationMessages([
+                                'regex' => 'Use apenas letras maiúsculas, pontos, traços, apóstrofos, asteriscos (*), interrogações (?) e espaços.',
+                            ])
+                            ->dehydrateStateUsing(fn ($state) => $state ? mb_strtoupper($state) : null)
+                            ->afterStateUpdated(fn (callable $set, $state) => $set('partial_name', $state ? mb_strtoupper($state) : null))
+                            ->extraInputAttributes(['style' => 'text-transform: uppercase;'])
+                            ->live(),
                             
                         Forms\Components\TextInput::make('phone')
                             ->label('Telefone (Parcial)')
                             ->placeholder('Ex: (21)????-5678')
-                            ->helperText('Use * para qualquer sequência de caracteres e ? para um único caractere')
-                            ->nullable(),
+                            ->helperText('Exemplos: "5678" = exatamente 5678; "5678*" = começa com 5678; "*5678" = termina com 5678; ? = substitui um único caractere')
+                            ->nullable()
+                            ->regex('/^[0-9\(\)\-\+\*\?\s]+$/')
+                            ->validationMessages([
+                                'regex' => 'Use apenas números, parênteses, traços, sinal de mais, asteriscos (*), interrogações (?) e espaços.',
+                            ])
+                            ->extraInputAttributes(['style' => 'text-transform: uppercase;']),
                     ])
                     ->columns(2),
 

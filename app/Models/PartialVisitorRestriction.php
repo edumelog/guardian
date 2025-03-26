@@ -67,12 +67,47 @@ class PartialVisitorRestriction extends Model
     }
 
     /**
-     * Converte wildcards (* e ?) para o padrão SQL (% e _)
+     * Converte padrões com wildcards (* e ?) para regex seguindo as regras específicas
+     * - * (asterisco): representa qualquer quantidade de caracteres (inclusive zero)
+     * - ? (interrogação): representa exatamente um caractere
      */
-    protected static function convertWildcardsToSql(string $term): string
+    protected function patternToRegex(string $pattern): string
     {
-        $sqlTerm = str_replace(['*', '?'], ['%', '_'], $term);
-        return $sqlTerm;
+        // Escapar caracteres especiais do regex, exceto * e ?
+        $escapedPattern = preg_quote($pattern, '/');
+        
+        // Reverter o escape dos * e ? que queremos processar
+        $escapedPattern = str_replace(['\*', '\?'], ['*', '?'], $escapedPattern);
+        
+        // Converter * para .* (qualquer quantidade de caracteres)
+        $escapedPattern = str_replace('*', '.*', $escapedPattern);
+        
+        // Converter ? para . (exatamente um caractere)
+        $escapedPattern = str_replace('?', '.', $escapedPattern);
+        
+        // Aplicar âncoras de início e fim apenas se o padrão não começa ou termina com *
+        $needsStartAnchor = !str_starts_with($pattern, '*');
+        $needsEndAnchor = !str_ends_with($pattern, '*');
+        
+        $finalPattern = '/';
+        if ($needsStartAnchor) {
+            $finalPattern .= '^';
+        }
+        
+        $finalPattern .= $escapedPattern;
+        
+        if ($needsEndAnchor) {
+            $finalPattern .= '$';
+        }
+        
+        $finalPattern .= '/i'; // case insensitive
+        
+        Log::info('PartialVisitorRestriction: Conversão de wildcard para regex', [
+            'original' => $pattern,
+            'final' => $finalPattern
+        ]);
+        
+        return $finalPattern;
     }
 
     /**
@@ -89,7 +124,7 @@ class PartialVisitorRestriction extends Model
         
         // Verifica documento se especificado
         if ($matches && $this->partial_doc) {
-            $pattern = '/^' . str_replace(['*', '?'], ['.*', '.'], $this->partial_doc) . '$/i';
+            $pattern = $this->patternToRegex($this->partial_doc);
             if (!preg_match($pattern, $visitor->doc)) {
                 $matches = false;
             }
@@ -97,7 +132,7 @@ class PartialVisitorRestriction extends Model
         
         // Verifica nome se especificado
         if ($matches && $this->partial_name) {
-            $pattern = '/^' . str_replace(['*', '?'], ['.*', '.'], $this->partial_name) . '$/i';
+            $pattern = $this->patternToRegex($this->partial_name);
             if (!preg_match($pattern, $visitor->name)) {
                 $matches = false;
             }
@@ -105,11 +140,19 @@ class PartialVisitorRestriction extends Model
         
         // Verifica telefone se especificado
         if ($matches && $this->phone && $visitor->phone) {
-            $pattern = '/^' . str_replace(['*', '?'], ['.*', '.'], $this->phone) . '$/i';
+            $pattern = $this->patternToRegex($this->phone);
             if (!preg_match($pattern, $visitor->phone)) {
                 $matches = false;
             }
         }
+        
+        Log::info('PartialVisitorRestriction: Resultado da verificação', [
+            'visitor_id' => $visitor->id,
+            'visitor_name' => $visitor->name,
+            'restriction_id' => $this->id,
+            'partial_name' => $this->partial_name,
+            'matches' => $matches
+        ]);
         
         return $matches;
     }
@@ -134,5 +177,21 @@ class PartialVisitorRestriction extends Model
         ]);
         
         return $restrictions;
+    }
+
+    /**
+     * Mutator para garantir que o nome parcial seja salvo em maiúsculas
+     */
+    public function setPartialNameAttribute($value)
+    {
+        $this->attributes['partial_name'] = $value ? mb_strtoupper($value) : null;
+    }
+
+    /**
+     * Mutator para garantir que o documento parcial seja salvo em maiúsculas
+     */
+    public function setPartialDocAttribute($value)
+    {
+        $this->attributes['partial_doc'] = $value ? mb_strtoupper($value) : null;
     }
 }
