@@ -609,9 +609,9 @@ class CreateVisitor extends CreateRecord
                     ->persistent()
                     ->icon('heroicon-o-exclamation-triangle')
                     ->actions([
-                        \Filament\Notifications\Actions\Action::make('ver_detalhes')
-                            ->label('Ver Todas Restrições')
-                            ->url(route('filament.dashboard.resources.visitor-restrictions.index'))
+                        \Filament\Notifications\Actions\Action::make('Ciente')
+                            ->label('Ciente')
+                            // ->url(route('filament.dashboard.resources.visitor-restrictions.index'))
                             ->color($notificationType)
                     ])
                     ->send();
