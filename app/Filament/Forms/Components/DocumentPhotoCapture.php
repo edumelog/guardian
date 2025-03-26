@@ -29,7 +29,42 @@ class DocumentPhotoCapture extends Field
         parent::setUp();
 
         $this->dehydrateStateUsing(function ($state) {
-            if (empty($state) || !is_string($state)) return null;
+            if (empty($state)) return null;
+            
+            // Se o estado já for um nome de arquivo, verifica se o formato é correto
+            if (is_string($state) && !str_starts_with($state, 'data:image')) {
+                // Verifica se o nome do arquivo contém o lado correto
+                if (!str_contains($state, "_{$this->side}.")) {
+                    Log::warning("DocumentPhotoCapture: Nome do arquivo inconsistente com o lado", [
+                        'field' => $this->getName(),
+                        'side' => $this->side,
+                        'filename' => $state
+                    ]);
+                    
+                    // Extrai as partes do nome do arquivo
+                    $parts = explode('_', pathinfo($state, PATHINFO_FILENAME));
+                    if (count($parts) >= 3) {
+                        // Reconstrói o nome do arquivo com o lado correto
+                        $newFilename = $parts[0] . '_' . $parts[1] . '_' . $parts[2] . '_' . $this->side . '.jpg';
+                        
+                        Log::info("DocumentPhotoCapture: Corrigindo nome do arquivo para {$newFilename}");
+                        
+                        // Verifica se o arquivo existe com o novo nome
+                        if (!Storage::disk('private')->exists('visitors-photos/' . $newFilename)) {
+                            // Se não existir, copia o arquivo atual com o novo nome
+                            if (Storage::disk('private')->exists('visitors-photos/' . $state)) {
+                                $fileContent = Storage::disk('private')->get('visitors-photos/' . $state);
+                                Storage::disk('private')->put('visitors-photos/' . $newFilename, $fileContent);
+                                Log::info("DocumentPhotoCapture: Arquivo copiado para {$newFilename}");
+                            }
+                        }
+                        
+                        return $newFilename;
+                    }
+                }
+                
+                return $state;
+            }
 
             if (str_starts_with($state, 'data:image')) {
                 $docNumber = $this->getLivewire()->data['doc'] ?? null;
@@ -47,48 +82,21 @@ class DocumentPhotoCapture extends Field
                 // Cria o nome do arquivo: doc_tipo_numero_lado.jpg
                 $filename = 'doc_' . strtolower($docType->type) . '_' . $safeDocNumber . '_' . $this->side . '.jpg';
                 
+                // Verifica se o arquivo já existe
+                if (Storage::disk('private')->exists('visitors-photos/' . $filename)) {
+                    Log::info("DocumentPhotoCapture: Arquivo {$filename} já existe, usando o existente");
+                    return $filename;
+                }
+                
                 // Converte base64 para arquivo
                 $image = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $state));
                 
                 // Salva o arquivo no disco private
                 Storage::disk('private')->put('visitors-photos/' . $filename, $image);
                 
-                Log::info("DocumentPhotoCapture: Salvando foto do documento {$this->side} como {$filename}");
+                Log::info("DocumentPhotoCapture: Salvando nova foto do documento {$this->side} como {$filename}");
                 
                 return $filename;
-            }
-
-            // Se o estado não é uma imagem base64, verifica se o nome do arquivo corresponde ao lado correto
-            if (is_string($state) && !empty($state)) {
-                // Verifica se o nome do arquivo contém o lado correto
-                if (!str_contains($state, "_{$this->side}.")) {
-                    Log::warning("DocumentPhotoCapture: Nome do arquivo inconsistente com o lado", [
-                        'field' => $this->getName(),
-                        'side' => $this->side,
-                        'filename' => $state
-                    ]);
-                    
-                    // Extrai as partes do nome do arquivo
-                    $parts = explode('_', pathinfo($state, PATHINFO_FILENAME));
-                    if (count($parts) >= 3) {
-                        // Reconstrói o nome do arquivo com o lado correto
-                        $newFilename = $parts[0] . '_' . $parts[1] . '_' . $this->side . '.jpg';
-                        
-                        Log::info("DocumentPhotoCapture: Corrigindo nome do arquivo para {$newFilename}");
-                        
-                        // Verifica se o arquivo existe com o novo nome
-                        if (!Storage::disk('private')->exists('visitors-photos/' . $newFilename)) {
-                            // Se não existir, copia o arquivo atual com o novo nome
-                            if (Storage::disk('private')->exists('visitors-photos/' . $state)) {
-                                $fileContent = Storage::disk('private')->get('visitors-photos/' . $state);
-                                Storage::disk('private')->put('visitors-photos/' . $newFilename, $fileContent);
-                                Log::info("DocumentPhotoCapture: Arquivo copiado para {$newFilename}");
-                            }
-                        }
-                        
-                        return $newFilename;
-                    }
-                }
             }
 
             return $state;

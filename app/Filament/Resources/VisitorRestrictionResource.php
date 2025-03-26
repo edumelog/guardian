@@ -65,7 +65,6 @@ class VisitorRestrictionResource extends Resource
                                 Forms\Components\ViewField::make('visitor_photo')
                                     ->label('Foto')
                                     ->view('filament.forms.components.visitor-photo')
-                                    ->extraAttributes(['style' => 'aspect-ratio: 9/16; height: auto;'])
                                     ->columnSpan(1),
 
                                 Forms\Components\ViewField::make('visitor_doc_photo_front')

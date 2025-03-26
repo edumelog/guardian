@@ -518,18 +518,14 @@ class CreateVisitor extends CreateRecord
 
     protected function getFormActions(): array
     {
-        // Se não estiver mostrando todos os campos, não mostra nenhuma ação
-        if (!$this->showAllFields) {
-            return [];
-        }
-
         // Sempre mostra o botão de criar com impressão e o botão cancelar
         return [
             $this->getCreateFormAction()
                 ->label('Imprimir Credencial e Salvar')
                 ->color('success')
                 ->icon('heroicon-o-printer')
-                ->disabled(fn() => $this->visitorRestriction !== null && !$this->authorization_granted)
+                ->visible(fn () => true) // Sempre visível
+                ->disabled(fn() => ($this->visitorRestriction !== null && !$this->authorization_granted) || !$this->showAllFields)
                 ->action(function () {
                     // Verifica se há visita em andamento
                     $formData = $this->form->getState();
