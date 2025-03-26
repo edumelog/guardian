@@ -35,11 +35,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/credentials/{visitor}/pdf', [CredentialPrintController::class, 'generatePdf'])
         ->name('credential.pdf');
 
-    // Rotas para geração de códigos
-    Route::get('/codes/qr/{id}', [App\Http\Controllers\CodeGeneratorController::class, 'qrcode'])
-        ->name('qrcode');
-    Route::get('/codes/bar/{id}', [App\Http\Controllers\CodeGeneratorController::class, 'barcode'])
-        ->name('barcode');
+    // FIXME: Rotas comentadas porque o controlador CodeGeneratorController não existe
+    // Para habilitar essas rotas, crie o controlador e implemente os métodos qrcode() e barcode()
+    // Route::get('/codes/qr/{id}', [App\Http\Controllers\CodeGeneratorController::class, 'qrcode'])
+    //     ->name('qrcode');
+    // Route::get('/codes/bar/{id}', [App\Http\Controllers\CodeGeneratorController::class, 'barcode'])
+    //     ->name('barcode');
 });
 
 // Rotas para templates de impressão que não requerem autenticação

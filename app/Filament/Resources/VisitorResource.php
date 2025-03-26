@@ -37,6 +37,12 @@ use Filament\Forms\Components\Placeholder;
 use Illuminate\Database\Eloquent\Collection;
 use Filament\Notifications\Notification;
 use Filament\Support\RawJs;
+use Illuminate\Support\Facades\Auth;
+use Filament\Forms\Components\Actions\Action;
+use Illuminate\Support\Facades\Log;
+use Filament\Support\Facades\FilamentView;
+use Filament\Notifications\Actions\Action as NotificationAction;
+use Illuminate\Database\Eloquent\Model;
 
 class VisitorResource extends Resource
 {
@@ -53,6 +59,32 @@ class VisitorResource extends Resource
     protected static ?string $pluralModelLabel = 'Visitantes';
 
     protected static ?string $navigationLabel = 'Registro de Entrada';
+
+    /**
+     * Banner para mostrar restrições
+     */
+    public static function getGlobalSearchResultDetails(Model $record): array
+    {
+        return [
+            'Documento' => $record->doc,
+            'Destino' => $record->destination?->name,
+        ];
+    }
+    
+    public static function getNavigationBadge(): ?string
+    {
+        $activeCount = \App\Models\VisitorRestriction::query()
+            ->whereHas('visitor')
+            ->active()
+            ->count();
+            
+        return $activeCount > 0 ? (string) $activeCount : null;
+    }
+    
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'danger';
+    }
 
     public static function form(Form $form): Form
     {
@@ -99,9 +131,17 @@ class VisitorResource extends Resource
                                         // Busca o visitante pelo documento e tipo
                                         $visitor = \App\Models\Visitor::where('doc', $state)
                                             ->where('doc_type_id', $component->getContainer()->getParentComponent()->getState()['doc_type_id'])
+                                            ->with(['docType', 'activeRestrictions'])
                                             ->first();
                                             
-                                        
+                                        // Log para verificar se o visitante foi encontrado
+                                        \Illuminate\Support\Facades\Log::info('VisitorResource: Buscando visitante', [
+                                            'doc' => $state,
+                                            'doc_type_id' => $component->getContainer()->getParentComponent()->getState()['doc_type_id'],
+                                            'visitor_encontrado' => $visitor ? 'Sim' : 'Não',
+                                            'visitor_id' => $visitor?->id,
+                                        ]);
+
                                         if (!$visitor) {
                                             \Filament\Notifications\Notification::make()
                                                 ->warning()
@@ -193,12 +233,75 @@ class VisitorResource extends Resource
                                                 'photoData' => $photoData
                                             ]) . ");
                                         ");
-
                                         \Filament\Notifications\Notification::make()
                                             ->success()
                                             ->title('Visitante encontrado')
                                             ->body('Os dados do visitante foram preenchidos automaticamente.')
                                             ->send();
+
+                                        // Verifica se o visitante possui restrições ativas
+                                        \Illuminate\Support\Facades\Log::info('VisitorResource: Verificando restrições para visitante', [
+                                            'visitor_id' => $visitor->id,
+                                            'doc' => $visitor->doc,
+                                            'name' => $visitor->name,
+                                        ]);
+
+                                        // Verifica diretamente as restrições associadas
+                                        $activeRestrictions = \App\Models\VisitorRestriction::where('visitor_id', $visitor->id)
+                                            ->active()
+                                            ->get();
+
+                                        \Illuminate\Support\Facades\Log::info('VisitorResource: Resultado da consulta direta de restrições', [
+                                            'visitor_id' => $visitor->id,
+                                            'count' => $activeRestrictions->count(),
+                                            'restrições' => $activeRestrictions->toArray(),
+                                        ]);
+
+                                        if ($visitor->hasActiveRestrictions() || $activeRestrictions->count() > 0) {
+                                            // Obtém a restrição mais crítica
+                                            $restriction = $visitor->getMostCriticalRestrictionAttribute();
+                                            
+                                            if (!$restriction && $activeRestrictions->count() > 0) {
+                                                $restriction = $activeRestrictions->first();
+                                            }
+                                            
+                                            \Illuminate\Support\Facades\Log::info('VisitorResource: Restrição determinada', [
+                                                'restriction' => $restriction ? $restriction->toArray() : null,
+                                            ]);
+                                            
+                                            if (!$restriction) {
+                                                \Illuminate\Support\Facades\Log::error('VisitorResource: Erro ao obter restrição');
+                                                return;
+                                            }
+                                            
+                                            // Determina a cor baseada na severidade
+                                            $notificationType = match ($restriction->severity_level) {
+                                                'low' => 'success',
+                                                'medium' => 'warning',
+                                                'high' => 'danger',
+                                                default => 'warning',
+                                            };
+                                            
+                                            // Formata a data de expiração
+                                            $expiraEm = $restriction->expires_at 
+                                                ? $restriction->expires_at->format('d M Y') 
+                                                : 'Nunca';
+                                            
+                                            // Usa uma notificação do Filament
+                                            \Filament\Notifications\Notification::make()
+                                                ->$notificationType()
+                                                ->title('ALERTA: Restrição Detectada')
+                                                ->body("O visitante {$visitor->name} possui uma restrição de severidade {$restriction->severity_text}: {$restriction->reason}")
+                                                ->persistent()
+                                                ->icon('heroicon-o-exclamation-triangle')
+                                                ->actions([
+                                                    NotificationAction::make('ver_detalhes')
+                                                        ->label('Ver Todas Restrições')
+                                                        ->url(route('filament.dashboard.resources.visitor-restrictions.index'))
+                                                        ->color($notificationType)
+                                                ])
+                                                ->send();
+                                        }
                                     })
                             )
                             ->extraInputAttributes(['step' => '1', 'class' => '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none'])
