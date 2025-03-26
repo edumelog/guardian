@@ -106,7 +106,7 @@ class CreateVisitor extends CreateRecord
                                 
                                 $expirationInfo = '';
                                 if ($this->visitorRestriction->expires_at) {
-                                    $expirationInfo = "<br><br><span class='font-medium'>Expira em:</span> " . $this->visitorRestriction->expires_at->format('d/m/Y');
+                                    $expirationInfo = "<br><span class='font-medium'>Expira em:</span> " . $this->visitorRestriction->expires_at->format('d/m/Y');
                                 }
                                 
                                 return new \Illuminate\Support\HtmlString(
@@ -468,6 +468,27 @@ class CreateVisitor extends CreateRecord
                             ->columnSpanFull(),
                     ])
                     ->visible(fn (): bool => $this->showAllFields),
+                    
+                // Mensagem de aviso sobre restrição no rodapé
+                Placeholder::make('restriction_warning')
+                    ->content(function() {
+                        if (!$this->visitorRestriction) {
+                            return null;
+                        }
+                        
+                        $colorClass = match ($this->visitorRestriction->severity_level) {
+                            'low' => 'text-green-600 dark:text-success-400',
+                            'medium' => 'text-amber-600 dark:text-amber-400',
+                            'high' => 'text-red-600 dark:text-danger-400',
+                            default => 'text-gray-600 dark:text-gray-400',
+                        };
+                        
+                        return new \Illuminate\Support\HtmlString(
+                            "<p class='{$colorClass} font-medium text-sm'>Visitante com Restrição. Necessita de autorização para prosseguir.</p>"
+                        );
+                    })
+                    ->visible(fn() => $this->visitorRestriction !== null)
+                    ->columnSpanFull(),
             ]);
     }
 
@@ -489,6 +510,7 @@ class CreateVisitor extends CreateRecord
                 ->label('Imprimir Credencial e Salvar')
                 ->color('success')
                 ->icon('heroicon-o-printer')
+                ->disabled(fn() => $this->visitorRestriction !== null)
                 ->action(function () {
                     // Verifica se há visita em andamento
                     $formData = $this->form->getState();
