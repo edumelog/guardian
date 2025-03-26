@@ -91,19 +91,34 @@ class Visitor extends Model
      */
     public function hasActiveRestrictions(): bool
     {
-        $hasRestrictions = $this->activeRestrictions()->exists();
+        $hasExactRestrictions = $this->activeRestrictions()->exists();
         
-        Log::info('Visitor::hasActiveRestrictions', [
+        if ($hasExactRestrictions) {
+            Log::info('Visitor::hasActiveRestrictions - Restrições exatas encontradas', [
+                'visitor_id' => $this->id,
+                'active_restrictions_count' => $this->activeRestrictions()->count(),
+            ]);
+            
+            return true;
+        }
+        
+        // Verifica restrições parciais
+        $partialRestrictions = \App\Models\PartialVisitorRestriction::findMatchingRestrictions($this);
+        
+        $hasPartialRestrictions = $partialRestrictions->isNotEmpty();
+        
+        Log::info('Visitor::hasActiveRestrictions - Resultado final', [
             'visitor_id' => $this->id,
-            'has_restrictions' => $hasRestrictions ? 'Sim' : 'Não',
-            'active_restrictions_count' => $this->activeRestrictions()->count(),
+            'has_restrictions' => ($hasExactRestrictions || $hasPartialRestrictions) ? 'Sim' : 'Não',
+            'exact_restrictions_count' => $this->activeRestrictions()->count(),
+            'partial_restrictions_count' => $partialRestrictions->count(),
         ]);
         
-        return $hasRestrictions;
+        return $hasExactRestrictions || $hasPartialRestrictions;
     }
 
     /**
-     * Retorna a restrição mais crítica ativa
+     * Retorna a restrição mais crítica ativa (incluindo restrições parciais)
      */
     public function getMostCriticalRestrictionAttribute()
     {
@@ -113,8 +128,16 @@ class Visitor extends Model
             'low' => 1,
         ];
 
-        $restriction = $this->activeRestrictions()
-            ->get()
+        // Busca restrições exatas
+        $exactRestrictions = $this->activeRestrictions()->get();
+        
+        // Busca restrições parciais
+        $partialRestrictions = \App\Models\PartialVisitorRestriction::findMatchingRestrictions($this);
+        
+        // Combina as coleções
+        $allRestrictions = $exactRestrictions->concat($partialRestrictions);
+        
+        $restriction = $allRestrictions
             ->sortByDesc(function ($restriction) use ($severityOrder) {
                 return $severityOrder[$restriction->severity_level] ?? 0;
             })
@@ -124,6 +147,7 @@ class Visitor extends Model
             'visitor_id' => $this->id,
             'restriction_encontrada' => $restriction ? 'Sim' : 'Não',
             'restriction_id' => $restriction?->id,
+            'restriction_type' => $restriction ? (get_class($restriction) === 'App\Models\VisitorRestriction' ? 'Exata' : 'Parcial') : null,
             'severity_level' => $restriction?->severity_level,
         ]);
         

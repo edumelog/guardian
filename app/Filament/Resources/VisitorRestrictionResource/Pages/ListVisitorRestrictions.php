@@ -14,6 +14,7 @@ class ListVisitorRestrictions extends ListRecords
     {
         return [
             Actions\CreateAction::make()
+                ->label('Criar Restrição')
                 ->url(fn (): string => VisitorRestrictionResource::getUrl('create')),
         ];
     }

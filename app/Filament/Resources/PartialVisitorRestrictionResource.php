@@ -2,98 +2,90 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\VisitorRestrictionResource\Pages;
-use App\Models\VisitorRestriction;
-use App\Models\Visitor;
+use App\Filament\Resources\PartialVisitorRestrictionResource\Pages;
+use App\Models\PartialVisitorRestriction;
+use App\Models\DocType;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Filament\Support\Colors\Color;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Facades\Auth;
-use Filament\Forms\Components\Actions\Action;
-use Illuminate\Support\Facades\Log;
 
-class VisitorRestrictionResource extends Resource
+class PartialVisitorRestrictionResource extends Resource
 {
-    protected static ?string $model = VisitorRestriction::class;
+    protected static ?string $model = PartialVisitorRestriction::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-shield-exclamation';
-    protected static ?string $navigationLabel = 'Restrições';
-    protected static ?string $modelLabel = 'Restrição';
-    protected static ?string $pluralModelLabel = 'Restrições';
+    protected static ?string $navigationLabel = 'Restrições Parciais';
+    protected static ?string $modelLabel = 'Restrição Parcial';
+    protected static ?string $pluralModelLabel = 'Restrições Parciais';
     protected static ?string $navigationGroup = 'Análise de Segurança';
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\Hidden::make('visitor_id'),
-                Forms\Components\Hidden::make('visitor_photo'),
-                Forms\Components\Hidden::make('visitor_doc_photo_front'),
-                Forms\Components\Hidden::make('visitor_doc_photo_back'),
-
                 Forms\Components\Section::make('Dados do Visitante')
+                    ->description('Preencha pelo menos um dos campos: Nome, Documento ou Telefone. Use * (asterisco) para substituir qualquer quantidade de caracteres e ? (interrogação) para substituir um caractere único.')
                     ->schema([
-                        Forms\Components\TextInput::make('visitor_doc_type')
+                        Forms\Components\Select::make('doc_type_id')
                             ->label('Tipo de Documento')
-                            ->disabled()
-                            ->columnSpan(1),
-
-                        Forms\Components\TextInput::make('visitor_doc')
-                            ->label('Número do Documento')
-                            ->disabled()
-                            ->columnSpan(1),
-
-                        Forms\Components\TextInput::make('visitor_name')
-                            ->label('Nome')
-                            ->disabled()
-                            ->columnSpan(1),
-
-                        Forms\Components\TextInput::make('visitor_phone')
-                            ->label('Telefone')
-                            ->disabled()
-                            ->columnSpan(1),
-
-                        Forms\Components\Section::make()
-                            ->schema([
-                                Forms\Components\ViewField::make('visitor_photo')
-                                    ->label('Foto')
-                                    ->view('filament.forms.components.visitor-photo')
-                                    ->columnSpan(1),
-
-                                Forms\Components\ViewField::make('visitor_doc_photo_front')
-                                    ->label('Documento - Frente')
-                                    ->view('filament.forms.components.visitor-doc-photos')
-                                    ->columnSpan(1),
-
-                                Forms\Components\ViewField::make('visitor_doc_photo_back')
-                                    ->label('Documento - Verso')
-                                    ->view('filament.forms.components.visitor-doc-photos')
-                                    ->columnSpan(1),
+                            ->options(function() {
+                                // Obtém todos os tipos de documento
+                                $docTypes = DocType::all()->pluck('type', 'id')->toArray();
+                                
+                                // Adiciona a opção "Todos" no início
+                                return [null => ''] + $docTypes;
+                            })
+                            ->searchable()
+                            ->nullable()
+                            ->helperText('Selecione ou deixe em branco para todos')
+                            ->placeholder('Selecione ou deixe em branco para todos'),
+                            
+                        Forms\Components\TextInput::make('partial_doc')
+                            ->label('Documento (Parcial)')
+                            ->placeholder('Ex: 123*.4??.*56')
+                            ->helperText('Exemplos: "123" = exatamente 123; "123*" = começa com 123; "*123" = termina com 123; "*123*" = contém 123')
+                            ->nullable()
+                            ->regex('/^[A-Z0-9\.\-\*\?\s]+$/')
+                            ->validationMessages([
+                                'regex' => 'Use apenas números, letras maiúsculas, pontos, traços, asteriscos (*), interrogações (?) e espaços.',
                             ])
-                            ->columns(3)
-                            ->columnSpan('full'),
-
-                        Forms\Components\Section::make('Última Visita')
-                            ->schema([
-                                Forms\Components\TextInput::make('visitor_destination')
-                                    ->label('Local')
-                                    ->disabled()
-                                    ->columnSpan(1),
-
-                                Forms\Components\TextInput::make('visitor_last_visit')
-                                    ->label('Data e Hora')
-                                    ->disabled()
-                                    ->columnSpan(1),
+                            ->dehydrateStateUsing(fn ($state) => $state ? mb_strtoupper($state) : null)
+                            ->afterStateUpdated(fn (callable $set, $state) => $set('partial_doc', $state ? mb_strtoupper($state) : null))
+                            ->extraInputAttributes(['style' => 'text-transform: uppercase;'])
+                            ->live(),
+                            
+                        Forms\Components\TextInput::make('partial_name')
+                            ->label('Nome (Parcial)')
+                            ->placeholder('Ex: JOÃO* ou *SILVA')
+                            ->helperText('Exemplos: "MELO" = exatamente MELO; "MELO*" = começa com MELO; "*MELO" = termina com MELO; "*MELO*" = contém MELO')
+                            ->nullable()
+                            ->regex('/^[A-Z\.\-\'\*\?\s]+$/')
+                            ->validationMessages([
+                                'regex' => 'Use apenas letras maiúsculas, pontos, traços, apóstrofos, asteriscos (*), interrogações (?) e espaços.',
                             ])
-                            ->columns(2)
-                            ->columnSpan('full'),
+                            ->dehydrateStateUsing(fn ($state) => $state ? mb_strtoupper($state) : null)
+                            ->afterStateUpdated(fn (callable $set, $state) => $set('partial_name', $state ? mb_strtoupper($state) : null))
+                            ->extraInputAttributes(['style' => 'text-transform: uppercase;'])
+                            ->live(),
+                            
+                        Forms\Components\TextInput::make('phone')
+                            ->label('Telefone (Parcial)')
+                            ->placeholder('Ex: (21)????-5678')
+                            ->helperText('Exemplos: "5678" = exatamente 5678; "5678*" = começa com 5678; "*5678" = termina com 5678; ? = substitui um único caractere')
+                            ->nullable()
+                            ->regex('/^[0-9\(\)\-\+\*\?\s]+$/')
+                            ->validationMessages([
+                                'regex' => 'Use apenas números, parênteses, traços, sinal de mais, asteriscos (*), interrogações (?) e espaços.',
+                            ])
+                            ->extraInputAttributes(['style' => 'text-transform: uppercase;']),
                     ])
                     ->columns(2),
 
@@ -148,19 +140,31 @@ class VisitorRestrictionResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('name')
+                Tables\Columns\TextColumn::make('partial_name')
                     ->searchable()
                     ->sortable()
-                    ->label('Nome'),
+                    ->placeholder('Qualquer nome')
+                    ->label('Nome Parcial'),
 
-                Tables\Columns\TextColumn::make('doc')
+                Tables\Columns\TextColumn::make('partial_doc')
                     ->searchable()
                     ->sortable()
-                    ->label('Documento'),
+                    ->placeholder('Qualquer documento')
+                    ->label('Documento Parcial'),
 
                 Tables\Columns\TextColumn::make('docType.type')
                     ->sortable()
+                    ->placeholder('Todos')
+                    ->formatStateUsing(function ($state, $record) {
+                        return $record->doc_type_id ? $state : 'Todos';
+                    })
                     ->label('Tipo de Documento'),
+
+                Tables\Columns\TextColumn::make('phone')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('Qualquer telefone')
+                    ->label('Telefone'),
 
                 Tables\Columns\TextColumn::make('severity_level')
                     ->badge()
@@ -228,8 +232,8 @@ class VisitorRestrictionResource extends Resource
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->visible(fn (VisitorRestriction $record) => $record->active)
-                    ->action(fn (VisitorRestriction $record) => $record->deactivate())
+                    ->visible(fn (PartialVisitorRestriction $record) => $record->active)
+                    ->action(fn (PartialVisitorRestriction $record) => $record->deactivate())
                     ->label('Desativar'),
             ])
             ->bulkActions([
@@ -250,17 +254,15 @@ class VisitorRestrictionResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListVisitorRestrictions::route('/'),
-            'create' => Pages\CreateVisitorRestriction::route('/create'),
-            'create-new' => Pages\CreateNewVisitorRestriction::route('/create-new'),
-            'new' => Pages\NewVisitorRestriction::route('/new'),
-            'edit' => Pages\EditVisitorRestriction::route('/{record}/edit'),
+            'index' => Pages\ListPartialVisitorRestrictions::route('/'),
+            'create' => Pages\CreatePartialVisitorRestriction::route('/create'),
+            'edit' => Pages\EditPartialVisitorRestriction::route('/{record}/edit'),
         ];
     }
-
+    
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['visitor', 'docType', 'creator']);
+            ->with(['docType', 'creator']);
     }
 }
