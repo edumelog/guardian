@@ -9,7 +9,11 @@
 @endphp
 
 @if ($state && is_string($state))
-    <img src="{{ route('visitor.photo', ['filename' => $state]) }}" class="w-32 h-32 object-cover rounded-lg">
+    <div class="w-48 h-64 mx-auto">
+        <img src="{{ route('visitor.photo', ['filename' => $state]) }}" class="w-full h-full object-cover rounded-lg" alt="Foto do Visitante">
+    </div>
 @else
-    <div class="text-gray-500">Sem foto</div>
+    <div class="w-48 h-64 mx-auto flex items-center justify-center bg-gray-100 border-2 border-gray-200 rounded-lg">
+        <div class="text-gray-500">Sem foto</div>
+    </div>
 @endif 
