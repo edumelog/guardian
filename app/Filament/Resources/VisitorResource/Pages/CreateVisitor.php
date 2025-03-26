@@ -28,10 +28,14 @@ class CreateVisitor extends CreateRecord
     protected static string $resource = VisitorResource::class;
 
     public bool $showAllFields = false;
+    public $visitorRestriction = null; // Nova propriedade para armazenar a restrição
 
     public function mount(): void
     {
         parent::mount();
+        
+        // Reinicia a propriedade visitorRestriction
+        $this->visitorRestriction = null;
         
         // Verifica se há parâmetros na URL para preencher o formulário
         $doc = request()->query('doc');
@@ -62,6 +66,59 @@ class CreateVisitor extends CreateRecord
             ->schema([
                 Section::make('Informações do Visitante')
                     ->schema([
+                        // Campo de alerta de restrição que aparece apenas quando há uma restrição
+                        Placeholder::make('restriction_alert')
+                            ->label(function () {
+                                if (!$this->visitorRestriction) {
+                                    return 'ALERTA: Restrição Detectada';
+                                }
+                                
+                                $severityText = match ($this->visitorRestriction->severity_level) {
+                                    'low' => 'Baixa',
+                                    'medium' => 'Média',
+                                    'high' => 'Alta',
+                                    default => 'Desconhecida',
+                                };
+                                
+                                // Define a cor do label baseada na severidade
+                                $colorClass = match ($this->visitorRestriction->severity_level) {
+                                    'low' => 'text-green-600 dark:text-success-400 font-bold',
+                                    'medium' => 'text-amber-600 dark:text-warning-400 font-bold',
+                                    'high' => 'text-red-600 dark:text-danger-400 font-bold',
+                                    default => 'text-warning-600 dark:text-warning-400 font-bold',
+                                };
+                                return new \Illuminate\Support\HtmlString(
+                                    "<span class='{$colorClass}'>ALERTA: Restrição de Severidade {$severityText}</span>"
+                                );
+                            })
+                            ->content(function () {
+                                if (!$this->visitorRestriction) {
+                                    return null;
+                                }
+                                
+                                // Determina a cor do texto baseada na severidade
+                                $colorClass = match ($this->visitorRestriction->severity_level) {
+                                    'low' => 'text-green-600 dark:text-success-400',
+                                    'medium' => 'text-amber-600 dark:text-warning-400',
+                                    'high' => 'text-red-600 dark:text-danger-400',
+                                    default => 'text-graywarning-600 dark:text-warning-400',
+                                };
+                                
+                                $expirationInfo = '';
+                                if ($this->visitorRestriction->expires_at) {
+                                    $expirationInfo = "<br><br><span class='font-medium'>Expira em:</span> " . $this->visitorRestriction->expires_at->format('d/m/Y');
+                                }
+                                
+                                return new \Illuminate\Support\HtmlString(
+                                    "<div class='p-4 rounded-lg border-2 {$colorClass}' style='border-color: currentColor;'>
+                                        <p class='mt-2 text-red-500'>{$this->visitorRestriction->reason}</p>
+                                        {$expirationInfo}
+                                    </div>"
+                                );
+                            })
+                            ->visible(fn () => $this->visitorRestriction !== null)
+                            ->columnSpanFull(),
+
                         Select::make('doc_type_id')
                             ->label('Tipo de Documento')
                             ->relationship('docType', 'type')
@@ -601,20 +658,23 @@ class CreateVisitor extends CreateRecord
                     default => 'warning',
                 };
 
+                // Armazena a restrição na propriedade do componente
+                $this->visitorRestriction = $restriction;
+                
                 // Usa uma notificação do Filament
-                \Filament\Notifications\Notification::make()
-                    ->$notificationType()
-                    ->title('ALERTA: Restrição Detectada')
-                    ->body("O visitante {$visitor->name} possui uma restrição de severidade {$restriction->severity_text}: {$restriction->reason}")
-                    ->persistent()
-                    ->icon('heroicon-o-exclamation-triangle')
-                    ->actions([
-                        \Filament\Notifications\Actions\Action::make('Ciente')
-                            ->label('Ciente')
-                            // ->url(route('filament.dashboard.resources.visitor-restrictions.index'))
-                            ->color($notificationType)
-                    ])
-                    ->send();
+                // \Filament\Notifications\Notification::make()
+                //     ->$notificationType()
+                //     ->title('ALERTA: Restrição Detectada')
+                //     ->body("O visitante {$visitor->name} possui uma restrição de severidade {$restriction->severity_text}: {$restriction->reason}")
+                //     ->persistent()
+                //     ->icon('heroicon-o-exclamation-triangle')
+                //     ->actions([
+                //         \Filament\Notifications\Actions\Action::make('Ciente')
+                //             ->label('Ciente')
+                //             // ->url(route('filament.dashboard.resources.visitor-restrictions.index'))
+                //             ->color($notificationType)
+                //     ])
+                //     ->send();
             }
         }
 
