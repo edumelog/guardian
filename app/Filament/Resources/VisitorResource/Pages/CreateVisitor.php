@@ -22,6 +22,7 @@ use Filament\Notifications\Notification;
 use Filament\Forms\Components\Grid;
 use Filament\Support\RawJs;
 use App\Models\Visitor;
+use App\Models\PartialVisitorRestriction;
 
 class CreateVisitor extends CreateRecord
 {
@@ -521,7 +522,7 @@ class CreateVisitor extends CreateRecord
         // Sempre mostra o botão de criar com impressão e o botão cancelar
         return [
             $this->getCreateFormAction()
-                ->label('Imprimir Credencial e Salvar')
+                ->label('Salvar dados do Visitante')
                 ->color('success')
                 ->icon('heroicon-o-printer')
                 ->visible(fn () => true) // Sempre visível
@@ -551,7 +552,13 @@ class CreateVisitor extends CreateRecord
                         }
                     }
 
-                    $this->create();
+                    // Verifica restrições parciais antes de salvar
+                    $this->checkPartialRestrictions($formData);
+                    
+                    // Se não houver restrições parciais ou já foram autorizadas, cria o visitante
+                    if (!$this->visitorRestriction || $this->authorization_granted) {
+                        $this->create();
+                    }
                 }),
 
             Actions\Action::make('authorize_restriction')
@@ -567,13 +574,26 @@ class CreateVisitor extends CreateRecord
                         $restrictionInfo = "Restrição: {$this->visitorRestriction->reason}";
                         
                         if ($this->visitorRestriction->expires_at) {
-                            $expirationInfo = "Expira em: " . $this->visitorRestriction->expires_at->format('d/m/Y');
+                            $expirationInfo = "Expira em: " . (is_object($this->visitorRestriction->expires_at) ? 
+                                $this->visitorRestriction->expires_at->format('d/m/Y') : 
+                                date('d/m/Y', strtotime($this->visitorRestriction->expires_at)));
                         }
                     }
                     
                     return [
                         \Filament\Forms\Components\Section::make('Detalhes da Restrição')
                             ->schema([
+                                \Filament\Forms\Components\Placeholder::make('restriction_type')
+                                    ->label('Tipo de Restrição')
+                                    ->content(function () {
+                                        if (!$this->visitorRestriction) {
+                                            return '-';
+                                        }
+                                        
+                                        $isPartial = isset($this->visitorRestriction->is_partial) && $this->visitorRestriction->is_partial;
+                                        return $isPartial ? 'Restrição Parcial' : 'Restrição de Visitante';
+                                    }),
+                                    
                                 \Filament\Forms\Components\Placeholder::make('severity_level')
                                     ->label('Nível de Severidade')
                                     ->content(function () {
@@ -634,7 +654,9 @@ class CreateVisitor extends CreateRecord
                                         };
 
                                         $expirationText = $this->visitorRestriction->expires_at 
-                                            ? $this->visitorRestriction->expires_at->format('d/m/Y')
+                                            ? (is_object($this->visitorRestriction->expires_at) ? 
+                                                $this->visitorRestriction->expires_at->format('d/m/Y') : 
+                                                date('d/m/Y', strtotime($this->visitorRestriction->expires_at)))
                                             : 'Sem data de expiração';
 
                                         return new \Illuminate\Support\HtmlString(
@@ -829,12 +851,10 @@ class CreateVisitor extends CreateRecord
             'name' => $visitor->name,
         ]);
 
-        // Verifica diretamente as restrições associadas
-        $activeRestrictions = \App\Models\VisitorRestriction::where('visitor_id', $visitor->id)
-            ->active()
-            ->get();
+        // Verifica restrições usando o relacionamento
+        $activeRestrictions = $visitor->activeRestrictions()->get();
 
-        \Illuminate\Support\Facades\Log::info('CreateVisitor: Resultado da consulta direta de restrições', [
+        \Illuminate\Support\Facades\Log::info('CreateVisitor: Resultado da consulta de restrições', [
             'visitor_id' => $visitor->id,
             'count' => $activeRestrictions->count(),
             'restrições' => $activeRestrictions->toArray(),
@@ -1005,6 +1025,26 @@ class CreateVisitor extends CreateRecord
             return $data;
         }
 
+        // Verifica restrições parciais (garantindo que seja verificado aqui também)
+        if (!$this->visitorRestriction) {
+            \Illuminate\Support\Facades\Log::info('CreateVisitor: Verificando restrições parciais no mutateFormDataBeforeCreate');
+            $this->checkPartialRestrictions($formData);
+            
+            // Se encontrou uma restrição e não está autorizada, interrompe o processo
+            if ($this->visitorRestriction && !$this->authorization_granted) {
+                \Illuminate\Support\Facades\Log::warning('CreateVisitor: Restrição parcial encontrada e não autorizada - interrompendo criação');
+                
+                Notification::make()
+                    ->warning()
+                    ->title('Restrição Detectada')
+                    ->body('Este visitante possui uma restrição que precisa ser autorizada antes de prosseguir.')
+                    ->send();
+                    
+                $this->halt();
+                return $data;
+            }
+        }
+
         // Verifica se o destino está ativo
         $destination = \App\Models\Destination::find($destinationId);
         if (!$destination || !$destination->is_active) {
@@ -1097,5 +1137,237 @@ class CreateVisitor extends CreateRecord
 
         // Redireciona para a página de edição
         $this->redirect($this->getResource()::getUrl('edit', ['record' => $this->record]));
+    }
+
+    /**
+     * Verifica se existem restrições parciais que se aplicam ao visitante
+     */
+    protected function checkPartialRestrictions(array $formData): void
+    {
+        // Se já há uma restrição específica de visitante, não precisa verificar parciais
+        if ($this->visitorRestriction !== null) {
+            \Illuminate\Support\Facades\Log::warning('CreateVisitor: Verificação de restrições parciais interrompida - já existe uma restrição ativa', [
+                'current_restriction' => $this->visitorRestriction
+            ]);
+            return;
+        }
+        
+        \Illuminate\Support\Facades\Log::info('CreateVisitor: Iniciando verificação de restrições parciais', [
+            'doc' => $formData['doc'] ?? null,
+            'name' => mb_strtoupper($formData['name'] ?? ''),
+            'phone' => $formData['phone'] ?? null,
+            'doc_type_id' => $formData['doc_type_id'] ?? null
+        ]);
+        
+        // Busca restrições parciais ativas na tabela correta
+        $query = \App\Models\PartialVisitorRestriction::query()
+            ->where('active', true)
+            ->where(function ($query) {
+                // Restrições sem data de expiração ou com data futura
+                $query->whereNull('expires_at')
+                    ->orWhere('expires_at', '>', now());
+            });
+            
+        // Log da consulta SQL
+        \Illuminate\Support\Facades\Log::info('CreateVisitor: Query de restrições parciais', [
+            'sql' => $query->toSql(),
+            'bindings' => $query->getBindings(),
+            'class' => get_class($query->getModel())
+        ]);
+            
+        $partialRestrictions = $query->get();
+            
+        \Illuminate\Support\Facades\Log::info('CreateVisitor: Restrições parciais encontradas no banco', [
+            'total' => $partialRestrictions->count(),
+            'restricoes' => $partialRestrictions->map(function($r) {
+                return [
+                    'id' => $r->id,
+                    'doc_type_id' => $r->doc_type_id,
+                    'partial_doc' => $r->partial_doc,
+                    'partial_name' => $r->partial_name,
+                    'phone' => $r->phone,
+                    'active' => $r->active,
+                    'expires_at' => $r->expires_at,
+                    'severity_level' => $r->severity_level
+                ];
+            })->toArray()
+        ]);
+            
+        if ($partialRestrictions->isEmpty()) {
+            \Illuminate\Support\Facades\Log::info('CreateVisitor: Nenhuma restrição parcial ativa encontrada');
+            return;
+        }
+        
+        // Valores do visitante para comparação (convertendo para uppercase para garantir case-insensitive)
+        $visitorDoc = $formData['doc'] ?? '';
+        $visitorName = mb_strtoupper($formData['name'] ?? '');
+        $visitorPhone = $formData['phone'] ?? '';
+        $visitorDocTypeId = $formData['doc_type_id'] ?? null;
+        
+        \Illuminate\Support\Facades\Log::info('CreateVisitor: Dados normalizados do visitante para comparação', [
+            'visitorDoc' => $visitorDoc,
+            'visitorName' => $visitorName,
+            'visitorPhone' => $visitorPhone,
+            'visitorDocTypeId' => $visitorDocTypeId
+        ]);
+        
+        foreach ($partialRestrictions as $restriction) {
+            $matches = false;
+            $matchReason = [];
+            
+            // Normaliza os valores da restrição para comparação (uppercase)
+            $restrictionDoc = $restriction->partial_doc;
+            $restrictionName = mb_strtoupper($restriction->partial_name ?? '');
+            $restrictionPhone = $restriction->phone;
+            
+            \Illuminate\Support\Facades\Log::info('CreateVisitor: Analisando restrição', [
+                'restriction_id' => $restriction->id,
+                'doc_type_id' => $restriction->doc_type_id,
+                'partial_doc' => $restrictionDoc,
+                'partial_name' => $restrictionName,
+                'phone' => $restrictionPhone
+            ]);
+            
+            // Verifica se o tipo de documento corresponde (ou é nulo = qualquer tipo)
+            if ($restriction->doc_type_id !== null && $restriction->doc_type_id != $visitorDocTypeId) {
+                \Illuminate\Support\Facades\Log::info('CreateVisitor: Restrição ignorada - tipo de documento não corresponde', [
+                    'restriction_doc_type' => $restriction->doc_type_id,
+                    'visitor_doc_type' => $visitorDocTypeId
+                ]);
+                continue;
+            }
+            
+            // Verifica documento com pattern matching
+            if ($restrictionDoc && $visitorDoc) {
+                $pattern = $this->wildcardToRegex($restrictionDoc);
+                \Illuminate\Support\Facades\Log::info('CreateVisitor: Verificando documento', [
+                    'pattern' => $pattern,
+                    'visitorDoc' => $visitorDoc
+                ]);
+                if (preg_match($pattern, $visitorDoc)) {
+                    $matches = true;
+                    $matchReason[] = 'documento';
+                    \Illuminate\Support\Facades\Log::info('CreateVisitor: Match no documento');
+                }
+            }
+            
+            // Verifica nome com pattern matching
+            if ($restrictionName && $visitorName) {
+                $pattern = $this->wildcardToRegex($restrictionName);
+                \Illuminate\Support\Facades\Log::info('CreateVisitor: Verificando nome', [
+                    'pattern' => $pattern,
+                    'visitorName' => $visitorName
+                ]);
+                if (preg_match($pattern, $visitorName)) {
+                    $matches = true;
+                    $matchReason[] = 'nome';
+                    \Illuminate\Support\Facades\Log::info('CreateVisitor: Match no nome');
+                }
+            }
+            
+            // Verifica telefone com pattern matching
+            if ($restrictionPhone && $visitorPhone) {
+                $pattern = $this->wildcardToRegex($restrictionPhone);
+                \Illuminate\Support\Facades\Log::info('CreateVisitor: Verificando telefone', [
+                    'pattern' => $pattern,
+                    'visitorPhone' => $visitorPhone
+                ]);
+                if (preg_match($pattern, $visitorPhone)) {
+                    $matches = true;
+                    $matchReason[] = 'telefone';
+                    \Illuminate\Support\Facades\Log::info('CreateVisitor: Match no telefone');
+                }
+            }
+            
+            // Comparação direta para debug
+            if ($restrictionName && $visitorName) {
+                \Illuminate\Support\Facades\Log::info('CreateVisitor: Comparação direta de nomes', [
+                    'restrictionName' => $restrictionName,
+                    'visitorName' => $visitorName,
+                    'são_iguais' => $restrictionName === $visitorName,
+                    'strpos' => strpos($visitorName, $restrictionName) !== false
+                ]);
+            }
+            
+            // Se corresponder a qualquer critério, define a restrição
+            if ($matches) {
+                \Illuminate\Support\Facades\Log::warning('CreateVisitor: Restrição parcial encontrada', [
+                    'restriction_id' => $restriction->id,
+                    'match_fields' => $matchReason,
+                    'partial_doc' => $restriction->partial_doc,
+                    'partial_name' => $restriction->partial_name,
+                    'phone' => $restriction->phone,
+                    'severity_level' => $restriction->severity_level,
+                ]);
+                
+                // Convertemos a restrição parcial em um formato compatível com VisitorRestriction
+                // para reutilizar a lógica existente de autorização
+                $this->visitorRestriction = (object) [
+                    'id' => $restriction->id,
+                    'reason' => $restriction->reason,
+                    'severity_level' => $restriction->severity_level,
+                    'expires_at' => $restriction->expires_at,
+                    'is_partial' => true, // Marcador para identificar que é uma restrição parcial
+                    // Campos adicionais que podem ser úteis
+                    'partial_doc' => $restriction->partial_doc,
+                    'partial_name' => $restriction->partial_name,
+                    'phone' => $restriction->phone,
+                ];
+                
+                // Determina o tipo de notificação baseado na severidade
+                $notificationType = match ($restriction->severity_level) {
+                    'low' => 'success',
+                    'medium' => 'warning',
+                    'high' => 'danger',
+                    default => 'warning',
+                };
+                
+                // \Filament\Notifications\Notification::make()
+                //     ->$notificationType()
+                //     ->title('ALERTA: Restrição Parcial Detectada')
+                //     ->body("Detecção de restrição parcial: {$restriction->reason}")
+                //     ->persistent()
+                //     ->icon('heroicon-o-exclamation-triangle')
+                //     ->send();
+                
+                break;
+            } else {
+                \Illuminate\Support\Facades\Log::info('CreateVisitor: Nenhum match encontrado para esta restrição');
+            }
+        }
+        
+        if (!$this->visitorRestriction) {
+            \Illuminate\Support\Facades\Log::info('CreateVisitor: Nenhuma restrição parcial aplicável encontrada');
+        }
+    }
+    
+    /**
+     * Converte padrões com wildcards (* e ?) para regex
+     */
+    protected function wildcardToRegex(string $pattern): string
+    {
+        $originalPattern = $pattern;
+        
+        // Se o padrão não contém wildcards, tratamos como uma correspondência parcial
+        $containsWildcard = str_contains($pattern, '*') || str_contains($pattern, '?');
+        
+        // Se não contém wildcard, consideramos como substring (equivalente a *TEXTO*)
+        if (!$containsWildcard) {
+            $pattern = '*' . $pattern . '*';
+        }
+        
+        $pattern = preg_quote($pattern, '/');
+        $pattern = str_replace('\*', '.*', $pattern);
+        $pattern = str_replace('\?', '.', $pattern);
+        $finalPattern = '/^' . $pattern . '$/i';
+        
+        \Illuminate\Support\Facades\Log::info('CreateVisitor: Conversão de wildcard para regex', [
+            'original' => $originalPattern,
+            'contains_wildcard' => $containsWildcard,
+            'pattern_modificado' => $containsWildcard ? $originalPattern : '*' . $originalPattern . '*',
+            'final' => $finalPattern
+        ]);
+        
+        return $finalPattern;
     }
 }
