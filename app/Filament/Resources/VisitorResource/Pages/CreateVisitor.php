@@ -2,31 +2,34 @@
 
 namespace App\Filament\Resources\VisitorResource\Pages;
 
-use App\Filament\Resources\VisitorResource;
 use Filament\Actions;
-use Filament\Resources\Pages\CreateRecord;
-use Filament\Forms\Components\Section;
+use App\Models\Visitor;
+use Filament\Forms\Get;
 use Filament\Forms\Form;
+use Filament\Support\RawJs;
+use Filament\Forms\Components\Grid;
+use Filament\Forms\Components\View;
+use Filament\Support\Enums\MaxWidth;
+use Illuminate\Support\Facades\Auth;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Actions\Action;
+use Filament\Notifications\Notification;
+use App\Models\PartialVisitorRestriction;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Placeholder;
+use Filament\Resources\Pages\CreateRecord;
+use App\Filament\Resources\VisitorResource;
+use Filament\Forms\Components\Actions\Action;
 use App\Filament\Forms\Components\WebcamCapture;
 use App\Filament\Forms\Components\DocumentPhotoCapture;
-use Filament\Forms\Get;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\View;
-use Illuminate\Support\Facades\Auth;
-use Filament\Notifications\Notification;
-use Filament\Forms\Components\Grid;
-use Filament\Support\RawJs;
-use App\Models\Visitor;
-use App\Models\PartialVisitorRestriction;
 
 class CreateVisitor extends CreateRecord
 {
     protected static string $resource = VisitorResource::class;
+
+    // protected ?string $maxContentWidth = MaxWidth::Full->value;
 
     public bool $showAllFields = false;
     public $visitorRestriction = null; // Nova propriedade para armazenar a restrição
@@ -442,7 +445,7 @@ class CreateVisitor extends CreateRecord
                                         ->warning()
                                         ->title('Limite de visitantes atingido')
                                         ->body("O destino {$destination->name} atingiu o limite de {$maxVisitors} visitantes.")
-                                        ->persistent()
+                                        // ->persistent()
                                         ->send();
                                 } elseif ($occupancyRate >= 50 && $occupancyRate < 80) {
                                     // Laranja entre 50% e 80%
@@ -546,7 +549,7 @@ class CreateVisitor extends CreateRecord
                                 ->warning()
                                 ->title('Visita em Andamento')
                                 ->body("Este visitante já possui uma visita em andamento.")
-                                ->persistent()
+                                // ->persistent()
                                 ->send();
                             return;
                         }
@@ -916,7 +919,7 @@ class CreateVisitor extends CreateRecord
                 ->warning()
                 ->title('Visita em Andamento')
                 ->body("Este visitante já possui uma visita em andamento no local: {$lastVisit->destination->name}")
-                ->persistent()
+                // ->persistent()
                 ->actions([
                     \Filament\Notifications\Actions\Action::make('view')
                         ->label('Ver Detalhes')
@@ -1065,7 +1068,7 @@ class CreateVisitor extends CreateRecord
                     ->danger()
                     ->title('Limite de visitantes atingido')
                     ->body("O destino {$destination->name} atingiu o limite de {$destination->max_visitors} visitantes.")
-                    ->persistent()
+                    // ->persistent()
                     ->send();
                 $this->halt();
                 return $data;
