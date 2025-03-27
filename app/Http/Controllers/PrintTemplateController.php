@@ -319,18 +319,67 @@ class PrintTemplateController extends Controller
                 continue;
             }
 
+            // Verifica se a imagem tem alguma classe tpl-
+            $class = $img->getAttribute('class');
+            if ($class && preg_match('/\btpl-/', $class)) {
+                Log::info('Imagem com classe tpl-, mantendo caminho relativo:', [
+                    'src' => $src,
+                    'class' => $class
+                ]);
+                continue;
+            }
+
             try {
                 // Remove parâmetros de URL se existirem
                 $src = preg_replace('/\?.*$/', '', $src);
                 
-                // Log do caminho original da imagem
-                Log::info('Mantendo caminho original da imagem:', [
-                    'src' => $src
+                // Determina o caminho completo da imagem
+                $imagePath = '';
+                
+                // Verifica se o caminho é absoluto ou relativo
+                if (strpos($src, '/') === 0) {
+                    // Caminho absoluto, tentar encontrar dentro do diretório de extração
+                    $imagePath = $extractPath . $src;
+                } else {
+                    // Caminho relativo, combinar com diretório HTML atual
+                    $imagePath = rtrim($htmlDir, '/') . '/' . $src;
+                }
+                
+                Log::info('Convertendo imagem para base64:', [
+                    'src' => $src,
+                    'imagePath' => $imagePath
                 ]);
+                
+                if (File::exists($imagePath)) {
+                    // Lê o conteúdo da imagem
+                    $imageContent = File::get($imagePath);
+                    
+                    // Detecta o tipo MIME
+                    $mime = mime_content_type($imagePath);
+                    
+                    // Converte para base64
+                    $base64 = base64_encode($imageContent);
+                    $dataUri = "data:{$mime};base64,{$base64}";
+                    
+                    // Define o novo src
+                    $img->setAttribute('src', $dataUri);
+                    
+                    Log::info('Imagem convertida para base64 com sucesso', [
+                        'original_src' => $src,
+                        'mime' => $mime,
+                        'size' => strlen($base64)
+                    ]);
+                } else {
+                    Log::warning('Arquivo de imagem não encontrado:', [
+                        'src' => $src,
+                        'imagePath' => $imagePath
+                    ]);
+                }
             } catch (\Exception $e) {
                 Log::error('Erro ao processar imagem:', [
                     'src' => $src,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
                 ]);
             }
         }
