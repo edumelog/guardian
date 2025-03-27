@@ -141,6 +141,13 @@ document.addEventListener('alpine:init', () => {
                     throw new Error('Nenhum template configurado. Configure um template primeiro.');
                 }
 
+                // Validação das dimensões da página
+                if (!parsedConfig.printOptions || 
+                    !parsedConfig.printOptions.pageWidth || 
+                    !parsedConfig.printOptions.pageHeight) {
+                    throw new Error('Dimensões da página não configuradas. Configure o tamanho da etiqueta nas configurações da impressora.');
+                }
+
                 console.log('Template configurado:', parsedConfig.template);
 
                 // Carrega o template
@@ -163,9 +170,9 @@ document.addEventListener('alpine:init', () => {
                     flavor: 'plain',
                     data: templateHtml,
                     options: {
-                        pageWidth: '80mm',  // Largura padrão
-                        pageHeight: '120mm', // Altura estimada
-                        margins: { top: '5mm', right: '5mm', bottom: '5mm', left: '5mm' }
+                        pageWidth: parsedConfig.printOptions.pageWidth + 'mm',
+                        pageHeight: parsedConfig.printOptions.pageHeight + 'mm',
+                        margins: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' }
                     }
                 }];
 

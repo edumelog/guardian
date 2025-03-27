@@ -307,10 +307,10 @@ class CreateVisitor extends CreateRecord
 
                         Grid::make(2)
                             ->schema([
-                                TextInput::make('name')
-                                    ->label('Nome')
-                                    ->required()
-                                    ->maxLength(255)
+                        TextInput::make('name')
+                            ->label('Nome')
+                            ->required()
+                            ->maxLength(255)
                                     ->visible(fn (Get $get): bool => $this->showAllFields)
                                     ->disabled(function (Get $get) {
                                         // Se já existir um visitante com este documento, desabilita o campo
@@ -560,7 +560,7 @@ class CreateVisitor extends CreateRecord
                     
                     // Se não houver restrições parciais ou já foram autorizadas, cria o visitante
                     if (!$this->visitorRestriction || $this->authorization_granted) {
-                        $this->create();
+                    $this->create();
                     }
                 }),
 
