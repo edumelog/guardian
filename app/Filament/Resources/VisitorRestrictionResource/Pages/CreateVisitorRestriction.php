@@ -12,6 +12,9 @@ class CreateVisitorRestriction extends ListRecords
 {
     protected static string $resource = VisitorRestrictionResource::class;
 
+    // Set the page title
+    protected static ?string $title = 'Criar Restrição';
+
     public function table(Table $table): Table
     {
         return $table
@@ -20,7 +23,9 @@ class CreateVisitorRestriction extends ListRecords
                 Tables\Columns\ImageColumn::make('photo')
                     ->label('Foto')
                     ->circular()
-                    ->url(fn (Visitor $record) => route('visitor.photo', ['filename' => $record->photo]))
+                    ->getStateUsing(fn (Visitor $record): ?string => 
+                        $record->photo ? route('visitor.photo', ['filename' => $record->photo]) : null
+                    )
                     ->openUrlInNewTab(),
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nome')
@@ -64,6 +69,15 @@ class CreateVisitorRestriction extends ListRecords
             ])
             ->bulkActions([])
             ->paginated([10, 25, 50])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc')
+            ->recordUrl(null);
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [
+            route('filament.dashboard.resources.visitor-restrictions.index') => 'Restrições',
+            '#' => 'Criar',
+        ];
     }
 }

@@ -462,11 +462,12 @@ class VisitorResource extends Resource
                     ->hiddenOn('edit'),
 
                 Forms\Components\Section::make('Histórico de Visitas')
-                    ->description('Clique para expandir/recolher o histórico')
+                    ->description(new HtmlString('<span style="color: #2563eb !important;">Clique aqui para expandir/recolher o histórico</span>'))
                     ->collapsible()
                     ->collapsed()
                     ->schema([
                         Forms\Components\Placeholder::make('visit_history')
+                            ->label('')
                             ->content(function ($record) {
                                 if (!$record) return 'Nenhuma visita registrada';
 
