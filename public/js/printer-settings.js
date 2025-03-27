@@ -14,12 +14,12 @@ document.addEventListener('alpine:init', () => {
         hasChanges: false,
         
         // Configurações de tamanho da etiqueta
-        pageWidth: '100',
-        pageHeight: '65',
-        marginTop: '5',
-        marginRight: '5',
-        marginBottom: '5',
-        marginLeft: '5',
+        pageWidth: '',
+        pageHeight: '',
+        marginTop: '0',
+        marginRight: '0',
+        marginBottom: '0',
+        marginLeft: '0',
         units: 'mm', // Unidade de medida fixa em milímetros (mm)
         
         // Parâmetros adicionais de impressão (não exibidos na interface)
@@ -381,11 +381,11 @@ document.addEventListener('alpine:init', () => {
                 if (!selectedTemplate) {
                     throw new Error('Selecione um template');
                 }
-                if (isNaN(pageWidth) || pageWidth <= 0) {
-                    throw new Error('Largura da etiqueta inválida');
+                if (!this.pageWidth || isNaN(pageWidth) || pageWidth <= 0) {
+                    throw new Error('Largura da etiqueta é obrigatória e deve ser maior que zero');
                 }
-                if (isNaN(pageHeight) || pageHeight <= 0) {
-                    throw new Error('Altura da etiqueta inválida');
+                if (!this.pageHeight || isNaN(pageHeight) || pageHeight <= 0) {
+                    throw new Error('Altura da etiqueta é obrigatória e deve ser maior que zero');
                 }
 
                 // Monta o objeto de configuração
