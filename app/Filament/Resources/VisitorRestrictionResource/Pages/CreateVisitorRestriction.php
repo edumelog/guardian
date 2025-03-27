@@ -12,6 +12,9 @@ class CreateVisitorRestriction extends ListRecords
 {
     protected static string $resource = VisitorRestrictionResource::class;
 
+    // Set the page title
+    protected static ?string $title = 'Criar Restrição';
+
     public function table(Table $table): Table
     {
         return $table
@@ -68,5 +71,13 @@ class CreateVisitorRestriction extends ListRecords
             ->paginated([10, 25, 50])
             ->defaultSort('created_at', 'desc')
             ->recordUrl(null);
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [
+            route('filament.dashboard.resources.visitor-restrictions.index') => 'Restrições',
+            '#' => 'Criar',
+        ];
     }
 }
