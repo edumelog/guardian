@@ -3,6 +3,7 @@ document.addEventListener('alpine:init', () => {
         printers: [],
         selectedPrinter: null,
         orientation: null,
+        rotation: '0',
         loading: true,
         error: null,
         connected: false,
@@ -55,6 +56,9 @@ document.addEventListener('alpine:init', () => {
                         savedPrinter = config.printer;
                         
                         this.orientation = config.orientation || 'portrait';
+                        
+                        // Carrega a rotação (novo campo)
+                        this.rotation = config.rotation || '0';
                         
                         // Não define o selectedTemplate aqui, será definido após carregar a lista de templates
                         // para garantir que o template selecionado existe
@@ -156,6 +160,7 @@ document.addEventListener('alpine:init', () => {
                 // Observa mudanças nos campos
                 this.$watch('selectedPrinter', () => this.hasChanges = true);
                 this.$watch('orientation', () => this.hasChanges = true);
+                this.$watch('rotation', () => this.hasChanges = true);
                 this.$watch('selectedTemplate', () => this.hasChanges = true);
                 this.$watch('pageWidth', () => this.hasChanges = true);
                 this.$watch('pageHeight', () => this.hasChanges = true);
@@ -393,6 +398,7 @@ document.addEventListener('alpine:init', () => {
                     printer: this.selectedPrinter,
                     template: this.selectedTemplate,
                     orientation: this.orientation,
+                    rotation: this.rotation,
                     printOptions: {
                         pageWidth: parseFloat(this.pageWidth),
                         pageHeight: parseFloat(this.pageHeight),
