@@ -146,7 +146,7 @@ window.printVisitorCredential = async function(visitor) {
             units: 'mm',
             orientation: print_config.options.orientation || 'portrait',
             // Configurações para melhor qualidade
-            scaleContent: print_config.options.scaleContent !== undefined ? print_config.options.scaleContent : false,
+            scaleContent: print_config.options.scaleContent !== undefined ? print_config.options.scaleContent : true,
             rasterize: true,
             interpolation: 'bicubic',
             density: 'best',
