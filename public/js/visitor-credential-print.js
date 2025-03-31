@@ -117,11 +117,11 @@ window.printVisitorCredential = async function(visitor) {
             data: pdf_base64,
             options: {
                 // Força as dimensões exatas em milímetros
-                size: {
-                    width: print_config.options.size.width,
-                    height: print_config.options.size.height,
-                    units: 'mm'
-                },
+                // size: {
+                //     width: print_config.options.size.width,
+                //     height: print_config.options.size.height,
+                //     units: 'mm'
+                // },
                 // Força as margens em milímetros
                 margins: {
                     top: print_config.options.margins.top,

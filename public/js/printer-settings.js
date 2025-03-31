@@ -26,7 +26,7 @@ document.addEventListener('alpine:init', () => {
         // Parâmetros adicionais de impressão (não exibidos na interface)
         printParams: {
             type: 'pixel',
-            format: 'html',
+            format: 'pdf',
             flavor: 'plain',
             scaleContent: true,
             rasterize: true,
