@@ -11,15 +11,15 @@
     <div x-data="printerSettings">
         <div class="space-y-6">
             <!-- Status atual -->
-            <div class="p-6 bg-white rounded-xl shadow dark:bg-gray-800">
-                <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+            <div class="fi-ta-content p-6 bg-white dark:bg-gray-900 rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
+                <h2 class="text-lg font-medium text-gray-950 dark:text-white">
                     Configuração da Impressora
                 </h2>
 
                 <div class="mt-4">
                     <div x-show="loading" class="text-center p-4">
                         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-                        <p class="mt-2 text-gray-600 dark:text-gray-400">Conectando ao QZ Tray...</p>
+                        <p class="mt-2 text-gray-500 dark:text-gray-400">Conectando ao QZ Tray...</p>
                     </div>
 
                     <div x-show="error" x-cloak class="bg-red-50 dark:bg-red-900/50 p-4 rounded-lg">
@@ -39,7 +39,7 @@
                     <div x-show="!loading && !error" x-cloak>
                         <div class="space-y-4">
                             <!-- Status do QZ Tray -->
-                            <div class="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
+                            <div class="fi-section p-4 bg-white dark:bg-gray-900 rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10">
                                 <div class="flex items-center">
                                     <div class="flex-shrink-0">
                                         <div 
@@ -51,7 +51,7 @@
                                         ></div>
                                     </div>
                                     <div class="ml-3">
-                                        <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        <h3 class="text-sm font-medium text-gray-950 dark:text-white">
                                             Status do QZ Tray
                                         </h3>
                                         <p class="text-sm text-gray-500 dark:text-gray-400" x-text="connected ? 'Conectado' : 'Desconectado'"></p>
@@ -60,14 +60,14 @@
                             </div>
 
                             <!-- Seleção de Impressora -->
-                            <div class="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                                <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Selecione a Impressora</h3>
+                            <div class="fi-section p-4 bg-white dark:bg-gray-900 rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10">
+                                <h3 class="text-sm font-medium text-gray-950 dark:text-white mb-4">Selecione a Impressora</h3>
                                 
                                 <div class="grid grid-cols-1 gap-4">
                                     <div>
                                         <select 
                                             x-model="selectedPrinter"
-                                            class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                            class="fi-select-input block w-full bg-white dark:bg-gray-900 rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10"
                                         >
                                             <option value="">Selecione uma impressora</option>
                                             <template x-for="printer in printers" :key="printer">
@@ -82,18 +82,18 @@
                             </div>
 
                             <!-- Configurações da Impressora -->
-                            <div x-show="selectedPrinter" class="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                                <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Configurações da Impressora</h3>
+                            <div x-show="selectedPrinter" class="fi-section p-4 bg-white dark:bg-gray-900 rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10">
+                                <h3 class="text-sm font-medium text-gray-950 dark:text-white mb-4">Configurações da Impressora</h3>
                                 
                                 <div class="grid grid-cols-1 gap-4">
                                     <div class="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            <label class="block text-sm font-medium text-gray-950 dark:text-white mb-2">
                                                 Orientação
                                             </label>
                                             <select 
                                                 x-model="orientation"
-                                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                                class="fi-select-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 text-gray-950 dark:text-gray-200 dark:focus:ring-primary-500 bg-white"
                                             >
                                                 <option value="">Automático</option>
                                                 <option value="portrait">Retrato</option>
@@ -103,12 +103,12 @@
                                         </div>
 
                                         <div>
-                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            <label class="block text-sm font-medium text-gray-950 dark:text-white mb-2">
                                                 Rotação
                                             </label>
                                             <select 
                                                 x-model="rotation"
-                                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                                class="fi-select-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 text-gray-950 dark:text-gray-200 dark:focus:ring-primary-500 bg-white"
                                             >
                                                 <option value="0">0 graus</option>
                                                 <option value="90">90 graus</option>
@@ -118,13 +118,13 @@
                                     
                                     <!-- Configurações de Tamanho da Etiqueta -->
                                     <div class="mt-4">
-                                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <h4 class="text-sm font-medium text-gray-950 dark:text-white mb-2">
                                             Tamanho da Etiqueta (em milímetros)
                                         </h4>
                                         
                                         <div class="grid grid-cols-2 gap-4 mb-4">
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                <label class="block text-sm font-medium text-gray-950 dark:text-white mb-1">
                                                     Largura (mm)
                                                 </label>
                                                 <div class="flex">
@@ -134,13 +134,13 @@
                                                         min="1"
                                                         step="1"
                                                         @change="hasChanges = true"
-                                                        class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                                        class="fi-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-primary-500"
                                                     >
-                                </div>
-                            </div>
+                                                </div>
+                                            </div>
 
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                <label class="block text-sm font-medium text-gray-950 dark:text-white mb-1">
                                                     Altura (mm)
                                                 </label>
                                                 <div class="flex">
@@ -150,7 +150,7 @@
                                                         min="1"
                                                         step="1"
                                                         @change="hasChanges = true"
-                                                        class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                                        class="fi-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-primary-500"
                                                     >
                                                 </div>
                                             </div>
@@ -162,13 +162,13 @@
                                             </p>
                                         </div>
                                         
-                                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 mt-4">
+                                        <h4 class="text-sm font-medium text-gray-950 dark:text-white mb-2 mt-4">
                                             Margens (em milímetros)
                                         </h4>
                                         
                                         <div class="grid grid-cols-2 gap-4">
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                <label class="block text-sm font-medium text-gray-950 dark:text-white mb-1">
                                                     Superior (mm)
                                                 </label>
                                                 <input 
@@ -177,12 +177,12 @@
                                                     min="0"
                                                     step="1"
                                                     @change="hasChanges = true"
-                                                    class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                                    class="fi-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-primary-500"
                                                 >
                                             </div>
                                             
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                <label class="block text-sm font-medium text-gray-950 dark:text-white mb-1">
                                                     Direita (mm)
                                                 </label>
                                                 <input 
@@ -191,12 +191,12 @@
                                                     min="0"
                                                     step="1"
                                                     @change="hasChanges = true"
-                                                    class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                                    class="fi-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-primary-500"
                                                 >
                                             </div>
                                             
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                <label class="block text-sm font-medium text-gray-950 dark:text-white mb-1">
                                                     Inferior (mm)
                                                 </label>
                                                 <input 
@@ -205,12 +205,12 @@
                                                     min="0"
                                                     step="1"
                                                     @change="hasChanges = true"
-                                                    class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                                    class="fi-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-primary-500"
                                                 >
                                             </div>
                                             
                                             <div>
-                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                <label class="block text-sm font-medium text-gray-950 dark:text-white mb-1">
                                                     Esquerda (mm)
                                                 </label>
                                                 <input 
@@ -219,7 +219,7 @@
                                                     min="0"
                                                     step="1"
                                                     @change="hasChanges = true"
-                                                    class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+                                                    class="fi-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-primary-500"
                                                 >
                                             </div>
                                         </div>
@@ -228,8 +228,8 @@
                             </div>
 
                             <!-- Status da Impressora -->
-                            <div x-show="selectedPrinter" class="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                                <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Status da Impressora</h3>
+                            <div x-show="selectedPrinter" class="fi-section p-4 bg-white dark:bg-gray-900 rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10">
+                                <h3 class="text-sm font-medium text-gray-950 dark:text-white mb-4">Status da Impressora</h3>
                                 
                                 <div x-show="printerStatus" class="space-y-2">
                                     <div class="flex items-center">
@@ -245,30 +245,30 @@
                                             ></div>
                                         </div>
                                         <div class="ml-3">
-                                            <p class="text-sm text-gray-900 dark:text-gray-100" x-text="printerStatus?.message || 'Status desconhecido'"></p>
+                                            <p class="text-sm text-gray-950 dark:text-white" x-text="printerStatus?.message || 'Status desconhecido'"></p>
                                             <p class="text-xs text-gray-500" x-text="printerStatus?.statusText || ''"></p>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div x-show="!printerStatus" class="text-sm text-gray-500">
+                                <div x-show="!printerStatus" class="text-sm text-gray-300">
                                     Aguardando status da impressora...
                                 </div>
                             </div>
 
                             <!-- Templates de Impressão -->
-                            <div x-show="selectedPrinter" class="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                                <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Templates de Impressão</h3>
+                            <div x-show="selectedPrinter" class="fi-section p-4 bg-white dark:bg-gray-900 rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10">
+                                <h3 class="text-sm font-medium text-gray-950 dark:text-white mb-4">Templates de Impressão</h3>
                                 
                                 <div class="space-y-4">
                                     <!-- Upload de Template -->
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label class="block text-sm font-medium text-gray-950 dark:text-white mb-2">
                                             Enviar Novo Template
                                         </label>
                                         <div class="mt-1 space-y-2">
                                             <div class="flex items-center gap-2">
-                                                <label class="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                                                <label class="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-950 dark:text-white bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
                                                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                                     </svg>
@@ -307,7 +307,7 @@
 
                                     <!-- Lista de Templates -->
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <label class="block text-sm font-medium text-gray-950 dark:text-white mb-2">
                                             Template Selecionado
                                         </label>
                                         <div class="flex gap-2">
@@ -318,7 +318,7 @@
                                                     hasChanges = true;
                                                 "
                                                 :disabled="templates.length === 0"
-                                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 disabled:opacity-70 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-700"
+                                                class="fi-select-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 text-gray-950 dark:text-gray-200 dark:focus:ring-primary-500 bg-white"
                                             >
                                                 <option value="" x-show="templates.length === 0">Nenhum template disponível</option>
                                                 <template x-for="template in templates" :key="template.name">
