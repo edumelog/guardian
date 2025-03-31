@@ -133,6 +133,33 @@ class CredentialPrintService
                 'html_height_px' => $htmlHeight_px
             ]);
 
+            // Get the width and height of the paper size from mm to px
+            $paperWidth_px = 0;
+            $paperHeight_px = 0;
+            
+            if (isset($printerConfig['printOptions']) && 
+                isset($printerConfig['printOptions']['pageWidth']) && 
+                isset($printerConfig['printOptions']['pageHeight'])) {
+                $paperWidth_px = $this->convertToPoints($printerConfig['printOptions']['pageWidth'], 72);
+                $paperHeight_px = $this->convertToPoints($printerConfig['printOptions']['pageHeight'], 72);
+                Log::info('Dimensões do papel em pixels (72 dpi):', [
+                    'paper_width_px' => $paperWidth_px,
+                    'paper_height_px' => $paperHeight_px
+                ]);
+            } else {
+                Log::warning('Configurações de página não encontradas no printerConfig:', [
+                    'printerConfig' => $printerConfig
+                ]);
+                // Use HTML dimensions if paper size not provided
+                $paperWidth_px = $htmlWidth_px;
+                $paperHeight_px = $htmlHeight_px;
+            }
+            
+            // Calculate the scale factor based on the paper size
+            $scaleFactor = ($htmlWidth_px > 0) ? ($paperWidth_px / $htmlWidth_px) : 1;
+            Log::info('Fator de escala:', [
+                'scale_factor' => $scaleFactor
+            ]);
 
             // Obtém as configurações de impressão
             $printOptions = $printerConfig['printOptions'] ?? [];
@@ -162,7 +189,7 @@ class CredentialPrintService
                     ->paperSize($htmlWidth_px, $htmlHeight_px, 'px')
                     ->margins($margins['top'], $margins['right'], $margins['bottom'], $margins['left'])
                     ->showBackground()
-                    ->scale(1)
+                    ->scale($printerConfig['orientation'] === 'portrait'? .8 : 1)
                     ->noSandbox()
                     ->deviceScaleFactor(2)
                     // ->windowSize($widthPx, $heightPx)
@@ -171,16 +198,14 @@ class CredentialPrintService
                     ->waitUntilNetworkIdle()
                     // define the orientation accordning to orientation in printerConfig
                     ->landscape($printerConfig['orientation'] === 'portrait')
-                    ->base64pdf();
+                    // ->base64pdf();
                     // save at public folder
-                //     ->savePdf(public_path('teste.pdf'));
-                //     dd("parei aqui");
+                    ->savePdf(public_path('teste.pdf'));
+                    dd("parei aqui");
 
-                // Log::info('PDF gerado com sucesso', [
-                //     'pdf_size' => strlen($pdf)
-                // ]);
-
-                
+                Log::info('PDF gerado com sucesso', [
+                    'pdf_size' => strlen($pdf)
+                ]);
 
                 // Retorna o PDF em base64 e as configurações de impressão para o QZ-Tray
                 $returnConfig = [
@@ -188,10 +213,6 @@ class CredentialPrintService
                     'print_config' => [
                         'printer' => $printerConfig['printer'] ?? '',
                         'options' => [
-                            // 'size' => [
-                            //     'width' => $pageWidth_mm,
-                            //     'height' => $pageHeight_mm
-                            // ],
                             'margins' => $margins,
                             'orientation' => $orientation,
                             'scaleContent' => true,
@@ -204,6 +225,16 @@ class CredentialPrintService
                         ]
                     ]
                 ];
+
+                // Adiciona as dimensões ao retorno se estiverem disponíveis
+                if (isset($printerConfig['printOptions']) && 
+                    isset($printerConfig['printOptions']['pageWidth']) && 
+                    isset($printerConfig['printOptions']['pageHeight'])) {
+                    $returnConfig['print_config']['options']['size'] = [
+                        'width' => $printerConfig['printOptions']['pageWidth'],
+                        'height' => $printerConfig['printOptions']['pageHeight']
+                    ];
+                }
 
                 Log::info('Configuração final retornada:', [
                     'return_config' => $returnConfig['print_config']

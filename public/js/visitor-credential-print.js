@@ -94,57 +94,78 @@ window.printVisitorCredential = async function(visitor) {
         console.log('[CredentialPrint] Resposta do servidor:', data);
 
         const { pdf_base64, print_config } = data;
+        
+        if (!pdf_base64) {
+            console.error('[CredentialPrint] Erro: PDF em base64 não recebido do servidor');
+            throw new Error('Erro ao gerar PDF da credencial: PDF não gerado pelo servidor');
+        }
+        
+        if (!print_config) {
+            console.error('[CredentialPrint] Erro: Configuração de impressão não recebida do servidor');
+            throw new Error('Erro ao gerar PDF da credencial: Configurações de impressão não recebidas');
+        }
+        
+        if (!print_config.printer) {
+            console.error('[CredentialPrint] Erro: Impressora não especificada nas configurações');
+            throw new Error('Erro ao gerar PDF da credencial: Impressora não especificada');
+        }
+        
+        if (!print_config.options) {
+            console.error('[CredentialPrint] Erro: Opções de impressão não especificadas');
+            throw new Error('Erro ao gerar PDF da credencial: Opções de impressão não especificadas');
+        }
+        
         console.log('[CredentialPrint] Configuração de impressão:', print_config);
 
         // Configura QZ-Tray para impressão
         console.log('[CredentialPrint] Configurando QZ-Tray com:', print_config);
         
-        // Cria a configuração base do QZ-Tray
-        const qzConfig = qz.configs.create(print_config.printer, {
-            size: print_config.options.size,
-            margins: print_config.options.margins,
-            orientation: print_config.options.orientation,
+        // Cria a configuração base do QZ-Tray - com verificação para evitar acesso a propriedades indefinidas
+        const qzConfigOptions = {
+            margins: print_config.options.margins || { top: 0, right: 0, bottom: 0, left: 0 },
+            orientation: print_config.options.orientation || 'portrait',
             units: 'mm',
             forcePageSize: true,
             autoRotate: false
-        });
+        };
+        
+        // Adiciona o tamanho apenas se estiver definido
+        if (print_config.options.size) {
+            qzConfigOptions.size = print_config.options.size;
+            console.log('[CredentialPrint] Usando tamanho definido:', qzConfigOptions.size);
+        } else {
+            console.log('[CredentialPrint] Tamanho não definido nas configurações');
+        }
+        
+        const qzConfig = qz.configs.create(print_config.printer, qzConfigOptions);
 
         // Prepara os dados para impressão
+        const printDataOptions = {
+            // Força as margens em milímetros
+            margins: print_config.options.margins || { top: 0, right: 0, bottom: 0, left: 0 },
+            units: 'mm',
+            orientation: print_config.options.orientation || 'portrait',
+            // Configurações para melhor qualidade
+            scaleContent: print_config.options.scaleContent !== undefined ? print_config.options.scaleContent : false,
+            rasterize: true,
+            interpolation: 'bicubic',
+            density: 'best',
+            altFontRendering: true,
+            ignoreTransparency: true,
+            colorType: 'grayscale',
+            // Força o tamanho exato do papel
+            fitToPage: false,
+            forcePageSize: true,
+            autoRotate: false,
+            zoom: 1.0
+        };
+        
         const printData = [{
             type: 'pixel',
             format: 'pdf',
             flavor: 'base64',
             data: pdf_base64,
-            options: {
-                // Força as dimensões exatas em milímetros
-                // size: {
-                //     width: print_config.options.size.width,
-                //     height: print_config.options.size.height,
-                //     units: 'mm'
-                // },
-                // Força as margens em milímetros
-                margins: {
-                    top: print_config.options.margins.top,
-                    right: print_config.options.margins.right,
-                    bottom: print_config.options.margins.bottom,
-                    left: print_config.options.margins.left
-                },
-                units: 'mm',
-                orientation: print_config.options.orientation,
-                // Configurações para melhor qualidade
-                scaleContent: false,
-                rasterize: true,
-                interpolation: 'bicubic',
-                density: 'best',
-                altFontRendering: true,
-                ignoreTransparency: true,
-                colorType: 'grayscale',
-                // Força o tamanho exato do papel
-                fitToPage: false,
-                forcePageSize: true,
-                autoRotate: false,
-                zoom: 1.0
-            }
+            options: printDataOptions
         }];
 
         console.log('[CredentialPrint] Dados de impressão:', {
