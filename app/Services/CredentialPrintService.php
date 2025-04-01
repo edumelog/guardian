@@ -177,7 +177,7 @@ class CredentialPrintService
             if ($orientation === 'portrait') {
                 $scaleFactor = $paperWidth_px / $htmlWidth_px;
             } else {
-                $scaleFactor = $paperWidth_px / $htmlHeight_px;
+                $scaleFactor = $paperWidth_px / $htmlHeight_px*.98;
             }
             Log::info('Fator de escala:', [
                 'scale_factor' => $scaleFactor
@@ -186,13 +186,23 @@ class CredentialPrintService
 
             // Obtém as configurações de impressão
             $printOptions = $printerConfig['printOptions'] ?? [];
-            $margins = $printOptions['margins'] ?? [
+            $margins_mm = $printOptions['margins'] ?? [
                 'top' => 0,
                 'right' => 0,
                 'bottom' => 0,
                 'left' => 0
             ];
 
+            $margins_px = [
+                'top' => $this->convertToPoints($margins_mm['top'], 96)*$scaleFactor,
+                'right' => $this->convertToPoints($margins_mm['right'], 96)*$scaleFactor,
+                'bottom' => $this->convertToPoints($margins_mm['bottom'], 96)*$scaleFactor,
+                'left' => $this->convertToPoints($margins_mm['left'], 96)*$scaleFactor
+            ];
+            Log::info('Margens em pixels:', [
+                'margins_px' => $margins_px,
+                'margins_mm' => $margins_mm
+            ]);
 
             try {
                 
@@ -201,12 +211,12 @@ class CredentialPrintService
                     ->setChromePath('/home/admin/.cache/puppeteer/chrome-headless-shell/linux-134.0.6998.35/chrome-headless-shell-linux64/chrome-headless-shell')
                     // ->paperSize($htmlWidth_px, $htmlHeight_px, 'px')
                     ->paperSize($paperWidth_mm, $paperHeight_mm, 'mm')
-                    ->margins($margins['top'], $margins['right'], $margins['bottom'], $margins['left'])
+                    ->margins($margins_px['top'], $margins_px['right'], $margins_px['bottom'], $margins_px['left'], 'px')
                     ->showBackground()
                     ->scale($scaleFactor)
                     // ->scale(1)
                     ->noSandbox()
-                    ->deviceScaleFactor(1)
+                    ->deviceScaleFactor(3)
                     ->dismissDialogs()
                     ->waitUntilNetworkIdle()
                     // define the orientation according to orientation in printerConfig when using paperSize mm
@@ -228,7 +238,7 @@ class CredentialPrintService
                     'print_config' => [
                         'printer' => $printerConfig['printer'] ?? '',
                         'options' => [
-                            'margins' => $margins,
+                            // 'margins' => $margins_mm,
                             'orientation' => $orientation,
                             // 'rotation' => $rotation, 
                             'scaleContent' => true,
@@ -376,7 +386,7 @@ class CredentialPrintService
      * @param int $dpi Resolução em DPI (dots per inch)
      * @return float Valor em pixels
      */
-    private function convertToPoints($value, $dpi = 72)
+    private function convertToPoints($value, $dpi = 96)
     {
         // Conversão de mm para pixels baseada no DPI
         $result = $value * $dpi / 25.4;

@@ -122,7 +122,7 @@ window.printVisitorCredential = async function(visitor) {
         
         // Cria a configuração base do QZ-Tray - com verificação para evitar acesso a propriedades indefinidas
         const qzConfigOptions = {
-            margins: print_config.options.margins || { top: 0, right: 0, bottom: 0, left: 0 },
+            // margins: print_config.options.margins || { top: 0, right: 0, bottom: 0, left: 0 },
             orientation: print_config.options.orientation || 'portrait',
             // rotation: print_config.options.rotation !== undefined ? 
                 // (typeof print_config.options.rotation === 'string' ? 
@@ -147,7 +147,7 @@ window.printVisitorCredential = async function(visitor) {
         // Prepara os dados para impressão
         const printDataOptions = {
             // Força as margens em milímetros
-            margins: print_config.options.margins || { top: 0, right: 0, bottom: 0, left: 0 },
+            // margins: print_config.options.margins || { top: 0, right: 0, bottom: 0, left: 0 },
             units: 'mm',
             orientation: print_config.options.orientation || 'portrait',
             // Se rotation existir, garante que seja número
