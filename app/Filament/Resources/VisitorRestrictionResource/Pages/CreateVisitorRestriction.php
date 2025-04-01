@@ -2,11 +2,12 @@
 
 namespace App\Filament\Resources\VisitorRestrictionResource\Pages;
 
-use App\Filament\Resources\VisitorRestrictionResource;
-use App\Models\Visitor;
-use Filament\Resources\Pages\ListRecords;
 use Filament\Tables;
+use App\Models\Visitor;
 use Filament\Tables\Table;
+use Filament\Support\Enums\MaxWidth;
+use Filament\Resources\Pages\ListRecords;
+use App\Filament\Resources\VisitorRestrictionResource;
 
 class CreateVisitorRestriction extends ListRecords
 {
@@ -14,6 +15,7 @@ class CreateVisitorRestriction extends ListRecords
 
     // Set the page title
     protected static ?string $title = 'Criar Restrição';
+    protected ?string $maxContentWidth = MaxWidth::Full->value;
 
     public function table(Table $table): Table
     {
