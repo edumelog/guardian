@@ -777,20 +777,27 @@ class SecurityReports extends Page implements HasForms
         $sortDirectionDescription = $this->sortDirection === 'asc' ? 'Crescente' : 'Decrescente';
         
         $filterInfo = [
-            'start_date' => !empty($data['start_date']) ? date('d/m/Y', strtotime($data['start_date'])) : '01/01/1900',
-            'end_date' => !empty($data['end_date']) ? date('d/m/Y', strtotime($data['end_date'])) : date('d/m/Y'),
+            'start_date' => !empty($data['start_date']) ? \Carbon\Carbon::parse($data['start_date'])->format('d/m/Y') : '01/01/1900',
+            'end_date' => !empty($data['end_date']) ? \Carbon\Carbon::parse($data['end_date'])->format('d/m/Y') : \Carbon\Carbon::now()->format('d/m/Y'),
             'start_time' => $data['start_time'],
             'end_time' => $data['end_time'],
             'visitor_name' => $data['visitor_name'] ?? 'Todos',
             'doc_type' => !empty($data['doc_type_id']) ? DocType::find($data['doc_type_id'])?->type : 'Todos',
             'doc' => $data['doc'] ?? 'Todos',
             'destination' => !empty($data['destination_id']) ? Destination::find($data['destination_id'])?->name : 'Todos',
-            'generated_at' => now()->format('d/m/Y H:i:s'),
+            'generated_at' => \Carbon\Carbon::now()->locale('pt_BR')->isoFormat('DD/MM/YYYY HH:mm:ss'),
             'generated_by' => Auth::user() ? Auth::user()->name : 'Sistema',
             'total_records' => count($this->results),
             'sort_field' => $sortFieldDescription,
             'sort_direction' => $sortDirectionDescription
         ];
+        
+        // Formatar todas as datas dos resultados antes de enviar para a view
+        $formattedResults = collect($this->results)->map(function ($log) {
+            $log->formatted_in_date = $log->in_date ? \Carbon\Carbon::parse($log->in_date)->format('d/m/Y H:i') : 'N/A';
+            $log->formatted_out_date = $log->out_date ? \Carbon\Carbon::parse($log->out_date)->format('d/m/Y H:i') : 'Em andamento';
+            return $log;
+        });
         
         // Prepara a imagem do logo como base64
         $logoPath = public_path('images/logo-cmrj-horizontal.jpg');
@@ -801,22 +808,48 @@ class SecurityReports extends Page implements HasForms
         
         // Gera o HTML do relatório
         $html = view('reports.visitors-report', [
-            'results' => $this->results,
+            'results' => $formattedResults,
             'filterInfo' => $filterInfo,
-            'logoBase64' => $logoBase64
+            'logoBase64' => $logoBase64,
+            'showFooter' => false // Usar o footer do Browsershot em vez de usar o footer do HTML
         ])->render();
+
+        // Prepara o footer com a numeração de páginas
+            $footerHtml = '
+            <div style="width: 100%; font-size: 9px; text-align: center; color: #6b7280; font-family: Arial, sans-serif; padding: 0 15mm;">
+                <div style="display: inline-block; width: 33%; text-align: left;">DTI - Diretoria de Tecnologia da Informação</div>
+                <div style="display: inline-block; width: 33%; text-align: center;">Sistema Guardian - Relatório de Visitantes</div>
+                <div style="display: inline-block; width: 33%; text-align: right;"><span class="pageNumber"></span> de <span class="totalPages"></span></div>
+            </div>';
         
-        // Usa o Browsershot para gerar o PDF, mantendo a mesma configuração que funciona no CredentialPrintService
+        // Usa o Browsershot para gerar o PDF
         $pdfOutput = Browsershot::html($html)
             ->setNodeBinary('/usr/bin/node')
             ->setChromePath('/opt/google/chrome/chrome') // Caminho direto para o executável chrome (não o script)
             ->paperSize(297, 210, 'mm') // A4 em modo paisagem (landscape)
-            ->margins(15, 15, 15, 15, 'mm')
+            ->margins(15, 15, 20, 15, 'mm') // Margem inferior aumentada para acomodar o footer
             ->showBackground()
             ->noSandbox()
             ->deviceScaleFactor(2)
             ->dismissDialogs()
             ->waitUntilNetworkIdle()
+            ->emulateMedia('print')
+            ->setScreenshotOptions([
+                'printBackground' => true,
+                'preferCSSPageSize' => true,
+                'displayHeaderFooter' => false, // Desativar header e footer automáticos
+                'landscape' => true,
+                'format' => 'A4',
+                'margin' => [
+                    'top' => '15mm',
+                    'right' => '15mm',
+                    'bottom' => '20mm',
+                    'left' => '15mm',
+                ],
+            ])
+            ->showBrowserHeaderAndFooter()
+            ->headerHtml('<div style="width: 100%; height: 0;"></div>')
+            ->footerHtml($footerHtml)
             ->pdf();
         
         Notification::make()
@@ -913,4 +946,116 @@ class SecurityReports extends Page implements HasForms
     {
         return [];
     }
+
+    // protected function generatePDF()
+    // {
+    //     if (empty($this->results)) {
+    //         Notification::make()
+    //             ->title('Erro')
+    //             ->body('Não há resultados para gerar o PDF.')
+    //             ->danger()
+    //             ->send();
+    //         return;
+    //     }
+
+    //     try {
+    //         // Formatando os resultados com Carbon antes de enviar para a view
+    //         $results = collect($this->results)->map(function ($log) {
+    //             $log['formatted_in_date'] = $log->in_date ? \Carbon\Carbon::parse($log->in_date)->isoFormat('DD/MM/YYYY HH:mm:ss') : 'N/A';
+    //             $log['formatted_out_date'] = $log->out_date ? \Carbon\Carbon::parse($log->out_date)->isoFormat('DD/MM/YYYY HH:mm:ss') : 'Em andamento';
+    //             return $log;
+    //         });
+
+    //         // Gerando o HTML com a view
+    //         $html = view('reports.visitors-report', [
+    //             'results' => $results,
+    //             'filters' => $this->getFormattedFilters(),
+    //             'current_date' => \Carbon\Carbon::now()->locale('pt_BR')->isoFormat('DD [de] MMMM [de] YYYY [às] HH:mm:ss'),
+    //             'total' => count($results),
+    //             'showFooter' => false // Não mostrar o footer no HTML pois usaremos o footer do Browsershot
+    //         ])->render();
+
+    //         // Prepara o footer com a numeração de páginas
+    //         $footerHtml = '
+    //         <div style="width: 100%; font-size: 9px; text-align: center; color: #6b7280; font-family: Arial, sans-serif; padding: 0 15mm;">
+    //             <div style="display: inline-block; width: 33%; text-align: left;">DTI - Diretoria de Tecnologia da Informação</div>
+    //             <div style="display: inline-block; width: 33%; text-align: center;">Sistema Guardian - Relatório de Visitantes</div>
+    //             <div style="display: inline-block; width: 33%; text-align: right;"><span class="pageNumber"></span> de <span class="totalPages"></span></div>
+    //         </div>';
+
+    //         // Configurando o Browsershot
+    //         $tempFile = tempnam(sys_get_temp_dir(), 'report_') . '.pdf';
+
+    //         Browsershot::html($html)
+    //             ->timeout(120)
+    //             ->ignoreHttpsErrors()
+    //             ->showBackground()
+    //             ->format('A4')
+    //             ->landscape()
+    //             ->margins(15, 15, 15, 15)
+    //             ->deviceScaleFactor(1.5)
+    //             // Configuração específica para cabeçalhos e rodapés
+    //             ->showBrowserHeaderAndFooter()
+    //             ->footerHtml($footerHtml)
+    //             ->headerHtml('<div style="width: 100%; height: 0;"></div>')
+    //             // Configurações adicionais
+    //             ->setOption('printBackground', true)
+    //             ->setOption('preferCSSPageSize', true)
+    //             ->setOption('landscape', true)
+    //             ->setOption('format', 'A4')
+    //             // Adicionar argumentos extras para o Chrome
+    //             ->addChromiumArguments([
+    //                 '--no-sandbox',
+    //                 '--disable-setuid-sandbox',
+    //                 '--disable-gpu',
+    //                 '--font-render-hinting=none',
+    //                 '--lang=pt-BR', // Configurar idioma para português do Brasil
+    //             ])
+    //             ->savePdf($tempFile);
+
+    //         // Verificar se o diretório temporário é gravável
+    //         if (!is_writable(sys_get_temp_dir())) {
+    //             throw new \Exception("O diretório temporário não é gravável: " . sys_get_temp_dir());
+    //         }
+
+    //         // Obter o conteúdo do PDF e configurar o download
+    //         $pdfContent = file_get_contents($tempFile);
+    //         if (!$pdfContent) {
+    //             throw new \Exception("Falha ao ler o arquivo PDF: " . $tempFile);
+    //         }
+
+    //         // Excluir o arquivo temporário
+    //         if (file_exists($tempFile)) {
+    //             unlink($tempFile);
+    //         }
+
+    //         // Registrar sucesso
+    //         Log::info('PDF gerado com sucesso', [
+    //             'file' => $tempFile,
+    //             'size' => strlen($pdfContent)
+    //         ]);
+
+    //         // Configurar o download
+    //         $filename = 'relatorio_visitantes_' . now()->format('Y-m-d_H-i-s') . '.pdf';
+    //         return response()->streamDownload(
+    //             fn () => print($pdfContent),
+    //             $filename,
+    //             [
+    //                 'Content-Type' => 'application/pdf',
+    //                 'Content-Disposition' => 'attachment; filename="' . $filename . '"'
+    //             ]
+    //         );
+    //     } catch (\Exception $e) {
+    //         Log::error('Erro ao gerar PDF: ' . $e->getMessage(), [
+    //             'exception' => $e,
+    //             'trace' => $e->getTraceAsString()
+    //         ]);
+
+    //         Notification::make()
+    //             ->title('Erro')
+    //             ->body('Ocorreu um erro ao gerar o PDF: ' . $e->getMessage())
+    //             ->danger()
+    //             ->send();
+    //     }
+    // }
 } 

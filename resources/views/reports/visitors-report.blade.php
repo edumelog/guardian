@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Language" content="pt-BR">
+    <meta http-equiv="Accept-Language" content="pt-BR">
     <title>Relatório de Visitantes</title>
     <style>
         @page {
@@ -15,7 +17,7 @@
             color: #333;
             margin: 0;
             padding: 0 0 60px 0; /* Aumentar padding inferior para o footer */
-            counter-reset: pages;
+            counter-reset: page;
         }
         .header {
             position: relative;
@@ -152,6 +154,11 @@
             font-weight: bold;
         }
         
+        /* CSS para o rodapé de página, agora gerenciado por HTML */
+        .page-number {
+            font-weight: bold;
+        }
+        
         /* Estilo para quebra de página no CSS */
         @media print {
             .page-break {
@@ -172,38 +179,24 @@
             .header, .filter-info {
                 page-break-inside: avoid;
             }
-            
-            /* Estilo para o contador de páginas */
-            .footer::after {
-                content: "Página " counter(page);
-                position: absolute;
-                bottom: 10px;
-                left: 0;
-                right: 0;
-                text-align: center;
-                font-size: 9px;
-                color: #6b7280;
-            }
         }
     </style>
     
     <script>
-        // Script para adicionar classe CSS para numeração de páginas
-        // Este script é executado quando o Browsershot renderiza a página
-        document.addEventListener('DOMContentLoaded', function() {
-            // Adiciona um estilo para contar as páginas
-            var style = document.createElement('style');
-            style.innerHTML = `
-                @page {
-                    counter-increment: page;
-                    counter-reset: page 1;
-                }
-                body {
-                    counter-reset: pages;
-                }
-            `;
-            document.head.appendChild(style);
-        });
+        // Script para adicionar numeração de páginas
+        // document.addEventListener('DOMContentLoaded', function() {
+        //     // Garantir que o script seja executado após a renderização da página
+        //     setTimeout(function() {
+        //         // Adicionar um elemento para mostrar o número da página no rodapé
+        //         var footers = document.querySelectorAll('.footer');
+        //         footers.forEach(function(footer, index) {
+        //             var pageNum = document.createElement('div');
+        //             pageNum.id = 'page-counter';
+        //             pageNum.textContent = 'Página ' + (index + 1);
+        //             footer.appendChild(pageNum);
+        //         });
+        //     }, 100);
+        // });
     </script>
 </head>
 <body>
@@ -240,11 +233,11 @@
                 </div>
                 <div class="filter-column">
                     <div class="filter-item">
-                        <span class="filter-label">Tipo de Documento:</span>
+                        <span class="filter-label">Tipo Documento:</span>
                         <span class="filter-value">{{ $filterInfo['doc_type'] }}</span>
                     </div>
                     <div class="filter-item">
-                        <span class="filter-label">Número do Documento:</span>
+                        <span class="filter-label">Num. Documento:</span>
                         <span class="filter-value">{{ $filterInfo['doc'] }}</span>
                     </div>
                     <div class="filter-item">
@@ -285,8 +278,8 @@
                                 <td>{{ $log->visitor->name ?? 'N/A' }}</td>
                                 <td>{{ ($log->visitor->docType->type ?? '') . ' ' . ($log->visitor->doc ?? 'N/A') }}</td>
                                 <td>{{ $log->destination->name ?? 'N/A' }}</td>
-                                <td>{{ $log->in_date ? date('d/m/Y H:i', strtotime($log->in_date)) : 'N/A' }}</td>
-                                <td>{{ $log->out_date ? date('d/m/Y H:i', strtotime($log->out_date)) : 'Em andamento' }}</td>
+                                <td>{{ $log->formatted_in_date }}</td>
+                                <td>{{ $log->formatted_out_date }}</td>
                                 <td>
                                     @if(!empty($log->in_date) && !empty($log->out_date))
                                         @php
@@ -322,6 +315,7 @@
         </div>
     </div>
     
+    @if(!isset($showFooter) || $showFooter !== false)
     <div class="footer">
         <div class="footer-left">
             DTI - Diretoria de Tecnologia da Informação
@@ -329,6 +323,10 @@
         <div class="footer-center">
             Sistema Guardian - Relatório de Visitantes
         </div>
+        <div class="footer-right">
+            <span class="pageNumber"></span> de <span class="totalPages"></span>
+        </div>
     </div>
+    @endif
 </body>
 </html> 
