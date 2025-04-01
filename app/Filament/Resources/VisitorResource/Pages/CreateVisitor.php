@@ -426,10 +426,10 @@ class CreateVisitor extends CreateRecord
                                 $currentCount = $destination->getCurrentVisitorsCount();
                                 $maxVisitors = $destination->max_visitors;
 
-                                // Se não tem limite, mostra em preto sem destaque
+                                // Se não tem limite, mostra em azul
                                 if ($maxVisitors <= 0) {
                                     return new \Illuminate\Support\HtmlString(
-                                        "<span class='text-gray-900'>{$currentCount}</span>"
+                                        "<span class='text-blue-600 dark:text-blue-400'>{$currentCount}</span>"
                                     );
                                 }
 
@@ -437,8 +437,8 @@ class CreateVisitor extends CreateRecord
                                 $occupancyRate = ($currentCount / $maxVisitors) * 100;
 
                                 // Define a cor e estilo baseado na ocupação
-                                if ($currentCount >= $maxVisitors) {
-                                    // Vermelho quando atingir o limite
+                                if ($occupancyRate >= 100) {
+                                    // Vermelho para 100% ou mais
                                     $style = 'text-red-600 dark:text-red-400';
                                     
                                     \Filament\Notifications\Notification::make()
@@ -447,12 +447,15 @@ class CreateVisitor extends CreateRecord
                                         ->body("O destino {$destination->name} atingiu o limite de {$maxVisitors} visitantes.")
                                         // ->persistent()
                                         ->send();
-                                } elseif ($occupancyRate >= 50 && $occupancyRate < 80) {
-                                    // Laranja entre 50% e 80%
+                                } elseif ($occupancyRate >= 75) {
+                                    // Laranja para 75% ou mais
                                     $style = 'text-orange-500 dark:text-orange-400';
+                                } elseif ($occupancyRate >= 50) {
+                                    // Amarelo para 50% ou mais
+                                    $style = 'text-yellow-500 dark:text-yellow-400';
                                 } else {
-                                    // Verde abaixo de 50%
-                                    $style = 'text-emerald-600 dark:text-emerald-400';
+                                    // Verde para < 50%
+                                    $style = 'text-green-600 dark:text-green-400';
                                 }
 
                                 return new \Illuminate\Support\HtmlString(
