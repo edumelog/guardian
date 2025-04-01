@@ -37,6 +37,8 @@ document.addEventListener('alpine:init', () => {
             colorType: 'grayscale'
         },
 
+        dpi: 96,
+
         async init() {
             this.loading = true;
             
@@ -110,6 +112,9 @@ document.addEventListener('alpine:init', () => {
                             if (config.printOptions.ignoreTransparency !== undefined) this.printParams.ignoreTransparency = config.printOptions.ignoreTransparency;
                             if (config.printOptions.colorType !== undefined) this.printParams.colorType = config.printOptions.colorType;
                         }
+
+                        // Carrega o DPI
+                        this.dpi = parseInt(config.dpi) || 96;
                     } catch (configErr) {
                         console.error('Erro ao carregar configuração do localStorage:', configErr);
                     }
@@ -170,6 +175,7 @@ document.addEventListener('alpine:init', () => {
                 this.$watch('marginRight', () => this.hasChanges = true);
                 this.$watch('marginBottom', () => this.hasChanges = true);
                 this.$watch('marginLeft', () => this.hasChanges = true);
+                this.$watch('dpi', () => this.hasChanges = true);
                 
                 console.log('Inicialização concluída');
             } catch (err) {
@@ -420,7 +426,8 @@ document.addEventListener('alpine:init', () => {
                         altFontRendering: this.printParams.altFontRendering,
                         ignoreTransparency: this.printParams.ignoreTransparency,
                         colorType: this.printParams.colorType
-                    }
+                    },
+                    dpi: parseInt(this.dpi) || 96,
                 };
 
                 console.log('Configuração a ser salva:', config);

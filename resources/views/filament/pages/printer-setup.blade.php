@@ -95,25 +95,26 @@
                                                 x-model="orientation"
                                                 class="fi-select-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 text-gray-950 dark:text-gray-200 dark:focus:ring-primary-500 bg-white"
                                             >
-                                                <option value="">Automático</option>
+                                                {{-- <option value="">Automático</option> --}}
                                                 <option value="portrait">Retrato</option>
                                                 <option value="landscape">Paisagem</option>
-                                                <option value="reverse-landscape">Paisagem Invertida</option>
+                                                {{-- <option value="reverse-landscape">Paisagem Invertida</option> --}}
                                             </select>
                                         </div>
 
-                                        {{-- <div>
+                                        <div>
                                             <label class="block text-sm font-medium text-gray-950 dark:text-white mb-2">
-                                                Rotação
+                                                Resolução (DPI)
                                             </label>
-                                            <select 
-                                                x-model="rotation"
-                                                class="fi-select-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 text-gray-950 dark:text-gray-200 dark:focus:ring-primary-500 bg-white"
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                x-model="dpi"
+                                                @input="hasChanges = true"
+                                                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 text-gray-950 dark:text-white"
+                                                placeholder="96"
                                             >
-                                                <option value="0">0 graus</option>
-                                                <option value="90">90 graus</option>
-                                            </select>
-                                        </div> --}}
+                                        </div>
                                     </div>
                                     
                                     <!-- Configurações de Tamanho da Etiqueta -->

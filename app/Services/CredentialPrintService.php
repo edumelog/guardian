@@ -135,9 +135,7 @@ class CredentialPrintService
 
             // Get all data from printerConfig stored at printerConfig['printOptions']
             $printOptions = $printerConfig['printOptions'] ?? [];
-            // Log::info('Configurações de impressão:', [
-            //     'print_options' => $printOptions
-            // ]);
+            $resolution = $printerConfig['dpi'] ?? 96;
 
             // Get the width and height of the paper size in mm
             $paperWidth_mm = $printerConfig['printOptions']['pageWidth'];
@@ -148,8 +146,8 @@ class CredentialPrintService
             ]);
 
             // Get the width and height of the paper size from mm to px
-            $paperWidth_px = $this->convertToPoints($paperWidth_mm, 96);
-            $paperHeight_px = $this->convertToPoints($paperHeight_mm, 96);
+            $paperWidth_px = $this->convertToPoints($paperWidth_mm, $resolution);
+            $paperHeight_px = $this->convertToPoints($paperHeight_mm, $resolution);
 
             // Obtém a orientação diretamente da raiz do printerConfig
             $orientation = $printerConfig['orientation'] ?? 'portrait';
@@ -194,10 +192,10 @@ class CredentialPrintService
             ];
 
             $margins_px = [
-                'top' => $this->convertToPoints($margins_mm['top'], 96)*$scaleFactor,
-                'right' => $this->convertToPoints($margins_mm['right'], 96)*$scaleFactor,
-                'bottom' => $this->convertToPoints($margins_mm['bottom'], 96)*$scaleFactor,
-                'left' => $this->convertToPoints($margins_mm['left'], 96)*$scaleFactor
+                'top' => $this->convertToPoints($margins_mm['top'], $resolution)*$scaleFactor,
+                'right' => $this->convertToPoints($margins_mm['right'], $resolution)*$scaleFactor,
+                'bottom' => $this->convertToPoints($margins_mm['bottom'], $resolution)*$scaleFactor,
+                'left' => $this->convertToPoints($margins_mm['left'], $resolution)*$scaleFactor
             ];
             Log::info('Margens em pixels:', [
                 'margins_px' => $margins_px,
