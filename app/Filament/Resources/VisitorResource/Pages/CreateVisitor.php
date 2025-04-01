@@ -1083,8 +1083,8 @@ class CreateVisitor extends CreateRecord
             // Se o visitante existe, atualiza apenas as informações que devem ser atualizáveis
             $visitor->update([
                 'other' => $data['other'] ?? null,
-                'phone' => $data['phone'] ?? null
-                // O nome não é incluído aqui para garantir que não seja alterado
+                'phone' => $data['phone'] ?? null,
+                'destination_id' => $data['destination_id']
             ]);
 
             $visitor->visitorLogs()->create([
