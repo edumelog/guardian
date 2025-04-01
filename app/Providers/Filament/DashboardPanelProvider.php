@@ -50,6 +50,10 @@ class DashboardPanelProvider extends PanelProvider
             ->pages([
                 Pages\Dashboard::class,
             ])
+            ->widgets([
+                \App\Filament\Widgets\ActiveVisitorStats::class,
+                \App\Filament\Widgets\ActiveVisitorsChart::class,
+            ])
             ->plugins([
                 \BezhanSalleh\FilamentShield\FilamentShieldPlugin::make()
             ])
