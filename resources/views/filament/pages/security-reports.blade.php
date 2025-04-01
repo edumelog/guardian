@@ -16,7 +16,7 @@
             </div>
             
             <div class="overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm dark:bg-gray-800 dark:border-gray-700">
-                <table class="w-full text-start divide-y table-auto">
+                <table class="w-full text-start divide-y divide-gray-200 dark:divide-gray-700 table-auto">
                     <thead>
                         <tr class="bg-primary-600 dark:bg-primary-700">
                             <th class="px-4 py-3 font-bold text-white text-left cursor-pointer" wire:click="sortResults('visitor_name')">
@@ -119,30 +119,28 @@
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y">
+                    <tbody class="divide-y divide-gray-200">
                         @foreach($this->getPaginatedResults() as $log)
-                            <tr @class([
-                                'bg-gray-50 dark:bg-gray-700/30' => $loop->even,
-                            ])>
-                                <td class="px-4 py-3 whitespace-nowrap">{{ $log->visitor->name ?? 'N/A' }}</td>
-                                <td class="px-4 py-3 whitespace-nowrap">
+                            <tr class="{{ $loop->even ? 'bg-gray-50' : 'bg-white' }}">
+                                <td class="px-4 py-3 whitespace-nowrap text-gray-900">{{ $log->visitor->name ?? 'N/A' }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-gray-900">
                                     {{ $log->visitor->docType->type ?? 'N/A' }}: {{ $log->visitor->doc ?? 'N/A' }}
                                 </td>
-                                <td class="px-4 py-3 whitespace-nowrap">{{ $log->destination->name ?? 'N/A' }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-gray-900">{{ $log->destination->name ?? 'N/A' }}</td>
                                 <td class="px-4 py-3 whitespace-nowrap text-sm">
                                     @if($log->in_date)
-                                        <div class="font-medium">{{ date('d/m/Y', strtotime($log->in_date)) }}</div>
-                                        <div class="text-gray-500 dark:text-gray-400">{{ date('H:i:s', strtotime($log->in_date)) }}</div>
+                                        <div class="font-medium text-gray-900">{{ date('d/m/Y', strtotime($log->in_date)) }}</div>
+                                        <div class="text-gray-600">{{ date('H:i:s', strtotime($log->in_date)) }}</div>
                                     @else
-                                        N/A
+                                        <span class="text-gray-900">N/A</span>
                                     @endif
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap text-sm">
                                     @if($log->out_date)
-                                        <div class="font-medium">{{ date('d/m/Y', strtotime($log->out_date)) }}</div>
-                                        <div class="text-gray-500 dark:text-gray-400">{{ date('H:i:s', strtotime($log->out_date)) }}</div>
+                                        <div class="font-medium text-gray-900">{{ date('d/m/Y', strtotime($log->out_date)) }}</div>
+                                        <div class="text-gray-600">{{ date('H:i:s', strtotime($log->out_date)) }}</div>
                                     @else
-                                        <span class="px-2 py-1 text-xs rounded-full font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                                        <span class="px-2 py-1 text-xs rounded-full font-medium bg-blue-100 text-blue-800">
                                             Em andamento
                                         </span>
                                     @endif
@@ -174,49 +172,123 @@
                                         @endphp
                                         
                                         @if($horasTotal >= 8)
-                                            <span class="px-2 py-1 text-xs rounded-full font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300">
+                                            <span class="px-2 py-1 text-xs rounded-full font-medium bg-amber-100 text-amber-800">
                                                 {{ $duracao }}
                                             </span>
                                         @else
-                                            {{ $duracao }}
+                                            <span class="px-2 py-1 text-xs rounded-full font-medium bg-gray-100 text-gray-800">
+                                                {{ $duracao }}
+                                            </span>
                                         @endif
                                     @else
-                                        <span class="px-2 py-1 text-xs rounded-full font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                                        <span class="px-2 py-1 text-xs rounded-full font-medium bg-blue-100 text-blue-800">
                                             Em andamento
                                         </span>
                                     @endif
                                 </td>
-                                <td class="px-4 py-3 whitespace-nowrap">{{ $log->operator->name ?? 'N/A' }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-gray-900">{{ $log->operator->name ?? 'N/A' }}</td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
                 
-                <div class="px-4 py-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                <div class="px-4 py-4 bg-white border-t border-gray-200">
+                    <div class="flex flex-col items-center space-y-6">
+                        <div class="text-sm text-gray-600 w-full text-center">
                             <span>Exibindo {{ $this->getPaginatedResults()->firstItem() ?? 0 }} a {{ $this->getPaginatedResults()->lastItem() ?? 0 }} de {{ $this->resultsCount() }} registros</span>
                         </div>
                         
-                        <x-filament::pagination
-                            :paginator="$this->getPaginatedResults()"
-                            :page-options="[15, 25, 50, 100]"
-                            :current-page-option-property="'perPage'"
-                            extreme-links
-                        />
+                        <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                            <div class="inline-flex items-center">
+                                <span class="mr-2 text-sm text-gray-600">Itens por página:</span>
+                                <select wire:model.live="perPage" class="h-8 text-sm py-0 border-gray-300 rounded-lg shadow-sm">
+                                    <option value="15">15</option>
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-center w-full">
+                            <nav role="navigation" aria-label="Pagination Navigation" class="filament-tables-pagination">
+                                <ul class="flex items-center gap-x-1">
+                                    {{-- Primeira página --}}
+                                    <li>
+                                        <button 
+                                            type="button"
+                                            @if($this->getPaginatedResults()->onFirstPage()) disabled @endif
+                                            wire:click="firstPage"
+                                            class="relative inline-flex items-center justify-center font-medium min-w-[2rem] px-1.5 h-8 -my-3 rounded-md outline-none transition text-primary-600 focus:bg-primary-500/10 focus:ring-2 focus:ring-primary-500 @if($this->getPaginatedResults()->onFirstPage()) opacity-50 cursor-not-allowed @endif"
+                                        >
+                                            <span>«</span>
+                                        </button>
+                                    </li>
+                                    
+                                    {{-- Página anterior --}}
+                                    <li>
+                                        <button 
+                                            type="button"
+                                            @if($this->getPaginatedResults()->onFirstPage()) disabled @endif
+                                            wire:click="previousPage"
+                                            class="relative inline-flex items-center justify-center font-medium min-w-[2rem] px-1.5 h-8 -my-3 rounded-md outline-none transition text-primary-600 focus:bg-primary-500/10 focus:ring-2 focus:ring-primary-500 @if($this->getPaginatedResults()->onFirstPage()) opacity-50 cursor-not-allowed @endif"
+                                        >
+                                            <span>‹</span>
+                                        </button>
+                                    </li>
+                                    
+                                    {{-- Links de páginas --}}
+                                    @foreach ($this->getPaginatedResults()->getUrlRange(max(1, $this->getPaginatedResults()->currentPage() - 2), min($this->getPaginatedResults()->lastPage(), $this->getPaginatedResults()->currentPage() + 2)) as $page => $url)
+                                        <li>
+                                            <button 
+                                                type="button"
+                                                wire:click="gotoPage({{ $page }})"
+                                                class="relative inline-flex items-center justify-center font-medium min-w-[2rem] px-1.5 h-8 -my-3 rounded-md outline-none transition @if($page === $this->getPaginatedResults()->currentPage()) bg-primary-500 text-white @else text-gray-700 hover:bg-gray-100 focus:bg-primary-500/10 focus:ring-2 focus:ring-primary-500 @endif"
+                                            >
+                                                <span>{{ $page }}</span>
+                                            </button>
+                                        </li>
+                                    @endforeach
+                                    
+                                    {{-- Próxima página --}}
+                                    <li>
+                                        <button 
+                                            type="button"
+                                            @if(!$this->getPaginatedResults()->hasMorePages()) disabled @endif
+                                            wire:click="nextPage"
+                                            class="relative inline-flex items-center justify-center font-medium min-w-[2rem] px-1.5 h-8 -my-3 rounded-md outline-none transition text-primary-600 focus:bg-primary-500/10 focus:ring-2 focus:ring-primary-500 @if(!$this->getPaginatedResults()->hasMorePages()) opacity-50 cursor-not-allowed @endif"
+                                        >
+                                            <span>›</span>
+                                        </button>
+                                    </li>
+                                    
+                                    {{-- Última página --}}
+                                    <li>
+                                        <button 
+                                            type="button"
+                                            @if(!$this->getPaginatedResults()->hasMorePages()) disabled @endif
+                                            wire:click="lastPage"
+                                            class="relative inline-flex items-center justify-center font-medium min-w-[2rem] px-1.5 h-8 -my-3 rounded-md outline-none transition text-primary-600 focus:bg-primary-500/10 focus:ring-2 focus:ring-primary-500 @if(!$this->getPaginatedResults()->hasMorePages()) opacity-50 cursor-not-allowed @endif"
+                                        >
+                                            <span>»</span>
+                                        </button>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     @elseif($this->isEmptyResults())
-        <div class="mt-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm dark:bg-gray-800 dark:border-gray-700">
-            <div class="flex items-center justify-center text-gray-500 dark:text-gray-400">
+        <div class="mt-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+            <div class="flex items-center justify-center text-gray-500">
                 <svg class="h-12 w-12 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div>
-                    <h3 class="text-lg font-medium">Nenhum resultado encontrado</h3>
-                    <p class="text-sm">Tente ajustar os filtros para encontrar registros.</p>
+                    <h3 class="text-lg font-medium text-gray-900">Nenhum resultado encontrado</h3>
+                    <p class="text-sm text-gray-600">Tente ajustar os filtros para encontrar registros.</p>
                 </div>
             </div>
         </div>
