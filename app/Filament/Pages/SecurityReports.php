@@ -11,7 +11,7 @@ use App\Models\Destination;
 use Filament\Support\RawJs;
 use Livewire\Attributes\On;
 use Filament\Actions\Action;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Spatie\Browsershot\Browsershot;
 use Livewire\Attributes\Computed;
 use Illuminate\Support\Facades\DB;
 use Filament\Forms\Components\Grid;
@@ -792,12 +792,32 @@ class SecurityReports extends Page implements HasForms
             'sort_direction' => $sortDirectionDescription
         ];
         
-        $pdf = PDF::loadView('reports.visitors-report', [
-            'results' => $this->results,
-            'filterInfo' => $filterInfo
-        ]);
+        // Prepara a imagem do logo como base64
+        $logoPath = public_path('images/logo-cmrj-horizontal.jpg');
+        $logoBase64 = '';
+        if (file_exists($logoPath)) {
+            $logoBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($logoPath));
+        }
         
-        $pdf->setPaper('a4', 'landscape');
+        // Gera o HTML do relatório
+        $html = view('reports.visitors-report', [
+            'results' => $this->results,
+            'filterInfo' => $filterInfo,
+            'logoBase64' => $logoBase64
+        ])->render();
+        
+        // Usa o Browsershot para gerar o PDF, mantendo a mesma configuração que funciona no CredentialPrintService
+        $pdfOutput = Browsershot::html($html)
+            ->setNodeBinary('/usr/bin/node')
+            ->setChromePath('/opt/google/chrome/chrome') // Caminho direto para o executável chrome (não o script)
+            ->paperSize(297, 210, 'mm') // A4 em modo paisagem (landscape)
+            ->margins(15, 15, 15, 15, 'mm')
+            ->showBackground()
+            ->noSandbox()
+            ->deviceScaleFactor(2)
+            ->dismissDialogs()
+            ->waitUntilNetworkIdle()
+            ->pdf();
         
         Notification::make()
             ->success()
@@ -806,8 +826,9 @@ class SecurityReports extends Page implements HasForms
             ->send();
             
         return response()->streamDownload(
-            fn () => print($pdf->output()),
-            'relatorio_visitantes_' . now()->format('YmdHis') . '.pdf'
+            fn () => print($pdfOutput),
+            'relatorio_visitantes_' . now()->format('YmdHis') . '.pdf',
+            ['Content-Type' => 'application/pdf']
         );
     }
 
