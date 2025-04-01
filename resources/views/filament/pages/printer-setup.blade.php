@@ -102,7 +102,7 @@
                                             </select>
                                         </div>
 
-                                        <div>
+                                        {{-- <div>
                                             <label class="block text-sm font-medium text-gray-950 dark:text-white mb-2">
                                                 Rotação
                                             </label>
@@ -113,7 +113,7 @@
                                                 <option value="0">0 graus</option>
                                                 <option value="90">90 graus</option>
                                             </select>
-                                        </div>
+                                        </div> --}}
                                     </div>
                                     
                                     <!-- Configurações de Tamanho da Etiqueta -->
@@ -134,7 +134,7 @@
                                                         min="1"
                                                         step="1"
                                                         @change="hasChanges = true"
-                                                        class="fi-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-primary-500"
+                                                        class="fi-input block w-full border-gray-300 rounded-lg shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:focus:ring-primary-500 text-gray-950 dark:text-white"
                                                     >
                                                 </div>
                                             </div>
@@ -150,7 +150,7 @@
                                                         min="1"
                                                         step="1"
                                                         @change="hasChanges = true"
-                                                        class="fi-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-primary-500"
+                                                        class="fi-input block w-full border-gray-300 rounded-lg shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:focus:ring-primary-500 text-gray-950 dark:text-white"
                                                     >
                                                 </div>
                                             </div>
@@ -177,7 +177,7 @@
                                                     min="0"
                                                     step="1"
                                                     @change="hasChanges = true"
-                                                    class="fi-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-primary-500"
+                                                    class="fi-input block w-full border-gray-300 rounded-lg shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:focus:ring-primary-500 text-gray-950 dark:text-white"
                                                 >
                                             </div>
                                             
@@ -191,7 +191,7 @@
                                                     min="0"
                                                     step="1"
                                                     @change="hasChanges = true"
-                                                    class="fi-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-primary-500"
+                                                    class="fi-input block w-full border-gray-300 rounded-lg shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:focus:ring-primary-500 text-gray-950 dark:text-white"
                                                 >
                                             </div>
                                             
@@ -205,7 +205,7 @@
                                                     min="0"
                                                     step="1"
                                                     @change="hasChanges = true"
-                                                    class="fi-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-primary-500"
+                                                    class="fi-input block w-full border-gray-300 rounded-lg shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:focus:ring-primary-500 text-gray-950 dark:text-white"
                                                 >
                                             </div>
                                             
@@ -219,7 +219,7 @@
                                                     min="0"
                                                     step="1"
                                                     @change="hasChanges = true"
-                                                    class="fi-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:focus:ring-primary-500"
+                                                    class="fi-input block w-full border-gray-300 rounded-lg shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:focus:ring-primary-500 text-gray-950 dark:text-white"
                                                 >
                                             </div>
                                         </div>

@@ -51,8 +51,8 @@ window.printVisitorCredential = async function(visitor) {
             throw new Error('ID do visitante não fornecido');
         }
 
-        console.log('[CredentialPrint] Gerando PDF para visitante:', visitor.id);
         console.log('[CredentialPrint] Configuração da impressora:', printerConfig);
+        console.log('[CredentialPrint] Gerando PDF para visitante:', visitor.id);
 
         // Gera o PDF no servidor
         const response = await fetch(`/credentials/${visitor.id}/pdf`, {
@@ -118,26 +118,31 @@ window.printVisitorCredential = async function(visitor) {
         console.log('[CredentialPrint] Configuração de impressão:', print_config);
 
         // Configura QZ-Tray para impressão
-        console.log('[CredentialPrint] Configurando QZ-Tray com:', print_config);
+        console.log('[CredentialPrint] Disponivel para impressão QZ-Tray:', print_config);
         
         // Cria a configuração base do QZ-Tray - com verificação para evitar acesso a propriedades indefinidas
         const qzConfigOptions = {
             margins: print_config.options.margins || { top: 0, right: 0, bottom: 0, left: 0 },
             orientation: print_config.options.orientation || 'portrait',
+            // rotation: print_config.options.rotation !== undefined ? 
+                // (typeof print_config.options.rotation === 'string' ? 
+                // parseFloat(print_config.options.rotation) || 0 : 
+                // print_config.options.rotation) : 0,
             units: 'mm',
-            forcePageSize: true,
-            autoRotate: false
+            autoRotate: false,
+            scaleContent: print_config.options.scaleContent !== undefined ? print_config.options.scaleContent : true,
         };
+        console.log('[CredentialPrint] Configuração qzConfigOptions:', qzConfigOptions);
         
         // Adiciona o tamanho apenas se estiver definido
-        if (print_config.options.size) {
-            qzConfigOptions.size = print_config.options.size;
-            console.log('[CredentialPrint] Usando tamanho definido:', qzConfigOptions.size);
-        } else {
-            console.log('[CredentialPrint] Tamanho não definido nas configurações');
-        }
+        // if (print_config.options.size) {
+        //     qzConfigOptions.size = print_config.options.size;
+        //     console.log('[CredentialPrint] Usando tamanho definido:', qzConfigOptions.size);
+        // } else {
+        //     console.log('[CredentialPrint] Tamanho não definido nas configurações');
+        // }
         
-        const qzConfig = qz.configs.create(print_config.printer, qzConfigOptions);
+        const qzConfig = qz.configs.create(print_config.printer);
 
         // Prepara os dados para impressão
         const printDataOptions = {
@@ -145,36 +150,42 @@ window.printVisitorCredential = async function(visitor) {
             margins: print_config.options.margins || { top: 0, right: 0, bottom: 0, left: 0 },
             units: 'mm',
             orientation: print_config.options.orientation || 'portrait',
+            // Se rotation existir, garante que seja número
+            // rotation: print_config.options.rotation !== undefined ? 
+            //     (typeof print_config.options.rotation === 'string' ? 
+            //     parseFloat(print_config.options.rotation) || 0 : 
+            //     print_config.options.rotation) : 0,
             // Configurações para melhor qualidade
-            scaleContent: print_config.options.scaleContent !== undefined ? print_config.options.scaleContent : true,
+            scaleContent: print_config.options.scaleContent !== undefined ? print_config.options.scaleContent : false,
             rasterize: true,
             interpolation: 'bicubic',
             density: 'best',
             altFontRendering: true,
-            ignoreTransparency: true,
+            ignoreTransparency: false,
             colorType: 'grayscale',
             // Força o tamanho exato do papel
-            fitToPage: false,
-            forcePageSize: true,
-            autoRotate: false,
+            // fitToPage: false,
+            // forcePageSize: true,
+            // autoRotate: false,
             zoom: 1.0
         };
         
-        const printData = [{
+        const qzData = [{
             type: 'pixel',
             format: 'pdf',
             flavor: 'base64',
             data: pdf_base64,
-            options: printDataOptions
+            // options: { altFontRendering: true, rotation: print_config.options.rotation || 0 }
+            options: { altFontRendering: true }
         }];
 
         console.log('[CredentialPrint] Dados de impressão:', {
-            ...printData[0],
+            ...qzData[0],
             data: 'BASE64_DATA' // Não loga o PDF em base64
         });
 
         // Executa a impressão
-        await qz.print(qzConfig, printData);
+        await qz.print(qzConfig, qzData);
 
         // Notifica sucesso
                 if (window.Filament) {

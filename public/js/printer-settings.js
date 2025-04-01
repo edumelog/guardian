@@ -3,7 +3,7 @@ document.addEventListener('alpine:init', () => {
         printers: [],
         selectedPrinter: null,
         orientation: null,
-        rotation: '0',
+        // rotation: 0,
         loading: true,
         error: null,
         connected: false,
@@ -33,7 +33,8 @@ document.addEventListener('alpine:init', () => {
             interpolation: 'bicubic',
             density: 'best',
             altFontRendering: true,
-            ignoreTransparency: true
+            ignoreTransparency: true,
+            colorType: 'grayscale'
         },
 
         async init() {
@@ -58,7 +59,7 @@ document.addEventListener('alpine:init', () => {
                         this.orientation = config.orientation || 'portrait';
                         
                         // Carrega a rotação (novo campo)
-                        this.rotation = config.rotation || '0';
+                        // this.rotation = typeof config.rotation === 'string' ? parseFloat(config.rotation) || 0 : (config.rotation || 0);
                         
                         // Não define o selectedTemplate aqui, será definido após carregar a lista de templates
                         // para garantir que o template selecionado existe
@@ -107,6 +108,7 @@ document.addEventListener('alpine:init', () => {
                             if (config.printOptions.density) this.printParams.density = config.printOptions.density;
                             if (config.printOptions.altFontRendering !== undefined) this.printParams.altFontRendering = config.printOptions.altFontRendering;
                             if (config.printOptions.ignoreTransparency !== undefined) this.printParams.ignoreTransparency = config.printOptions.ignoreTransparency;
+                            if (config.printOptions.colorType !== undefined) this.printParams.colorType = config.printOptions.colorType;
                         }
                     } catch (configErr) {
                         console.error('Erro ao carregar configuração do localStorage:', configErr);
@@ -160,7 +162,7 @@ document.addEventListener('alpine:init', () => {
                 // Observa mudanças nos campos
                 this.$watch('selectedPrinter', () => this.hasChanges = true);
                 this.$watch('orientation', () => this.hasChanges = true);
-                this.$watch('rotation', () => this.hasChanges = true);
+                // this.$watch('rotation', () => this.hasChanges = true);
                 this.$watch('selectedTemplate', () => this.hasChanges = true);
                 this.$watch('pageWidth', () => this.hasChanges = true);
                 this.$watch('pageHeight', () => this.hasChanges = true);
@@ -398,7 +400,7 @@ document.addEventListener('alpine:init', () => {
                     printer: this.selectedPrinter,
                     template: this.selectedTemplate,
                     orientation: this.orientation,
-                    rotation: this.rotation,
+                    // rotation: parseFloat(this.rotation) || 0,
                     printOptions: {
                         pageWidth: parseFloat(this.pageWidth),
                         pageHeight: parseFloat(this.pageHeight),
@@ -416,7 +418,8 @@ document.addEventListener('alpine:init', () => {
                         interpolation: this.printParams.interpolation,
                         density: this.printParams.density,
                         altFontRendering: this.printParams.altFontRendering,
-                        ignoreTransparency: this.printParams.ignoreTransparency
+                        ignoreTransparency: this.printParams.ignoreTransparency,
+                        colorType: this.printParams.colorType
                     }
                 };
 

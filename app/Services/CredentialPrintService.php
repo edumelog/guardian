@@ -29,7 +29,7 @@ class CredentialPrintService
         Log::info('Iniciando geração de PDF para impressão', [
             'visitor_id' => $visitor->id,
             'visitor_photo' => $visitor->photo,
-            'printer_config' => $printerConfig
+            'printerConfig' => $printerConfig
         ]);
 
         try {
@@ -135,22 +135,44 @@ class CredentialPrintService
 
             // Get all data from printerConfig stored at printerConfig['printOptions']
             $printOptions = $printerConfig['printOptions'] ?? [];
-            Log::info('Configurações de impressão:', [
-                'print_options' => $printOptions
-            ]);
+            // Log::info('Configurações de impressão:', [
+            //     'print_options' => $printOptions
+            // ]);
 
             // Get the width and height of the paper size in mm
             $paperWidth_mm = $printerConfig['printOptions']['pageWidth'];
             $paperHeight_mm = $printerConfig['printOptions']['pageHeight'];
+            Log::info('Dimensões da folha:', [
+                'paperWidth_mm' => $paperWidth_mm,
+                'paperHeight_mm' => $paperHeight_mm
+            ]);
 
             // Get the width and height of the paper size from mm to px
             $paperWidth_px = $this->convertToPoints($paperWidth_mm, 96);
             $paperHeight_px = $this->convertToPoints($paperHeight_mm, 96);
 
-            // Get orientation from printerConfig
+            // Obtém a orientação diretamente da raiz do printerConfig
             $orientation = $printerConfig['orientation'] ?? 'portrait';
             
-            // Calculate the scale factor based on the paper size. If orientation is portrait, scale the width, if orientation is landscape, scale the height
+            // Obtém e converte a rotação para número, garantindo que seja 0 se não for válido
+            // $rotation = isset($printerConfig['rotation']) ? 
+            //     (is_numeric($printerConfig['rotation']) ? (float)$printerConfig['rotation'] : 0) : 
+            //     0;
+
+            Log::info('Configurações de impressão:', [
+                'orientation' => $orientation,
+                // 'rotation' => $rotation,
+                'margins' => $printOptions['margins'] ?? [
+                    'top' => 0,
+                    'right' => 0,
+                    'bottom' => 0,
+                    'left' => 0
+                ],
+                'print_options' => $printOptions,
+                'printer_config' => $printerConfig
+            ]);
+            
+            // Calculate the scale factor based on the paper size and orientation.
             $scaleFactor = 1;   
             if ($orientation === 'portrait') {
                 $scaleFactor = $paperWidth_px / $htmlWidth_px;
@@ -160,6 +182,7 @@ class CredentialPrintService
             Log::info('Fator de escala:', [
                 'scale_factor' => $scaleFactor
             ]);
+            
 
             // Obtém as configurações de impressão
             $printOptions = $printerConfig['printOptions'] ?? [];
@@ -181,15 +204,18 @@ class CredentialPrintService
                     ->margins($margins['top'], $margins['right'], $margins['bottom'], $margins['left'])
                     ->showBackground()
                     ->scale($scaleFactor)
+                    // ->scale(1)
                     ->noSandbox()
                     ->deviceScaleFactor(1)
                     ->dismissDialogs()
                     ->waitUntilNetworkIdle()
-                    // define the orientation accordning to orientation in printerConfig
-                    ->landscape($printerConfig['orientation'] === 'landscape')
+                    // define the orientation according to orientation in printerConfig when using paperSize mm
+                    ->landscape($orientation == 'landscape' || $orientation == 'reverse-landscape' ? true : false)
+                    // define the orientation according to orientation in printerConfig when using paperSize px
+                    // ->landscape($htmlWidth_px > $htmlHeight_px ? false : true)
                     ->base64pdf();
                     // save at public folder
-                    // ->savePdf(public_path('teste.pdf'));
+                    // ->savePdf(public_path('teste_'.$orientation.'.pdf'));
                     // dd("parei aqui");
 
                 Log::info('PDF gerado com sucesso', [
@@ -204,14 +230,14 @@ class CredentialPrintService
                         'options' => [
                             'margins' => $margins,
                             'orientation' => $orientation,
-                            'rotation' => 0, 
+                            // 'rotation' => $rotation, 
                             'scaleContent' => true,
                             'rasterize' => true,
                             'interpolation' => 'bicubic',
                             'density' => 'best',
                             'altFontRendering' => true,
                             'ignoreTransparency' => true,
-                            'colorType' => 'blackwhite'
+                            'colorType' => $printerConfig['printOptions']['colorType'] ?? 'grayscale'
                         ]
                     ]
                 ];
