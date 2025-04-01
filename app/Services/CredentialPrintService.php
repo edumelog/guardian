@@ -29,7 +29,7 @@ class CredentialPrintService
         Log::info('Iniciando geração de PDF para impressão', [
             'visitor_id' => $visitor->id,
             'visitor_photo' => $visitor->photo,
-            'printer_config' => $printerConfig
+            'printerConfig' => $printerConfig
         ]);
 
         try {
@@ -72,7 +72,7 @@ class CredentialPrintService
                     ? preg_replace('/(\d{3})(\d{3})(\d{3})(\d{2})/', '$1.$2.$3-$4', $visitor->doc)
                     : $visitor->doc,
                 'visitor-destination' => $visitor->destination->name,
-                'visitor-destination-alias' => $visitor->destination->alias,
+                'visitor-destination-alias' => $visitor->destination->getFirstAvailableAlias(),
                 'visitor-destination-address' => $visitor->destination->address,
                 'visitor-destination-phone' => $visitor->destination->phone,
                 'visitor-in-datetime' => $visitor->latestLog?->in_date?->format('d/m/Y H:i') ?? '',
@@ -125,87 +125,109 @@ class CredentialPrintService
             // Processa o template substituindo os marcadores
             $html = $this->processTemplate($html, $data);
 
-            // Configurações do PDF
-            $pageWidth = $printerConfig['printOptions']['pageWidth'] ?? 100;
-            $pageHeight = $printerConfig['printOptions']['pageHeight'] ?? 65;
-
-            // Converte mm para pixels (96 pixels por polegada)
-            $pixelsPerMm = 96 / 25.4;
-            $widthPx = ceil($pageWidth * $pixelsPerMm);
-            $heightPx = ceil($pageHeight * $pixelsPerMm);
-
-            Log::info('Dimensões do PDF:', [
-                'width_mm' => $pageWidth,
-                'height_mm' => $pageHeight,
-                'width_px' => $widthPx,
-                'height_px' => $heightPx
+            // Get the width and height of the html in pixels
+            $htmlWidth_px = $this->getHtmlWidth($html);
+            $htmlHeight_px = $this->getHtmlHeight($html);
+            Log::info('Dimensões do HTML:', [
+                'html_width_px' => $htmlWidth_px,
+                'html_height_px' => $htmlHeight_px
             ]);
 
-            // Gera o PDF usando Browsershot
-            Log::info('Iniciando geração do PDF com Browsershot', [
-                'width_px' => $widthPx,
-                'height_px' => $heightPx
+            // Get all data from printerConfig stored at printerConfig['printOptions']
+            $printOptions = $printerConfig['printOptions'] ?? [];
+            $resolution = $printerConfig['dpi'] ?? 96;
+
+            // Get the width and height of the paper size in mm
+            $paperWidth_mm = $printerConfig['printOptions']['pageWidth'];
+            $paperHeight_mm = $printerConfig['printOptions']['pageHeight'];
+            Log::info('Dimensões da folha:', [
+                'paperWidth_mm' => $paperWidth_mm,
+                'paperHeight_mm' => $paperHeight_mm
             ]);
 
-            try {
-                // Injeta CSS para garantir que o conteúdo fique contido na página
-                $styleTag = "<style>
-                    html, body {
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        width: {$widthPx}px !important;
-                        height: {$heightPx}px !important;
-                        overflow: hidden !important;
-                    }
-                    body > * {
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        box-sizing: border-box !important;
-                    }
-                </style>";
-                $html = str_replace('</head>', $styleTag . '</head>', $html);
+            // Get the width and height of the paper size from mm to px
+            $paperWidth_px = $this->convertToPoints($paperWidth_mm, $resolution);
+            $paperHeight_px = $this->convertToPoints($paperHeight_mm, $resolution);
 
-                Log::info('Configurações do PDF:', [
-                    'width_px' => $widthPx,
-                    'height_px' => $heightPx
-                ]);
+            // Obtém a orientação diretamente da raiz do printerConfig
+            $orientation = $printerConfig['orientation'] ?? 'portrait';
+            
+            // Obtém e converte a rotação para número, garantindo que seja 0 se não for válido
+            // $rotation = isset($printerConfig['rotation']) ? 
+            //     (is_numeric($printerConfig['rotation']) ? (float)$printerConfig['rotation'] : 0) : 
+            //     0;
 
-                $pdf = Browsershot::html($html)
-                    ->setNodeBinary('/usr/bin/node')
-                    ->setChromePath('/home/admin/.cache/puppeteer/chrome-headless-shell/linux-134.0.6998.35/chrome-headless-shell-linux64/chrome-headless-shell')
-                    ->paperSize($widthPx, $heightPx, 'px')
-                    ->margins(0, 0, 0, 0)
-                    ->showBackground()
-                    ->scale(1)
-                    ->noSandbox()
-                    ->deviceScaleFactor(2)
-                    ->windowSize($widthPx, $heightPx)
-                    ->fullPage(false)
-                    ->dismissDialogs()
-                    ->waitUntilNetworkIdle()
-                    ->base64pdf();
-
-                Log::info('PDF gerado com sucesso', [
-                    'pdf_size' => strlen($pdf)
-                ]);
-
-                // Obtém as configurações de impressão
-                $printOptions = $printerConfig['printOptions'] ?? [];
-                $margins = $printOptions['margins'] ?? [
+            Log::info('Configurações de impressão:', [
+                'orientation' => $orientation,
+                // 'rotation' => $rotation,
+                'margins' => $printOptions['margins'] ?? [
                     'top' => 0,
                     'right' => 0,
                     'bottom' => 0,
                     'left' => 0
-                ];
+                ],
+                'print_options' => $printOptions,
+                'printer_config' => $printerConfig
+            ]);
+            
+            // Calculate the scale factor based on the paper size and orientation.
+            $scaleFactor = 1;   
+            if ($orientation === 'portrait') {
+                $scaleFactor = $paperWidth_px / $htmlWidth_px;
+            } else {
+                $scaleFactor = $paperWidth_px / $htmlHeight_px*.98;
+            }
+            Log::info('Fator de escala:', [
+                'scale_factor' => $scaleFactor
+            ]);
+            
 
-                // Obtém a orientação diretamente da raiz do printerConfig
-                $orientation = $printerConfig['orientation'] ?? 'portrait';
+            // Obtém as configurações de impressão
+            $printOptions = $printerConfig['printOptions'] ?? [];
+            $margins_mm = $printOptions['margins'] ?? [
+                'top' => 0,
+                'right' => 0,
+                'bottom' => 0,
+                'left' => 0
+            ];
 
-                Log::info('Configurações de impressão:', [
-                    'orientation' => $orientation,
-                    'margins' => $margins,
-                    'print_options' => $printOptions,
-                    'printer_config' => $printerConfig
+            $margins_px = [
+                'top' => $this->convertToPoints($margins_mm['top'], $resolution)*$scaleFactor,
+                'right' => $this->convertToPoints($margins_mm['right'], $resolution)*$scaleFactor,
+                'bottom' => $this->convertToPoints($margins_mm['bottom'], $resolution)*$scaleFactor,
+                'left' => $this->convertToPoints($margins_mm['left'], $resolution)*$scaleFactor
+            ];
+            Log::info('Margens em pixels:', [
+                'margins_px' => $margins_px,
+                'margins_mm' => $margins_mm
+            ]);
+
+            try {
+                
+                $pdf = Browsershot::html($html)
+                    ->setNodeBinary('/usr/bin/node')
+                    ->setChromePath('/home/admin/.cache/puppeteer/chrome-headless-shell/linux-134.0.6998.35/chrome-headless-shell-linux64/chrome-headless-shell')
+                    // ->paperSize($htmlWidth_px, $htmlHeight_px, 'px')
+                    ->paperSize($paperWidth_mm, $paperHeight_mm, 'mm')
+                    ->margins($margins_px['top'], $margins_px['right'], $margins_px['bottom'], $margins_px['left'], 'px')
+                    ->showBackground()
+                    ->scale($scaleFactor)
+                    // ->scale(1)
+                    ->noSandbox()
+                    ->deviceScaleFactor(3)
+                    ->dismissDialogs()
+                    ->waitUntilNetworkIdle()
+                    // define the orientation according to orientation in printerConfig when using paperSize mm
+                    ->landscape($orientation == 'landscape' || $orientation == 'reverse-landscape' ? true : false)
+                    // define the orientation according to orientation in printerConfig when using paperSize px
+                    // ->landscape($htmlWidth_px > $htmlHeight_px ? false : true)
+                    ->base64pdf();
+                    // save at public folder
+                    // ->savePdf(public_path('teste_'.$orientation.'.pdf'));
+                    // dd("parei aqui");
+
+                Log::info('PDF gerado com sucesso', [
+                    'pdf_size' => strlen($pdf)
                 ]);
 
                 // Retorna o PDF em base64 e as configurações de impressão para o QZ-Tray
@@ -214,22 +236,29 @@ class CredentialPrintService
                     'print_config' => [
                         'printer' => $printerConfig['printer'] ?? '',
                         'options' => [
-                            'size' => [
-                                'width' => $pageWidth,
-                                'height' => $pageHeight
-                            ],
-                            'margins' => $margins,
+                            // 'margins' => $margins_mm,
                             'orientation' => $orientation,
-                            'scaleContent' => false,
+                            // 'rotation' => $rotation, 
+                            'scaleContent' => true,
                             'rasterize' => true,
                             'interpolation' => 'bicubic',
                             'density' => 'best',
                             'altFontRendering' => true,
                             'ignoreTransparency' => true,
-                            'colorType' => 'blackwhite'
+                            'colorType' => $printerConfig['printOptions']['colorType'] ?? 'grayscale'
                         ]
                     ]
                 ];
+
+                // Adiciona as dimensões ao retorno se estiverem disponíveis
+                if (isset($printerConfig['printOptions']) && 
+                    isset($printerConfig['printOptions']['pageWidth']) && 
+                    isset($printerConfig['printOptions']['pageHeight'])) {
+                    $returnConfig['print_config']['options']['size'] = [
+                        'width' => $printerConfig['printOptions']['pageWidth'],
+                        'height' => $printerConfig['printOptions']['pageHeight']
+                    ];
+                }
 
                 Log::info('Configuração final retornada:', [
                     'return_config' => $returnConfig['print_config']
@@ -348,20 +377,22 @@ class CredentialPrintService
     }
 
     /**
-     * Converte milímetros para pontos (unidade usada pelo DomPDF)
-     * 1 mm = 2.835 pontos (72/25.4)
+     * Converte milímetros para pixels baseado no valor de DPI fornecido
+     * Fórmula: pixels = (mm * dpi) / 25.4
      * 
      * @param float $value Valor em milímetros
-     * @return float Valor em pontos
+     * @param int $dpi Resolução em DPI (dots per inch)
+     * @return float Valor em pixels
      */
-    private function convertToPoints($value)
+    private function convertToPoints($value, $dpi = 96)
     {
-        // Conversão direta de mm para pontos (72/25.4 ≈ 2.835)
-        $result = $value * (72/25.4);
+        // Conversão de mm para pixels baseada no DPI
+        $result = $value * $dpi / 25.4;
 
-        Log::info('Conversão mm para pontos:', [
+        Log::info('Conversão mm para pixels:', [
             'valor_mm' => $value,
-            'valor_pt' => $result
+            'dpi' => $dpi,
+            'valor_px' => $result
         ]);
 
         return $result;
@@ -435,5 +466,188 @@ class CredentialPrintService
             ]);
             return '';
         }
+    }
+
+    /**
+     * Extrai a largura em pixels do HTML através do marcador tpl-size
+     *
+     * @param string $html O conteúdo HTML do template
+     * @return int|null A largura em pixels ou null se não encontrada
+     */
+    private function getHtmlWidth(string $html): ?int
+    {
+        // Carrega o HTML em um objeto DOMDocument
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        @$dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        
+        $xpath = new \DOMXPath($dom);
+        
+        // Procura por elementos com a classe 'tpl-size'
+        $elements = $xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' tpl-size ')]");
+        
+        if ($elements->length > 0) {
+            $element = $elements->item(0);
+            
+            // Verifica se é um elemento e se tem atributo width
+            if ($element instanceof \DOMElement) {
+                if ($element->hasAttribute('width')) {
+                    $width = (int)$element->getAttribute('width');
+                    Log::info('Dimensão de largura encontrada no atributo width com classe tpl-size', [
+                        'width' => $width,
+                        'element' => $element->nodeName
+                    ]);
+                    return $width;
+                }
+                
+                // Se não tem atributo width, tenta obter do style
+                if ($element->hasAttribute('style')) {
+                    $style = $element->getAttribute('style');
+                    
+                    // Expressão regular corrigida para capturar exatamente a propriedade width
+                    // Busca por: (^|;|\s)width\s*:\s*(\d+)px - para garantir que seja a propriedade "width" e não qualquer substring que contenha "width"
+                    if (preg_match('/(^|;|\s)width\s*:\s*(\d+)px/i', $style, $matches)) {
+                        $width = (int)$matches[2]; // Índice alterado de 1 para 2 devido ao novo grupo de captura
+                        Log::info('Dimensão de largura encontrada no style do elemento com classe tpl-size', [
+                            'width' => $width,
+                            'element' => $element->nodeName,
+                            'style' => $style
+                        ]);
+                        return $width;
+                    }
+                    
+                    // Expressão regular alternativa para buscar width sem a unidade px
+                    if (preg_match('/(^|;|\s)width\s*:\s*(\d+)\s*;/i', $style, $matches)) {
+                        $width = (int)$matches[2]; // Índice alterado de 1 para 2 devido ao novo grupo de captura
+                        Log::info('Dimensão de largura encontrada no style (sem px) do elemento com classe tpl-size', [
+                            'width' => $width,
+                            'element' => $element->nodeName,
+                            'style' => $style
+                        ]);
+                        return $width;
+                    }
+                    
+                    // Procura o width mesmo que esteja no meio do estilo ou no final sem ponto-e-vírgula
+                    if (preg_match('/(^|;|\s)width\s*:\s*(\d+)(px)?(\s*[;$]|\s*$)/i', $style, $matches)) {
+                        $width = (int)$matches[2]; // Índice alterado de 1 para 2 devido ao novo grupo de captura
+                        Log::info('Dimensão de largura encontrada no pattern completo do elemento com classe tpl-size', [
+                            'width' => $width,
+                            'element' => $element->nodeName,
+                            'style' => $style
+                        ]);
+                        return $width;
+                    }
+                }
+            }
+        }
+        
+        // Métodos de fallback (mantém os existentes para compatibilidade)
+        if (preg_match('/tpl-size="([0-9]+)x([0-9]+)"/', $html, $matches)) {
+            Log::info('Dimensões encontradas no marcador tpl-size', [
+                'width' => (int)$matches[1],
+                'height' => (int)$matches[2]
+            ]);
+            
+            return (int)$matches[1];
+        }
+        
+        if (preg_match('/<meta\s+name="tpl-dimensions"\s+content="([0-9]+)x([0-9]+)"\s*\/?>/i', $html, $matches)) {
+            Log::info('Dimensões encontradas na meta tag', [
+                'width' => (int)$matches[1],
+                'height' => (int)$matches[2]
+            ]);
+            
+            return (int)$matches[1];
+        }
+        
+        Log::warning('Não foi possível encontrar dimensões de largura no HTML');
+        return null;
+    }
+
+    /**
+     * Extrai a altura em pixels do HTML através do marcador tpl-size
+     *
+     * @param string $html O conteúdo HTML do template
+     * @return int|null A altura em pixels ou null se não encontrada
+     */
+    private function getHtmlHeight(string $html): ?int
+    {
+        // Carrega o HTML em um objeto DOMDocument
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        @$dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        
+        $xpath = new \DOMXPath($dom);
+        
+        // Procura por elementos com a classe 'tpl-size'
+        $elements = $xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' tpl-size ')]");
+        
+        if ($elements->length > 0) {
+            $element = $elements->item(0);
+            
+            // Verifica se é um elemento e se tem atributo height
+            if ($element instanceof \DOMElement) {
+                if ($element->hasAttribute('height')) {
+                    $height = (int)$element->getAttribute('height');
+                    Log::info('Dimensão de altura encontrada no atributo height com classe tpl-size', [
+                        'height' => $height,
+                        'element' => $element->nodeName
+                    ]);
+                    return $height;
+                }
+                
+                // Se não tem atributo height, tenta obter do style
+                if ($element->hasAttribute('style')) {
+                    $style = $element->getAttribute('style');
+                    
+                    // Expressão regular para capturar exatamente a propriedade height
+                    if (preg_match('/(^|;|\s)height\s*:\s*(\d+)px/i', $style, $matches)) {
+                        $height = (int)$matches[2]; // Índice alterado de 1 para 2 devido ao novo grupo de captura
+                        Log::info('Dimensão de altura encontrada no style do elemento com classe tpl-size', [
+                            'height' => $height,
+                            'element' => $element->nodeName,
+                            'style' => $style
+                        ]);
+                        return $height;
+                    }
+                    
+                    // Expressão regular alternativa para buscar height sem a unidade px
+                    if (preg_match('/(^|;|\s)height\s*:\s*(\d+)\s*;/i', $style, $matches)) {
+                        $height = (int)$matches[2]; // Índice alterado de 1 para 2 devido ao novo grupo de captura
+                        Log::info('Dimensão de altura encontrada no style (sem px) do elemento com classe tpl-size', [
+                            'height' => $height,
+                            'element' => $element->nodeName,
+                            'style' => $style
+                        ]);
+                        return $height;
+                    }
+                    
+                    // Procura o height mesmo que esteja no meio do estilo ou no final sem ponto-e-vírgula
+                    if (preg_match('/(^|;|\s)height\s*:\s*(\d+)(px)?(\s*[;$]|\s*$)/i', $style, $matches)) {
+                        $height = (int)$matches[2]; // Índice alterado de 1 para 2 devido ao novo grupo de captura
+                        Log::info('Dimensão de altura encontrada no pattern completo do elemento com classe tpl-size', [
+                            'height' => $height,
+                            'element' => $element->nodeName,
+                            'style' => $style
+                        ]);
+                        return $height;
+                    }
+                }
+            }
+        }
+        
+        // Métodos de fallback (mantém os existentes para compatibilidade)
+        if (preg_match('/tpl-size="([0-9]+)x([0-9]+)"/', $html, $matches)) {
+            return (int)$matches[2];
+        }
+        
+        if (preg_match('/<meta\s+name="tpl-dimensions"\s+content="([0-9]+)x([0-9]+)"\s*\/?>/i', $html, $matches)) {
+            return (int)$matches[2];
+        }
+        
+        Log::warning('Não foi possível encontrar dimensões de altura no HTML');
+        return null;
     }
 } 
