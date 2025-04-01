@@ -206,7 +206,7 @@ class CredentialPrintService
                 
                 $pdf = Browsershot::html($html)
                     ->setNodeBinary('/usr/bin/node')
-                    ->setChromePath('/home/admin/.cache/puppeteer/chrome-headless-shell/linux-134.0.6998.35/chrome-headless-shell-linux64/chrome-headless-shell')
+                    ->setChromePath('/opt/google/chrome/chrome')
                     // ->paperSize($htmlWidth_px, $htmlHeight_px, 'px')
                     ->paperSize($paperWidth_mm, $paperHeight_mm, 'mm')
                     ->margins($margins_px['top'], $margins_px['right'], $margins_px['bottom'], $margins_px['left'], 'px')
