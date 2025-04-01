@@ -654,97 +654,97 @@ class SecurityReports extends Page implements HasForms
 
         // Exporta todos os resultados, não apenas a página atual
         $filename = 'relatorio_visitantes_' . now()->format('YmdHis') . '.csv';
-        $headers = [
+        
+        // Usar uma closure para gerar o CSV no momento do download
+        return response()->streamDownload(function () {
+            $handle = fopen('php://output', 'w');
+            // BOM para UTF-8 - garante que acentos sejam exibidos corretamente
+            fputs($handle, $bom = (chr(0xEF) . chr(0xBB) . chr(0xBF)));
+
+            // Obter a descrição do campo de ordenação para incluir na exportação
+            $sortFieldDescription = match($this->sortField) {
+                'visitor_name' => 'Nome do Visitante',
+                'document' => 'Documento',
+                'destination' => 'Destino',
+                'in_date' => 'Data de Entrada',
+                'out_date' => 'Data de Saída',
+                'duration' => 'Duração da Visita',
+                'operator' => 'Operador',
+                default => 'Data de Entrada'
+            };
+            
+            $sortDirectionDescription = $this->sortDirection === 'asc' ? 'Crescente' : 'Decrescente';
+            
+            // Incluir informações de ordenação como primeira linha do CSV
+            fputcsv($handle, [
+                'Relatório de Visitantes - ' . now()->format('d/m/Y H:i:s'),
+                'Ordenado por: ' . $sortFieldDescription,
+                'Ordem: ' . $sortDirectionDescription
+            ]);
+            
+            // Linha em branco para separar o cabeçalho
+            fputcsv($handle, ['']);
+    
+            // Cabeçalhos do CSV
+            fputcsv($handle, [
+                'Nome do Visitante',
+                'Tipo de Documento',
+                'Número do Documento',
+                'Destino',
+                'Data de Entrada',
+                'Data de Saída',
+                'Operador',
+                'Duração da Visita'
+            ]);
+    
+            // Linhas de dados
+            foreach ($this->results as $log) {
+                $duracao = '';
+                if (!empty($log->in_date) && !empty($log->out_date)) {
+                    $inDate = new \DateTime($log->in_date);
+                    $outDate = new \DateTime($log->out_date);
+                    $interval = $inDate->diff($outDate);
+                    
+                    // Cálculo da duração em dias, horas, minutos
+                    $dias = $interval->days;
+                    $horas = $interval->h;
+                    $minutos = $interval->i;
+                    $segundos = $interval->s;
+                    
+                    // Formata a duração dependendo do tempo total
+                    if ($dias > 0) {
+                        $duracao = $dias.'d '.$horas.'h';
+                    } elseif ($horas > 0) {
+                        $duracao = $horas.'h '.$minutos.'m';
+                    } else {
+                        $duracao = $minutos.'m '.$segundos.'s';
+                    }
+                }
+    
+                fputcsv($handle, [
+                    $log->visitor->name ?? 'N/A',
+                    $log->visitor->docType->type ?? 'N/A',
+                    $log->visitor->doc ?? 'N/A',
+                    $log->destination->name ?? 'N/A',
+                    $log->in_date ? date('d/m/Y H:i', strtotime($log->in_date)) : 'N/A',
+                    $log->out_date ? date('d/m/Y H:i', strtotime($log->out_date)) : 'Em andamento',
+                    $log->operator->name ?? 'N/A',
+                    $duracao ?: 'Em andamento'
+                ]);
+            }
+            
+            fclose($handle);
+        }, $filename, [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-        ];
-
-        $handle = fopen('php://temp', 'w+');
-        fputs($handle, $bom = (chr(0xEF) . chr(0xBB) . chr(0xBF))); // BOM para UTF-8
-
-        // Obter a descrição do campo de ordenação para incluir na exportação
-        $sortFieldDescription = match($this->sortField) {
-            'visitor_name' => 'Nome do Visitante',
-            'document' => 'Documento',
-            'destination' => 'Destino',
-            'in_date' => 'Data de Entrada',
-            'out_date' => 'Data de Saída',
-            'duration' => 'Duração da Visita',
-            'operator' => 'Operador',
-            default => 'Data de Entrada'
-        };
-        
-        $sortDirectionDescription = $this->sortDirection === 'asc' ? 'Crescente' : 'Decrescente';
-        
-        // Incluir informações de ordenação como primeira linha do CSV
-        fputcsv($handle, [
-            'Relatório de Visitantes - ' . now()->format('d/m/Y H:i:s'),
-            'Ordenado por: ' . $sortFieldDescription,
-            'Ordem: ' . $sortDirectionDescription
-        ]);
-        
-        // Linha em branco para separar o cabeçalho
-        fputcsv($handle, ['']);
-
-        // Cabeçalhos do CSV
-        fputcsv($handle, [
-            'Nome do Visitante',
-            'Tipo de Documento',
-            'Número do Documento',
-            'Destino',
-            'Data de Entrada',
-            'Data de Saída',
-            'Operador',
-            'Duração da Visita'
         ]);
 
-        // Linhas de dados
-        foreach ($this->results as $log) {
-            $duracao = '';
-            if (!empty($log->in_date) && !empty($log->out_date)) {
-                $inDate = new \DateTime($log->in_date);
-                $outDate = new \DateTime($log->out_date);
-                $interval = $inDate->diff($outDate);
-                
-                // Cálculo da duração em dias, horas, minutos
-                $dias = $interval->days;
-                $horas = $interval->h;
-                $minutos = $interval->i;
-                $segundos = $interval->s;
-                
-                // Formata a duração dependendo do tempo total
-                if ($dias > 0) {
-                    $duracao = $dias.'d '.$horas.'h';
-                } elseif ($horas > 0) {
-                    $duracao = $horas.'h '.$minutos.'m';
-                } else {
-                    $duracao = $minutos.'m '.$segundos.'s';
-                }
-            }
-
-            fputcsv($handle, [
-                $log->visitor->name ?? 'N/A',
-                $log->visitor->docType->type ?? 'N/A',
-                $log->visitor->doc ?? 'N/A',
-                $log->destination->name ?? 'N/A',
-                $log->in_date ? date('d/m/Y H:i', strtotime($log->in_date)) : 'N/A',
-                $log->out_date ? date('d/m/Y H:i', strtotime($log->out_date)) : 'Em andamento',
-                $log->operator->name ?? 'N/A',
-                $duracao ?: 'Em andamento'
-            ]);
-        }
-
-        rewind($handle);
-        $csv = stream_get_contents($handle);
-        fclose($handle);
-
+        // Notificação será mostrada na interface pelo Filament após o download iniciar
         Notification::make()
             ->success()
             ->title('Exportação Concluída')
             ->body('O arquivo CSV foi gerado com sucesso.')
             ->send();
-
-        return response($csv, 200, $headers);
     }
 
     public function exportPdf()
@@ -947,115 +947,5 @@ class SecurityReports extends Page implements HasForms
         return [];
     }
 
-    // protected function generatePDF()
-    // {
-    //     if (empty($this->results)) {
-    //         Notification::make()
-    //             ->title('Erro')
-    //             ->body('Não há resultados para gerar o PDF.')
-    //             ->danger()
-    //             ->send();
-    //         return;
-    //     }
-
-    //     try {
-    //         // Formatando os resultados com Carbon antes de enviar para a view
-    //         $results = collect($this->results)->map(function ($log) {
-    //             $log['formatted_in_date'] = $log->in_date ? \Carbon\Carbon::parse($log->in_date)->isoFormat('DD/MM/YYYY HH:mm:ss') : 'N/A';
-    //             $log['formatted_out_date'] = $log->out_date ? \Carbon\Carbon::parse($log->out_date)->isoFormat('DD/MM/YYYY HH:mm:ss') : 'Em andamento';
-    //             return $log;
-    //         });
-
-    //         // Gerando o HTML com a view
-    //         $html = view('reports.visitors-report', [
-    //             'results' => $results,
-    //             'filters' => $this->getFormattedFilters(),
-    //             'current_date' => \Carbon\Carbon::now()->locale('pt_BR')->isoFormat('DD [de] MMMM [de] YYYY [às] HH:mm:ss'),
-    //             'total' => count($results),
-    //             'showFooter' => false // Não mostrar o footer no HTML pois usaremos o footer do Browsershot
-    //         ])->render();
-
-    //         // Prepara o footer com a numeração de páginas
-    //         $footerHtml = '
-    //         <div style="width: 100%; font-size: 9px; text-align: center; color: #6b7280; font-family: Arial, sans-serif; padding: 0 15mm;">
-    //             <div style="display: inline-block; width: 33%; text-align: left;">DTI - Diretoria de Tecnologia da Informação</div>
-    //             <div style="display: inline-block; width: 33%; text-align: center;">Sistema Guardian - Relatório de Visitantes</div>
-    //             <div style="display: inline-block; width: 33%; text-align: right;"><span class="pageNumber"></span> de <span class="totalPages"></span></div>
-    //         </div>';
-
-    //         // Configurando o Browsershot
-    //         $tempFile = tempnam(sys_get_temp_dir(), 'report_') . '.pdf';
-
-    //         Browsershot::html($html)
-    //             ->timeout(120)
-    //             ->ignoreHttpsErrors()
-    //             ->showBackground()
-    //             ->format('A4')
-    //             ->landscape()
-    //             ->margins(15, 15, 15, 15)
-    //             ->deviceScaleFactor(1.5)
-    //             // Configuração específica para cabeçalhos e rodapés
-    //             ->showBrowserHeaderAndFooter()
-    //             ->footerHtml($footerHtml)
-    //             ->headerHtml('<div style="width: 100%; height: 0;"></div>')
-    //             // Configurações adicionais
-    //             ->setOption('printBackground', true)
-    //             ->setOption('preferCSSPageSize', true)
-    //             ->setOption('landscape', true)
-    //             ->setOption('format', 'A4')
-    //             // Adicionar argumentos extras para o Chrome
-    //             ->addChromiumArguments([
-    //                 '--no-sandbox',
-    //                 '--disable-setuid-sandbox',
-    //                 '--disable-gpu',
-    //                 '--font-render-hinting=none',
-    //                 '--lang=pt-BR', // Configurar idioma para português do Brasil
-    //             ])
-    //             ->savePdf($tempFile);
-
-    //         // Verificar se o diretório temporário é gravável
-    //         if (!is_writable(sys_get_temp_dir())) {
-    //             throw new \Exception("O diretório temporário não é gravável: " . sys_get_temp_dir());
-    //         }
-
-    //         // Obter o conteúdo do PDF e configurar o download
-    //         $pdfContent = file_get_contents($tempFile);
-    //         if (!$pdfContent) {
-    //             throw new \Exception("Falha ao ler o arquivo PDF: " . $tempFile);
-    //         }
-
-    //         // Excluir o arquivo temporário
-    //         if (file_exists($tempFile)) {
-    //             unlink($tempFile);
-    //         }
-
-    //         // Registrar sucesso
-    //         Log::info('PDF gerado com sucesso', [
-    //             'file' => $tempFile,
-    //             'size' => strlen($pdfContent)
-    //         ]);
-
-    //         // Configurar o download
-    //         $filename = 'relatorio_visitantes_' . now()->format('Y-m-d_H-i-s') . '.pdf';
-    //         return response()->streamDownload(
-    //             fn () => print($pdfContent),
-    //             $filename,
-    //             [
-    //                 'Content-Type' => 'application/pdf',
-    //                 'Content-Disposition' => 'attachment; filename="' . $filename . '"'
-    //             ]
-    //         );
-    //     } catch (\Exception $e) {
-    //         Log::error('Erro ao gerar PDF: ' . $e->getMessage(), [
-    //             'exception' => $e,
-    //             'trace' => $e->getTraceAsString()
-    //         ]);
-
-    //         Notification::make()
-    //             ->title('Erro')
-    //             ->body('Ocorreu um erro ao gerar o PDF: ' . $e->getMessage())
-    //             ->danger()
-    //             ->send();
-    //     }
-    // }
+    
 } 
