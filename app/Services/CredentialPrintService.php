@@ -72,7 +72,7 @@ class CredentialPrintService
                     ? preg_replace('/(\d{3})(\d{3})(\d{3})(\d{2})/', '$1.$2.$3-$4', $visitor->doc)
                     : $visitor->doc,
                 'visitor-destination' => $visitor->destination->name,
-                'visitor-destination-alias' => $visitor->destination->alias,
+                'visitor-destination-alias' => $visitor->destination->getFirstAvailableAlias(),
                 'visitor-destination-address' => $visitor->destination->address,
                 'visitor-destination-phone' => $visitor->destination->phone,
                 'visitor-in-datetime' => $visitor->latestLog?->in_date?->format('d/m/Y H:i') ?? '',
