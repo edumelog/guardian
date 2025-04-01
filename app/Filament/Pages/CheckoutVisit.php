@@ -15,6 +15,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
+use Filament\Support\Enums\MaxWidth;
 
 class CheckoutVisit extends Page implements HasTable
 {
@@ -28,6 +29,8 @@ class CheckoutVisit extends Page implements HasTable
     protected static ?int $navigationSort = 2;
     protected static ?string $navigationGroup = 'Controle de Acesso';
     protected static string $view = 'filament.pages.checkout-visit';
+    // Max width
+    protected ?string $maxContentWidth = MaxWidth::Full->value;
 
     public $quickCheckoutDoc = '';
 
@@ -89,39 +92,67 @@ class CheckoutVisit extends Page implements HasTable
         return $table
             ->query(
                 \App\Models\VisitorLog::query()
-                    ->whereNull('out_date')
+                    ->select('visitor_logs.*')
+                    ->join('visitors', 'visitor_logs.visitor_id', '=', 'visitors.id')
+                    ->whereNull('visitor_logs.out_date')
                     ->with(['visitor', 'visitor.docType', 'destination'])
-                    ->latest('in_date')
             )
             ->columns([
                 TextColumn::make('id')
-                    ->label('ID da Visita'),
-                    // ->searchable()
-                    // ->sortable(),
-                // TextColumn::make('visitor.id')
-                //     ->label('ID Visitante')
-                //     ->searchable()
-                //     ->sortable(),
+                    ->label('ID da Visita')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('visitor.name')
-                    ->label('Nome'),
-                    // ->searchable()
-                    // ->sortable(),
+                    ->label('Nome')
+                    ->searchable()
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderBy('visitors.name', $direction);
+                    }),
                 TextColumn::make('visitor.doc')
-                    ->label('Documento'),
-                    // ->searchable()
-                    // ->sortable(),
+                    ->label('Documento')
+                    ->searchable(),
                 TextColumn::make('visitor.docType.type')
                     ->label('Tipo'),
-                    // ->sortable(),
                 TextColumn::make('destination.name')
-                    ->label('Local'),
-                    // ->sortable(),
+                    ->label('Local')
+                    ->searchable(),
                 TextColumn::make('in_date')
                     ->label('Entrada')
-                    ->dateTime('d/m/Y H:i'),
-                    // ->sortable(),
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable(),
             ])
             ->defaultSort('in_date', 'desc')
+            ->filters([
+                \Filament\Tables\Filters\SelectFilter::make('destination')
+                    ->label('Local')
+                    ->relationship('destination', 'name')
+                    ->preload(),
+                \Filament\Tables\Filters\SelectFilter::make('docType')
+                    ->label('Tipo de Documento')
+                    ->relationship('visitor.docType', 'type')
+                    ->preload(),
+                \Filament\Tables\Filters\Filter::make('in_date')
+                    ->label('Data de Entrada')
+                    ->form([
+                        \Filament\Forms\Components\DatePicker::make('data_entrada_de')
+                            ->label('Data de Entrada (de)')
+                            ->placeholder('De'),
+                        \Filament\Forms\Components\DatePicker::make('data_entrada_ate')
+                            ->label('Data de Entrada (até)')
+                            ->placeholder('Até'),
+                    ])
+                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
+                        return $query
+                            ->when(
+                                $data['data_entrada_de'],
+                                fn ($query, $date): \Illuminate\Database\Eloquent\Builder => $query->whereDate('in_date', '>=', $date),
+                            )
+                            ->when(
+                                $data['data_entrada_ate'],
+                                fn ($query, $date): \Illuminate\Database\Eloquent\Builder => $query->whereDate('in_date', '<=', $date),
+                            );
+                    })
+            ])
             ->actions([
                 \Filament\Tables\Actions\Action::make('checkout')
                     ->label('Registrar Saída')
@@ -143,7 +174,32 @@ class CheckoutVisit extends Page implements HasTable
                     ->modalDescription('Tem certeza que deseja registrar a saída deste visitante?')
                     ->modalSubmitActionLabel('Sim, registrar saída')
             ])
-            ->bulkActions([])
+            ->bulkActions([
+                \Filament\Tables\Actions\BulkAction::make('bulk_checkout')
+                    ->label('Registrar Saída em Massa')
+                    ->icon('heroicon-o-arrow-right-circle')
+                    ->color('warning')
+                    ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                        $count = 0;
+                        foreach ($records as $record) {
+                            if (!$record->out_date) {
+                                $record->update(['out_date' => now()]);
+                                $count++;
+                            }
+                        }
+                        
+                        Notification::make()
+                            ->success()
+                            ->title('Saídas registradas')
+                            ->body("Saída registrada com sucesso para {$count} visitante(s).")
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Registrar Saída em Massa')
+                    ->modalDescription('Tem certeza que deseja registrar a saída para todos os visitantes selecionados?')
+                    ->modalSubmitActionLabel('Sim, registrar saídas')
+                    ->deselectRecordsAfterCompletion()
+            ])
             ->emptyStateHeading('Nenhuma visita em andamento')
             ->emptyStateDescription('Não há visitantes com visitas em andamento no momento.')
             ->poll('10s');
@@ -162,5 +218,10 @@ class CheckoutVisit extends Page implements HasTable
     public function mount(): void
     {
         abort_unless(Gate::allows('page_CheckoutVisit'), 403);
+    }
+
+    public function getMaxWidth(): MaxWidth
+    {
+        return MaxWidth::Full;
     }
 } 
