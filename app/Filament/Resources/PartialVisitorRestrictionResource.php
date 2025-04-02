@@ -21,9 +21,9 @@ class PartialVisitorRestrictionResource extends Resource
     protected static ?string $model = PartialVisitorRestriction::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-shield-exclamation';
-    protected static ?string $navigationLabel = 'Restrições Parciais';
-    protected static ?string $modelLabel = 'Restrição Parcial';
-    protected static ?string $pluralModelLabel = 'Restrições Parciais';
+    protected static ?string $navigationLabel = 'Restrições Preditivas';
+    protected static ?string $modelLabel = 'Restrição Preditiva';
+    protected static ?string $pluralModelLabel = 'Restrições Preditivas';
     protected static ?string $navigationGroup = 'Análise de Segurança';
     protected static ?int $navigationSort = 2;
 
@@ -149,8 +149,8 @@ class PartialVisitorRestrictionResource extends Resource
                 Tables\Columns\TextColumn::make('partial_doc')
                     ->searchable()
                     ->sortable()
-                    ->placeholder('Qualquer documento')
-                    ->label('Documento Parcial'),
+                    ->placeholder('Todos')
+                    ->label('Num. Doc.'),
 
                 Tables\Columns\TextColumn::make('docType.type')
                     ->sortable()
@@ -158,12 +158,12 @@ class PartialVisitorRestrictionResource extends Resource
                     ->formatStateUsing(function ($state, $record) {
                         return $record->doc_type_id ? $state : 'Todos';
                     })
-                    ->label('Tipo de Documento'),
+                    ->label('Tipo Doc.'),
 
                 Tables\Columns\TextColumn::make('phone')
                     ->searchable()
                     ->sortable()
-                    ->placeholder('Qualquer telefone')
+                    ->placeholder('Todos')
                     ->label('Telefone'),
 
                 Tables\Columns\TextColumn::make('severity_level')
