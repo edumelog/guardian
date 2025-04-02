@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
 
-class PartialVisitorRestriction extends Model
+class PredictiveVisitorRestriction extends Model
 {
     use HasFactory;
 
@@ -102,7 +102,7 @@ class PartialVisitorRestriction extends Model
         
         $finalPattern .= '/i'; // case insensitive
         
-        Log::info('PartialVisitorRestriction: Conversão de wildcard para regex', [
+        Log::info('PredictiveVisitorRestriction: Conversão de wildcard para regex', [
             'original' => $pattern,
             'final' => $finalPattern
         ]);
@@ -146,7 +146,7 @@ class PartialVisitorRestriction extends Model
             }
         }
         
-        Log::info('PartialVisitorRestriction: Resultado da verificação', [
+        Log::info('PredictiveVisitorRestriction: Resultado da verificação', [
             'visitor_id' => $visitor->id,
             'visitor_name' => $visitor->name,
             'restriction_id' => $this->id,
@@ -169,7 +169,7 @@ class PartialVisitorRestriction extends Model
                 return $restriction->matchesVisitor($visitor);
             });
             
-        Log::info('PartialVisitorRestriction::findMatchingRestrictions', [
+        Log::info('PredictiveVisitorRestriction::findMatchingRestrictions', [
             'visitor_id' => $visitor->id,
             'visitor_name' => $visitor->name,
             'visitor_doc' => $visitor->doc,
@@ -194,4 +194,4 @@ class PartialVisitorRestriction extends Model
     {
         $this->attributes['partial_doc'] = $value ? mb_strtoupper($value) : null;
     }
-}
+} 

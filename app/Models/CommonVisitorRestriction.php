@@ -10,13 +10,15 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Modelo para gerenciar restrições de visitantes.
- * Este modelo é usado para registrar e gerenciar restrições de acesso para visitantes,
+ * Modelo para gerenciar restrições comuns de visitantes.
+ * Este modelo é usado para registrar e gerenciar restrições de acesso para visitantes específicos,
  * permitindo o controle de pessoas marcadas como "Persona Non Grata".
  */
-class VisitorRestriction extends Model
+class CommonVisitorRestriction extends Model
 {
     use HasFactory;
+
+    protected $table = 'common_visitor_restrictions';
 
     protected $fillable = [
         'visitor_id',
@@ -68,7 +70,7 @@ class VisitorRestriction extends Model
      */
     public function scopeActive(Builder $query): Builder
     {
-        Log::info('VisitorRestriction::scopeActive - Início', [
+        Log::info('CommonVisitorRestriction::scopeActive - Início', [
             'query_sql' => $query->toSql(),
             'query_bindings' => $query->getBindings(),
             'trace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5),
@@ -85,7 +87,7 @@ class VisitorRestriction extends Model
         // Adiciona log detalhado para cada restrição
         $restrictions = $result->get();
         foreach ($restrictions as $restriction) {
-            Log::info('VisitorRestriction::scopeActive - Restrição', [
+            Log::info('CommonVisitorRestriction::scopeActive - Restrição', [
                 'id' => $restriction->id,
                 'visitor_id' => $restriction->visitor_id,
                 'reason' => $restriction->reason,
@@ -97,7 +99,7 @@ class VisitorRestriction extends Model
             ]);
         }
             
-        Log::info('VisitorRestriction::scopeActive - Resultado', [
+        Log::info('CommonVisitorRestriction::scopeActive - Resultado', [
             'result_sql' => $result->toSql(),
             'result_bindings' => $result->getBindings(),
             'count' => $restrictions->count(),

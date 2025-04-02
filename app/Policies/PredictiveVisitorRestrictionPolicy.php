@@ -3,10 +3,10 @@
 namespace App\Policies;
 
 use App\Models\User;
-use App\Models\PartialVisitorRestriction;
+use App\Models\PredictiveVisitorRestriction;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
-class PartialVisitorRestrictionPolicy
+class PredictiveVisitorRestrictionPolicy
 {
     use HandlesAuthorization;
 
@@ -21,7 +21,7 @@ class PartialVisitorRestrictionPolicy
     /**
      * Determine whether the user can view the model.
      */
-    public function view(User $user, PartialVisitorRestriction $partialVisitorRestriction): bool
+    public function view(User $user, PredictiveVisitorRestriction $predictiveVisitorRestriction): bool
     {
         return $user->can('view_partial::visitor::restriction');
     }
@@ -37,7 +37,7 @@ class PartialVisitorRestrictionPolicy
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, PartialVisitorRestriction $partialVisitorRestriction): bool
+    public function update(User $user, PredictiveVisitorRestriction $predictiveVisitorRestriction): bool
     {
         return $user->can('update_partial::visitor::restriction');
     }
@@ -45,7 +45,7 @@ class PartialVisitorRestrictionPolicy
     /**
      * Determine whether the user can delete the model.
      */
-    public function delete(User $user, PartialVisitorRestriction $partialVisitorRestriction): bool
+    public function delete(User $user, PredictiveVisitorRestriction $predictiveVisitorRestriction): bool
     {
         return $user->can('delete_partial::visitor::restriction');
     }
@@ -61,7 +61,7 @@ class PartialVisitorRestrictionPolicy
     /**
      * Determine whether the user can permanently delete.
      */
-    public function forceDelete(User $user, PartialVisitorRestriction $partialVisitorRestriction): bool
+    public function forceDelete(User $user, PredictiveVisitorRestriction $predictiveVisitorRestriction): bool
     {
         return $user->can('force_delete_partial::visitor::restriction');
     }
@@ -77,7 +77,7 @@ class PartialVisitorRestrictionPolicy
     /**
      * Determine whether the user can restore.
      */
-    public function restore(User $user, PartialVisitorRestriction $partialVisitorRestriction): bool
+    public function restore(User $user, PredictiveVisitorRestriction $predictiveVisitorRestriction): bool
     {
         return $user->can('restore_partial::visitor::restriction');
     }
@@ -93,7 +93,7 @@ class PartialVisitorRestrictionPolicy
     /**
      * Determine whether the user can replicate.
      */
-    public function replicate(User $user, PartialVisitorRestriction $partialVisitorRestriction): bool
+    public function replicate(User $user, PredictiveVisitorRestriction $predictiveVisitorRestriction): bool
     {
         return $user->can('replicate_partial::visitor::restriction');
     }

@@ -73,7 +73,7 @@ class VisitorResource extends Resource
     
     public static function getNavigationBadge(): ?string
     {
-        $activeCount = \App\Models\VisitorRestriction::query()
+        $activeCount = \App\Models\CommonVisitorRestriction::query()
             ->whereHas('visitor')
             ->active()
             ->count();
@@ -247,7 +247,7 @@ class VisitorResource extends Resource
                                         ]);
 
                                         // Verifica diretamente as restrições associadas
-                                        $activeRestrictions = \App\Models\VisitorRestriction::where('visitor_id', $visitor->id)
+                                        $activeRestrictions = \App\Models\CommonVisitorRestriction::where('visitor_id', $visitor->id)
                                             ->active()
                                             ->get();
 

@@ -55,7 +55,18 @@ return [
         'pages' => true,
         'widgets' => true,
         'resources' => true,
-        'custom_permissions' => [],
+        'custom_permissions' => [
+            'view_automatic_occurrences',
+            'manage_automatic_occurrences',
+            'low_risk_approval',
+            'medium_risk_approval',
+            'high_risk_approval',
+            'critical_risk_approval',
+            'view_common_visitor_restrictions',
+            'manage_common_visitor_restrictions',
+            'view_predictive_visitor_restrictions',
+            'manage_predictive_visitor_restrictions',
+        ],
     ],
 
     'generator' => [
