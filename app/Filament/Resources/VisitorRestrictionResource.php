@@ -23,9 +23,9 @@ class VisitorRestrictionResource extends Resource
     protected static ?string $model = VisitorRestriction::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-shield-exclamation';
-    protected static ?string $navigationLabel = 'Restrições';
+    protected static ?string $navigationLabel = 'Restrições Comuns';
     protected static ?string $modelLabel = 'Restrição';
-    protected static ?string $pluralModelLabel = 'Restrições';
+    protected static ?string $pluralModelLabel = 'Restrições Comuns';
     protected static ?string $navigationGroup = 'Análise de Segurança';
     protected static ?int $navigationSort = 1;
 
