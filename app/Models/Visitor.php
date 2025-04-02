@@ -6,9 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class Visitor extends Model
 {
@@ -23,7 +25,13 @@ class Visitor extends Model
         'other',
         'phone',
         'destination_id',
-        'doc_type_id'
+        'doc_type_id',
+        'has_restrictions'
+    ];
+
+    protected $casts = [
+        'other' => 'array',
+        'has_restrictions' => 'boolean',
     ];
 
     public static function validationRules($record = null): array
@@ -63,9 +71,87 @@ class Visitor extends Model
         return $this->hasMany(VisitorLog::class);
     }
 
-    public function latestLog(): BelongsTo
+    public function latestLog(): HasOne
     {
-        return $this->belongsTo(VisitorLog::class)->latestOfMany();
+        return $this->hasOne(VisitorLog::class)->latestOfMany();
+    }
+
+    public function restrictions(): HasMany
+    {
+        return $this->hasMany(VisitorRestriction::class);
+    }
+
+    public function activeRestrictions(): HasMany
+    {
+        return $this->hasMany(VisitorRestriction::class)->active();
+    }
+
+    /**
+     * Verifica se o visitante possui restrições ativas
+     */
+    public function hasActiveRestrictions(): bool
+    {
+        $hasExactRestrictions = $this->activeRestrictions()->exists();
+        
+        if ($hasExactRestrictions) {
+            Log::info('Visitor::hasActiveRestrictions - Restrições exatas encontradas', [
+                'visitor_id' => $this->id,
+                'active_restrictions_count' => $this->activeRestrictions()->count(),
+            ]);
+            
+            return true;
+        }
+        
+        // Verifica restrições parciais
+        $partialRestrictions = \App\Models\PartialVisitorRestriction::findMatchingRestrictions($this);
+        
+        $hasPartialRestrictions = $partialRestrictions->isNotEmpty();
+        
+        Log::info('Visitor::hasActiveRestrictions - Resultado final', [
+            'visitor_id' => $this->id,
+            'has_restrictions' => ($hasExactRestrictions || $hasPartialRestrictions) ? 'Sim' : 'Não',
+            'exact_restrictions_count' => $this->activeRestrictions()->count(),
+            'partial_restrictions_count' => $partialRestrictions->count(),
+        ]);
+        
+        return $hasExactRestrictions || $hasPartialRestrictions;
+    }
+
+    /**
+     * Retorna a restrição mais crítica ativa (incluindo restrições parciais)
+     */
+    public function getMostCriticalRestrictionAttribute()
+    {
+        $severityOrder = [
+            'high' => 3,
+            'medium' => 2,
+            'low' => 1,
+        ];
+
+        // Busca restrições exatas
+        $exactRestrictions = $this->activeRestrictions()->get();
+        
+        // Busca restrições parciais
+        $partialRestrictions = \App\Models\PartialVisitorRestriction::findMatchingRestrictions($this);
+        
+        // Combina as coleções
+        $allRestrictions = $exactRestrictions->concat($partialRestrictions);
+        
+        $restriction = $allRestrictions
+            ->sortByDesc(function ($restriction) use ($severityOrder) {
+                return $severityOrder[$restriction->severity_level] ?? 0;
+            })
+            ->first();
+            
+        Log::info('Visitor::getMostCriticalRestrictionAttribute', [
+            'visitor_id' => $this->id,
+            'restriction_encontrada' => $restriction ? 'Sim' : 'Não',
+            'restriction_id' => $restriction?->id,
+            'restriction_type' => $restriction ? (get_class($restriction) === 'App\Models\VisitorRestriction' ? 'Exata' : 'Parcial') : null,
+            'severity_level' => $restriction?->severity_level,
+        ]);
+        
+        return $restriction;
     }
 
     /**
@@ -108,6 +194,15 @@ class Visitor extends Model
         }
 
         return route('visitor.photo', ['filename' => $this->doc_photo_back]);
+    }
+
+    /**
+     * Atualiza o campo has_restrictions baseado nas restrições ativas.
+     */
+    public function updateHasRestrictions(): bool
+    {
+        $this->has_restrictions = $this->hasActiveRestrictions();
+        return $this->save();
     }
 
     protected static function boot()

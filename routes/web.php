@@ -3,8 +3,11 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PrintTemplateController;
 use App\Http\Controllers\VisitorPhotoController;
+use App\Http\Controllers\CredentialPrintController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Response;
 
 Route::get('/', function () {
     // return view('welcome');
@@ -27,6 +30,17 @@ Route::middleware('auth')->group(function () {
     
     // Rota para acessar fotos dos visitantes de forma segura
     Route::get('/visitor-photo/{filename}', [VisitorPhotoController::class, 'show'])->name('visitor.photo');
+
+    // Rota para geração de PDF da credencial
+    Route::post('/credentials/{visitor}/pdf', [CredentialPrintController::class, 'generatePdf'])
+        ->name('credential.pdf');
+
+    // FIXME: Rotas comentadas porque o controlador CodeGeneratorController não existe
+    // Para habilitar essas rotas, crie o controlador e implemente os métodos qrcode() e barcode()
+    // Route::get('/codes/qr/{id}', [App\Http\Controllers\CodeGeneratorController::class, 'qrcode'])
+    //     ->name('qrcode');
+    // Route::get('/codes/bar/{id}', [App\Http\Controllers\CodeGeneratorController::class, 'barcode'])
+    //     ->name('barcode');
 });
 
 // Rotas para templates de impressão que não requerem autenticação
@@ -37,6 +51,27 @@ Route::prefix('qz')->group(function () {
     Route::post('sign', [App\Http\Controllers\QZSignController::class, 'sign']);
     Route::get('certificate', [App\Http\Controllers\QZPrintController::class, 'getCertificate']);
 });
+
+// Rota para ler o arquivo PDF temporário
+Route::get('/credentials/pdf/{path}', function (string $path) {
+    // Verifica se o caminho é válido e está dentro do diretório de PDFs temporários
+    $fullPath = urldecode($path);
+    if (!str_starts_with($fullPath, storage_path('app/private/temp/previews/'))) {
+        abort(403, 'Acesso negado');
+    }
+
+    if (!File::exists($fullPath)) {
+        abort(404, 'Arquivo não encontrado');
+    }
+
+    // Retorna o arquivo PDF
+    return Response::file($fullPath, [
+        'Content-Type' => 'application/pdf',
+        'Cache-Control' => 'no-cache, no-store, must-revalidate',
+        'Pragma' => 'no-cache',
+        'Expires' => '0'
+    ]);
+})->middleware(['auth', 'verified'])->name('credentials.pdf');
 
 require __DIR__.'/auth.php';
 URL::forceScheme('https');

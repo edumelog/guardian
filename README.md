@@ -18,6 +18,8 @@ Este sistema permite o cadastro de visitantes, captura de dados pessoais e fotos
 - Impressão de credenciais em impressoras térmicas
 - Gerenciamento de templates de credenciais personalizáveis
 - Controle de entrada e saída de visitantes
+- Registro de ocorrências de segurança com níveis de severidade
+- Relatórios avançados com exportação para PDF e CSV
 - Histórico de visitas
 - Painel administrativo completo
 - Proteção de dados sensíveis dos visitantes
@@ -44,6 +46,18 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 - Servidor web (Nginx, Apache)
 
 ## Histórico de Versões
+
+### v1.4.0
+- Implementação do módulo "Registro de Ocorrências" para registrar eventos de segurança
+- Melhorias nos relatórios de visitantes com opções avançadas de exportação em PDF e CSV
+- Correção da exibição de datas em relatórios PDF para formato brasileiro
+- Reestruturação da interface de pesquisa com layout em colunas
+- Validação avançada para períodos de data e hora nos relatórios
+
+### v1.2.0
+- Melhorias na interface do usuário
+- Correções de bugs relacionados à validação de formulários
+- Otimização de desempenho em relatórios com grandes volumes de dados
 
 ### v1.1.0
 - Implementação de QR code para identificação rápida

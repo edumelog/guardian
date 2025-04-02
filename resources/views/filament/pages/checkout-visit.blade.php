@@ -1,7 +1,7 @@
 <x-filament-panels::page>
     <div class="space-y-6">
         <div class="p-6 bg-white rounded-xl shadow dark:bg-gray-800">
-            <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+            <h2 class="text-lg font-medium text-gray-950 dark:text-white">
                 Registro Rápido de Saída
             </h2>
             <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
@@ -27,7 +27,7 @@
         </div>
 
         <div class="p-6 bg-white rounded-xl shadow dark:bg-gray-800">
-            <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+            <h2 class="text-lg font-medium text-gray-950 dark:text-white mb-4">
                 Visitas em Andamento
             </h2>
 

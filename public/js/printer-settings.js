@@ -3,6 +3,7 @@ document.addEventListener('alpine:init', () => {
         printers: [],
         selectedPrinter: null,
         orientation: null,
+        // rotation: 0,
         loading: true,
         error: null,
         connected: false,
@@ -14,27 +15,29 @@ document.addEventListener('alpine:init', () => {
         hasChanges: false,
         
         // Configurações de tamanho da etiqueta
-        pageWidth: '100',
-        pageHeight: '65',
-        marginTop: '5',
-        marginRight: '5',
-        marginBottom: '5',
-        marginLeft: '5',
+        pageWidth: '',
+        pageHeight: '',
+        marginTop: '0',
+        marginRight: '0',
+        marginBottom: '0',
+        marginLeft: '0',
         units: 'mm', // Unidade de medida fixa em milímetros (mm)
-        dpi: '96', // Resolução em DPI (dots per inch)
         
         // Parâmetros adicionais de impressão (não exibidos na interface)
         printParams: {
             type: 'pixel',
-            format: 'html',
+            format: 'pdf',
             flavor: 'plain',
             scaleContent: true,
             rasterize: true,
             interpolation: 'bicubic',
-            density: '300',
+            density: 'best',
             altFontRendering: true,
-            ignoreTransparency: true
+            ignoreTransparency: true,
+            colorType: 'grayscale'
         },
+
+        dpi: 96,
 
         async init() {
             this.loading = true;
@@ -57,59 +60,43 @@ document.addEventListener('alpine:init', () => {
                         
                         this.orientation = config.orientation || 'portrait';
                         
+                        // Carrega a rotação (novo campo)
+                        // this.rotation = typeof config.rotation === 'string' ? parseFloat(config.rotation) || 0 : (config.rotation || 0);
+                        
                         // Não define o selectedTemplate aqui, será definido após carregar a lista de templates
                         // para garantir que o template selecionado existe
                         this.savedTemplate = config.template;
                         
                         // Carrega as configurações de tamanho da etiqueta
                         if (config.printOptions) {
-                            // Extrai o valor numérico da largura
-                            if (config.printOptions.pageWidth) {
-                                const match = config.printOptions.pageWidth.match(/^(\d+)(\w+)$/);
-                                if (match) {
-                                    this.pageWidth = match[1];
-                                    // Mantém a unidade fixa em mm
-                                }
+                            // Carrega a largura
+                            if (typeof config.printOptions.pageWidth === 'number') {
+                                this.pageWidth = config.printOptions.pageWidth.toString();
                             }
                             
-                            // Extrai o valor numérico da altura
-                            if (config.printOptions.pageHeight) {
-                                const match = config.printOptions.pageHeight.match(/^(\d+)(\w+)$/);
-                                if (match) {
-                                    this.pageHeight = match[1];
-                                }
+                            // Carrega a altura
+                            if (typeof config.printOptions.pageHeight === 'number') {
+                                this.pageHeight = config.printOptions.pageHeight.toString();
                             }
                             
-                            // Extrai os valores das margens
+                            // Carrega as margens
                             if (config.printOptions.margins) {
                                 const margins = config.printOptions.margins;
                                 
-                                if (margins.top) {
-                                    const match = margins.top.match(/^(\d+)(\w+)$/);
-                                    if (match) {
-                                        this.marginTop = match[1];
-                                    }
+                                if (typeof margins.top === 'number') {
+                                    this.marginTop = margins.top.toString();
                                 }
                                 
-                                if (margins.right) {
-                                    const match = margins.right.match(/^(\d+)(\w+)$/);
-                                    if (match) {
-                                        this.marginRight = match[1];
-                                    }
+                                if (typeof margins.right === 'number') {
+                                    this.marginRight = margins.right.toString();
                                 }
                                 
-                                if (margins.bottom) {
-                                    const match = margins.bottom.match(/^(\d+)(\w+)$/);
-                                    if (match) {
-                                        this.marginBottom = match[1];
-                                    }
+                                if (typeof margins.bottom === 'number') {
+                                    this.marginBottom = margins.bottom.toString();
                                 }
                                 
-                                if (margins.left) {
-                                    const match = margins.left.match(/^(\d+)(\w+)$/);
-                                    if (match) {
-                                        this.marginLeft = match[1];
-                                    }
+                                if (typeof margins.left === 'number') {
+                                    this.marginLeft = margins.left.toString();
                                 }
                             }
                             
@@ -123,12 +110,11 @@ document.addEventListener('alpine:init', () => {
                             if (config.printOptions.density) this.printParams.density = config.printOptions.density;
                             if (config.printOptions.altFontRendering !== undefined) this.printParams.altFontRendering = config.printOptions.altFontRendering;
                             if (config.printOptions.ignoreTransparency !== undefined) this.printParams.ignoreTransparency = config.printOptions.ignoreTransparency;
+                            if (config.printOptions.colorType !== undefined) this.printParams.colorType = config.printOptions.colorType;
                         }
-                        
-                        // Carrega o valor de DPI
-                        if (config.dpi) {
-                            this.dpi = config.dpi;
-                        }
+
+                        // Carrega o DPI
+                        this.dpi = parseInt(config.dpi) || 96;
                     } catch (configErr) {
                         console.error('Erro ao carregar configuração do localStorage:', configErr);
                     }
@@ -181,6 +167,7 @@ document.addEventListener('alpine:init', () => {
                 // Observa mudanças nos campos
                 this.$watch('selectedPrinter', () => this.hasChanges = true);
                 this.$watch('orientation', () => this.hasChanges = true);
+                // this.$watch('rotation', () => this.hasChanges = true);
                 this.$watch('selectedTemplate', () => this.hasChanges = true);
                 this.$watch('pageWidth', () => this.hasChanges = true);
                 this.$watch('pageHeight', () => this.hasChanges = true);
@@ -392,130 +379,59 @@ document.addEventListener('alpine:init', () => {
 
         async saveConfig() {
             try {
-                // Verifica se o localStorage está disponível
-                if (typeof localStorage === 'undefined') {
-                    console.error('localStorage não está disponível');
-                    this.$dispatch('notify', { 
-                        message: 'Erro ao salvar configurações',
-                        description: 'localStorage não está disponível no navegador',
-                        status: 'danger'
-                    });
-                    return;
+                console.log('Salvando configurações...');
+                
+                // Recupera os valores dos campos
+                const selectedPrinter = this.selectedPrinter;
+                const selectedTemplate = this.selectedTemplate;
+                const pageWidth = parseFloat(this.pageWidth);
+                const pageHeight = parseFloat(this.pageHeight);
+                
+                // Validações
+                if (!selectedPrinter) {
+                    throw new Error('Selecione uma impressora');
                 }
-                
-                // Teste de escrita no localStorage
-                try {
-                    localStorage.setItem('guardian_test', 'test');
-                    const testValue = localStorage.getItem('guardian_test');
-                    console.log('Teste de localStorage:', testValue);
-                    localStorage.removeItem('guardian_test');
-                } catch (storageErr) {
-                    console.error('Erro ao testar localStorage:', storageErr);
-                    this.$dispatch('notify', { 
-                        message: 'Erro ao salvar configurações',
-                        description: 'Não foi possível escrever no localStorage: ' + storageErr.message,
-                        status: 'danger'
-                    });
-                    return;
+                if (!selectedTemplate) {
+                    throw new Error('Selecione um template');
                 }
-                
-                // Encontra o template selecionado
-                const selectedTemplate = this.templates.find(t => t.name === this.selectedTemplate);
-                
-                // Verifica se o template selecionado é válido
-                if (!selectedTemplate && this.selectedTemplate) {
-                    console.error('Template selecionado não encontrado na lista:', this.selectedTemplate);
-                    // Não impede o salvamento, apenas loga o erro
+                if (!this.pageWidth || isNaN(pageWidth) || pageWidth <= 0) {
+                    throw new Error('Largura da etiqueta é obrigatória e deve ser maior que zero');
                 }
-                
-                // Verifica se os valores são válidos
-                if (this.pageWidth === undefined || this.pageWidth === null || this.pageWidth === '') {
-                    console.error('Largura da página inválida:', this.pageWidth);
-                    this.pageWidth = '100'; // Valor padrão
+                if (!this.pageHeight || isNaN(pageHeight) || pageHeight <= 0) {
+                    throw new Error('Altura da etiqueta é obrigatória e deve ser maior que zero');
                 }
-                
-                if (this.pageHeight === undefined || this.pageHeight === null || this.pageHeight === '') {
-                    console.error('Altura da página inválida:', this.pageHeight);
-                    this.pageHeight = '65'; // Valor padrão
-                }
-                
-                if (this.marginTop === undefined || this.marginTop === null || this.marginTop === '') {
-                    console.error('Margem superior inválida:', this.marginTop);
-                    this.marginTop = '5'; // Valor padrão
-                }
-                
-                if (this.marginRight === undefined || this.marginRight === null || this.marginRight === '') {
-                    console.error('Margem direita inválida:', this.marginRight);
-                    this.marginRight = '5'; // Valor padrão
-                }
-                
-                if (this.marginBottom === undefined || this.marginBottom === null || this.marginBottom === '') {
-                    console.error('Margem inferior inválida:', this.marginBottom);
-                    this.marginBottom = '5'; // Valor padrão
-                }
-                
-                if (this.marginLeft === undefined || this.marginLeft === null || this.marginLeft === '') {
-                    console.error('Margem esquerda inválida:', this.marginLeft);
-                    this.marginLeft = '5'; // Valor padrão
-                }
-                
-                if (this.dpi === undefined || this.dpi === null || this.dpi === '') {
-                    console.error('DPI inválido:', this.dpi);
-                    this.dpi = '96'; // Valor padrão
-                }
-                
-                // Verifica se o objeto printParams é válido
-                if (!this.printParams) {
-                    console.error('Objeto printParams inválido:', this.printParams);
-                    this.printParams = {
-                        type: 'pixel',
-                        format: 'html',
-                        flavor: 'plain',
-                        scaleContent: true,
-                        rasterize: true,
-                        interpolation: 'bicubic',
-                        density: '300',
-                        altFontRendering: true,
-                        ignoreTransparency: true
-                    };
-                }
-                
-                // Salva configuração
+
+                // Monta o objeto de configuração
                 const config = {
-                    printer: this.selectedPrinter || '',
-                    orientation: this.orientation || 'portrait',
-                    template: this.selectedTemplate || '', // Nome do arquivo para compatibilidade
-                    templateSlug: selectedTemplate?.slug || 'default', // Slug para uso interno
-                    timestamp: new Date().toISOString(),
-                    dpi: this.dpi || '96', // Valor de DPI para conversão de unidades
-                    // Configurações de impressão
+                    printer: this.selectedPrinter,
+                    template: this.selectedTemplate,
+                    orientation: this.orientation,
+                    // rotation: parseFloat(this.rotation) || 0,
                     printOptions: {
-                        // Parâmetros de tamanho (sempre em mm)
-                        pageWidth: this.pageWidth + 'mm',
-                        pageHeight: this.pageHeight + 'mm',
-                        margins: { 
-                            top: this.marginTop + 'mm', 
-                            right: this.marginRight + 'mm', 
-                            bottom: this.marginBottom + 'mm', 
-                            left: this.marginLeft + 'mm' 
+                        pageWidth: parseFloat(this.pageWidth),
+                        pageHeight: parseFloat(this.pageHeight),
+                        margins: {
+                            top: parseFloat(this.marginTop),
+                            right: parseFloat(this.marginRight),
+                            bottom: parseFloat(this.marginBottom),
+                            left: parseFloat(this.marginLeft)
                         },
-                        
-                        // Parâmetros de formato e tipo
-                        type: this.printParams?.type || 'pixel',
-                        format: this.printParams?.format || 'html',
-                        flavor: this.printParams?.flavor || 'plain',
-                        
-                        // Parâmetros de qualidade
-                        scaleContent: this.printParams?.scaleContent !== undefined ? this.printParams.scaleContent : true,
-                        rasterize: this.printParams?.rasterize !== undefined ? this.printParams.rasterize : true,
-                        interpolation: this.printParams?.interpolation || 'bicubic',
-                        density: this.printParams?.density || '300',
-                        altFontRendering: this.printParams?.altFontRendering !== undefined ? this.printParams.altFontRendering : true,
-                        ignoreTransparency: this.printParams?.ignoreTransparency !== undefined ? this.printParams.ignoreTransparency : true
-                    }
+                        type: this.printParams.type,
+                        format: this.printParams.format,
+                        flavor: this.printParams.flavor,
+                        scaleContent: this.printParams.scaleContent,
+                        rasterize: this.printParams.rasterize,
+                        interpolation: this.printParams.interpolation,
+                        density: this.printParams.density,
+                        altFontRendering: this.printParams.altFontRendering,
+                        ignoreTransparency: this.printParams.ignoreTransparency,
+                        colorType: this.printParams.colorType
+                    },
+                    dpi: parseInt(this.dpi) || 96,
                 };
-                
-                console.log('Salvando configuração:', config);
+
+                console.log('Configuração a ser salva:', config);
+
                 try {
                     const configString = JSON.stringify(config);
                     console.log('Tamanho da string de configuração:', configString.length, 'bytes');
@@ -546,35 +462,31 @@ document.addEventListener('alpine:init', () => {
                         });
                         return;
                     }
+
+                    // Verifica se os valores numéricos foram salvos corretamente
+                    const parsedConfig = JSON.parse(savedConfig);
+                    if (typeof parsedConfig.printOptions.pageWidth !== 'number' || 
+                        typeof parsedConfig.printOptions.pageHeight !== 'number') {
+                        throw new Error('Erro ao salvar dimensões da etiqueta');
+                    }
+
                     console.log('Configuração salva com sucesso');
+                    this.$dispatch('notify', { 
+                        message: 'Configurações salvas',
+                        description: 'As configurações da impressora foram salvas com sucesso',
+                        status: 'success'
+                    });
+
                 } catch (saveErr) {
-                    console.error('Erro ao salvar configuração no localStorage:', saveErr);
+                    console.error('Erro ao salvar no localStorage:', saveErr);
                     this.$dispatch('notify', { 
                         message: 'Erro ao salvar configurações',
-                        description: 'Erro ao salvar no localStorage: ' + saveErr.message,
+                        description: saveErr.message,
                         status: 'danger'
                     });
-                    return;
                 }
-                
-                // Para monitoramento atual
-                await this.stopMonitoring();
-                
-                // Inicia monitoramento da nova impressora
-                await this.startMonitoring();
-
-                // Reseta flag de mudanças
-                this.hasChanges = false;
-                
-                // Notificação do Filament
-                this.$dispatch('notify', { 
-                    message: 'Configurações salvas',
-                    description: 'As configurações foram salvas com sucesso',
-                    status: 'success'
-                });
             } catch (err) {
                 console.error('Erro ao salvar configurações:', err);
-                
                 this.$dispatch('notify', { 
                     message: 'Erro ao salvar configurações',
                     description: err.message,

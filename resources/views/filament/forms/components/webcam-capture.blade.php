@@ -34,10 +34,9 @@
                 const config = localStorage.getItem('guardian_cameras_config');
                 let constraints = { 
                     video: { 
-                        width: { ideal: 640 },
-                        height: { ideal: 640 },
-                        facingMode: 'user',
-                        aspectRatio: 1
+                        width: { ideal: 480 },  // Aumentado para melhor qualidade
+                        height: { ideal: 640 },  // Mantendo proporção 3:4
+                        facingMode: 'user'
                     } 
                 };
 
@@ -64,17 +63,40 @@
             const canvas = this.$refs.canvas;
             const context = canvas.getContext('2d');
             
-            // Configura o canvas como quadrado
-            const size = Math.min(video.videoWidth, video.videoHeight);
-            canvas.width = size;
-            canvas.height = size;
+            // Calcula as dimensões para manter a proporção 3:4
+            const targetWidth = 480;  // Largura desejada
+            const targetHeight = 640; // Altura desejada (proporção 3:4)
             
-            // Calcula o recorte central quadrado
-            const xOffset = (video.videoWidth - size) / 2;
-            const yOffset = (video.videoHeight - size) / 2;
+            // Configura o canvas com as dimensões desejadas
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
             
-            // Desenha o frame atual do vídeo no canvas (recorte quadrado)
-            context.drawImage(video, xOffset, yOffset, size, size, 0, 0, size, size);
+            // Calcula as dimensões do vídeo mantendo a proporção 3:4
+            const videoAspect = video.videoWidth / video.videoHeight;
+            const targetAspect = targetWidth / targetHeight;
+            
+            let sx, sy, sWidth, sHeight;
+            
+            if (videoAspect > targetAspect) {
+                // Vídeo é mais largo que necessário
+                sHeight = video.videoHeight;
+                sWidth = sHeight * targetAspect;
+                sx = (video.videoWidth - sWidth) / 2;
+                sy = 0;
+            } else {
+                // Vídeo é mais alto que necessário
+                sWidth = video.videoWidth;
+                sHeight = sWidth / targetAspect;
+                sx = 0;
+                sy = (video.videoHeight - sHeight) / 2;
+            }
+            
+            // Limpa o canvas
+            context.fillStyle = '#fff';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Desenha o frame do vídeo no canvas com o crop correto
+            context.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
             
             // Converte para base64
             const imageData = canvas.toDataURL('image/jpeg', 0.9);
@@ -108,7 +130,7 @@
                 <div x-show="!capturing" class="w-full h-full">
                     <div 
                         x-show="!previewUrl"
-                        class="w-full h-full flex items-center justify-center bg-gray-100 border-2 border-gray-200"
+                        class="w-full h-full flex items-center justify-center bg-gray-100 border-2 border-gray-200 rounded-lg"
                     >
                         <!-- TAMANHO DO ÍCONE: Ajuste w-16 h-16 proporcionalmente ao tamanho da foto -->
                         <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -119,7 +141,7 @@
                         x-ref="preview"
                         x-show="previewUrl"
                         :src="previewUrl"
-                        class="w-full h-full object-cover border-2 border-gray-200"
+                        class="w-full h-full object-cover rounded-lg"
                         alt="Foto do Visitante"
                     />
                 </div>
@@ -130,7 +152,7 @@
                         x-ref="video" 
                         autoplay 
                         playsinline 
-                        class="w-full h-full object-cover border-2 border-blue-400"
+                        class="w-full h-full object-cover rounded-lg"
                     ></video>
                 </div>
                 

@@ -314,129 +314,73 @@ class PrintTemplateController extends Controller
         foreach ($images as $img) {
             $src = $img->getAttribute('src');
             
-            // Pula se já for base64
-            if (strpos($src, 'data:image/') === 0) {
-                Log::info('Imagem já está em base64, mantendo:', ['src' => substr($src, 0, 50) . '...']);
+            // Pula se já for base64 ou URL externa
+            if (strpos($src, 'data:image/') === 0 || strpos($src, 'http://') === 0 || strpos($src, 'https://') === 0) {
                 continue;
             }
 
-            // Se a URL contém base64 como parte do caminho (erro), extrai apenas a parte base64
-            if (strpos($src, 'data:image/') !== false) {
-                $base64Match = [];
-                if (preg_match('/(data:image\/[^;]+;base64,[^\\s"]+)/', $src, $base64Match)) {
-                    Log::info('Extraindo base64 da URL incorreta');
-                    $img->setAttribute('src', $base64Match[1]);
-                    continue;
-                }
+            // Verifica se a imagem tem alguma classe tpl-
+            $class = $img->getAttribute('class');
+            if ($class && preg_match('/\btpl-/', $class)) {
+                Log::info('Imagem com classe tpl-, mantendo caminho relativo:', [
+                    'src' => $src,
+                    'class' => $class
+                ]);
+                continue;
             }
-            
+
             try {
                 // Remove parâmetros de URL se existirem
                 $src = preg_replace('/\?.*$/', '', $src);
                 
-                // Tenta diferentes caminhos para encontrar a imagem
-                $imagePath = null;
+                // Determina o caminho completo da imagem
+                $imagePath = '';
                 
-                // Caminho absoluto no sistema de arquivos
+                // Verifica se o caminho é absoluto ou relativo
                 if (strpos($src, '/') === 0) {
-                    $path = $extractPath . $src;
-                    if (File::exists($path)) {
-                        $imagePath = $path;
-                    }
+                    // Caminho absoluto, tentar encontrar dentro do diretório de extração
+                    $imagePath = $extractPath . $src;
+                } else {
+                    // Caminho relativo, combinar com diretório HTML atual
+                    $imagePath = rtrim($htmlDir, '/') . '/' . $src;
                 }
                 
-                // Caminho relativo começando com ./
-                if (!$imagePath && strpos($src, './') === 0) {
-                    $path = $htmlDir . '/' . substr($src, 2);
-                    if (File::exists($path)) {
-                        $imagePath = $path;
-                    }
-                }
+                Log::info('Convertendo imagem para base64:', [
+                    'src' => $src,
+                    'imagePath' => $imagePath
+                ]);
                 
-                // Caminho relativo sem ./
-                if (!$imagePath) {
-                    $path = $htmlDir . '/' . $src;
-                    if (File::exists($path)) {
-                        $imagePath = $path;
-                    }
-                }
-                
-                // Tenta na raiz do template
-                if (!$imagePath) {
-                    $path = $extractPath . '/' . $src;
-                    if (File::exists($path)) {
-                        $imagePath = $path;
-                    }
-                }
-                
-                // Se for uma URL, tenta fazer o download usando cURL
-                if (!$imagePath && (strpos($src, 'http://') === 0 || strpos($src, 'https://') === 0)) {
-                    try {
-                        $ch = curl_init($src);
-                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-                        curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
-                        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-                        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-                        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-                        
-                        $imageContent = curl_exec($ch);
-                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-                        curl_close($ch);
-                        
-                        if ($imageContent !== false && $httpCode === 200 && strpos($contentType, 'image/') === 0) {
-                            $tempFile = tempnam(sys_get_temp_dir(), 'img');
-                            file_put_contents($tempFile, $imageContent);
-                            $imagePath = $tempFile;
-                            Log::info('Imagem baixada com sucesso:', ['url' => $src, 'content_type' => $contentType]);
-                        } else {
-                            throw new \Exception('Falha ao baixar imagem: HTTP ' . $httpCode);
-                        }
-                    } catch (\Exception $e) {
-                        Log::warning('Erro ao baixar imagem:', [
-                            'url' => $src,
-                            'error' => $e->getMessage()
-                        ]);
-                        // Limpa o src em caso de erro no download
-                        $img->setAttribute('src', '');
-                        continue;
-                    }
-                }
-                
-                // Se encontrou a imagem, converte para base64
-                if ($imagePath) {
+                if (File::exists($imagePath)) {
+                    // Lê o conteúdo da imagem
                     $imageContent = File::get($imagePath);
-                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-                    $mimeType = finfo_file($finfo, $imagePath);
-                    finfo_close($finfo);
                     
+                    // Detecta o tipo MIME
+                    $mime = mime_content_type($imagePath);
+                    
+                    // Converte para base64
                     $base64 = base64_encode($imageContent);
-                    $img->setAttribute('src', "data:{$mimeType};base64,{$base64}");
+                    $dataUri = "data:{$mime};base64,{$base64}";
                     
-                    Log::info('Imagem convertida para base64:', [
-                        'original' => $src,
-                        'mime_type' => $mimeType,
+                    // Define o novo src
+                    $img->setAttribute('src', $dataUri);
+                    
+                    Log::info('Imagem convertida para base64 com sucesso', [
+                        'original_src' => $src,
+                        'mime' => $mime,
                         'size' => strlen($base64)
                     ]);
-                    
-                    // Remove o arquivo temporário se foi criado
-                    if (strpos($imagePath, sys_get_temp_dir()) === 0) {
-                        unlink($imagePath);
-                    }
                 } else {
-                    // Se não encontrou a imagem, limpa o src
-                    $img->setAttribute('src', '');
-                    Log::warning('Imagem não encontrada, limpando src:', ['src' => $src]);
+                    Log::warning('Arquivo de imagem não encontrado:', [
+                        'src' => $src,
+                        'imagePath' => $imagePath
+                    ]);
                 }
             } catch (\Exception $e) {
                 Log::error('Erro ao processar imagem:', [
                     'src' => $src,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
                 ]);
-                // Em caso de erro, limpa o src
-                $img->setAttribute('src', '');
-                Log::warning('Limpando src devido ao erro:', ['src' => $src]);
             }
         }
         
@@ -560,6 +504,7 @@ class PrintTemplateController extends Controller
                 $html = $this->convertCssToInline($html, $cssContent);
             }
             
+            /* Comentando as substituições de caminhos para manter os caminhos relativos originais
             // Agora substitui os caminhos que não foram convertidos para base64
             
             // Substitui caminhos que começam com ./
@@ -573,6 +518,7 @@ class PrintTemplateController extends Controller
             // Substitui caminhos que começam com /
             $html = preg_replace('/href=["\']\/(?!storage|http)([^"\']*)["\']/', "href=\"{$absolutePath}/$1\"", $html);
             $html = preg_replace('/src=["\']\/(?!storage|http)([^"\']*)["\'](?![^<>]*base64)/', "src=\"{$absolutePath}/$1\"", $html);
+            */
             
             // Log do HTML após todas as substituições
             Log::info('HTML após todas as substituições:', ['html' => $html]);
@@ -643,12 +589,13 @@ class PrintTemplateController extends Controller
         // Carrega o HTML em um DOMDocument
         $doc = new \DOMDocument();
         
-        // Preserva espaços em branco
+        // Preserva espaços em branco e formatação
         $doc->preserveWhiteSpace = true;
+        $doc->formatOutput = true;
         
-        // Suprime erros de parsing HTML
+        // Suprime erros de parsing HTML e mantém a codificação
         libxml_use_internal_errors(true);
-        $doc->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
+        $doc->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'), LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         $errors = libxml_get_errors();
         if (!empty($errors)) {
             Log::warning('Erros ao carregar HTML:', ['errors' => $errors]);
@@ -687,13 +634,14 @@ class PrintTemplateController extends Controller
                         // Certifica-se de que estamos trabalhando com um DOMElement
                         if ($element instanceof \DOMElement) {
                             // Obtém o estilo atual do elemento
-                            $currentStyle = '';
-                            if ($element->hasAttribute('style')) {
-                                $currentStyle = $element->getAttribute('style');
-                            }
+                            $currentStyle = $element->getAttribute('style');
                             
                             // Combina com os novos estilos
                             $newStyle = $currentStyle ? $currentStyle . '; ' . $styles : $styles;
+                            
+                            // Remove espaços extras e ponto e vírgula duplicados
+                            $newStyle = preg_replace('/;\s*;/', ';', trim($newStyle));
+                            $newStyle = rtrim($newStyle, ';') . ';';
                             
                             // Define o atributo style
                             $element->setAttribute('style', $newStyle);
@@ -707,11 +655,6 @@ class PrintTemplateController extends Controller
                             ]);
                         }
                     }
-                    
-                    Log::info('Aplicado estilo para seletor:', [
-                        'selector' => $selector, 
-                        'elements' => $elements->length
-                    ]);
                 } else {
                     Log::warning('Nenhum elemento encontrado para o seletor:', [
                         'seletor' => $selector,
@@ -727,7 +670,7 @@ class PrintTemplateController extends Controller
             }
         }
         
-        // Converte de volta para string HTML
+        // Converte de volta para string HTML preservando a formatação
         $inlineHtml = $doc->saveHTML();
         
         Log::info('Conversão de CSS para inline concluída');
@@ -748,24 +691,28 @@ class PrintTemplateController extends Controller
         // Remove comentários
         $css = preg_replace('!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $css);
         
+        // Remove quebras de linha e espaços extras
+        $css = preg_replace('/[\r\n\t]+/', ' ', $css);
+        
         // Encontra todas as regras CSS
         preg_match_all('/([^{]+){([^}]+)}/s', $css, $matches, PREG_SET_ORDER);
         
         foreach ($matches as $match) {
             // Seletores (podem ser múltiplos, separados por vírgula)
-            $selectors = explode(',', trim($match[1]));
+            $selectors = array_map('trim', explode(',', trim($match[1])));
             
             // Estilos
             $styles = trim($match[2]);
             
-            // Remove quebras de linha e espaços extras
+            // Remove quebras de linha e espaços extras dos estilos
             $styles = preg_replace('/\s+/', ' ', $styles);
             
+            // Remove ponto e vírgula extra no final se existir
+            $styles = rtrim($styles, ';');
+            
             foreach ($selectors as $selector) {
-                $selector = trim($selector);
-                
-                // Ignora seletores vazios ou pseudo-elementos complexos
-                if (empty($selector) || strpos($selector, '::') !== false) {
+                // Ignora seletores vazios
+                if (empty($selector)) {
                     continue;
                 }
                 
@@ -775,6 +722,11 @@ class PrintTemplateController extends Controller
                 } else {
                     $rules[$selector] = $styles;
                 }
+                
+                Log::debug('Regra CSS processada:', [
+                    'selector' => $selector,
+                    'styles' => $styles
+                ]);
             }
         }
         
@@ -790,7 +742,7 @@ class PrintTemplateController extends Controller
      */
     private function cssToXPath($selector)
     {
-        // Usando a biblioteca Symfony CSS Selector
+        // Instancia o conversor
         $converter = new CssSelectorConverter();
         
         try {
@@ -804,30 +756,13 @@ class PrintTemplateController extends Controller
             
             return $xpath;
         } catch (\Exception $e) {
-            // Em caso de erro, registrar e usar a implementação anterior como fallback
             Log::error('Erro ao converter seletor CSS para XPath:', [
                 'seletor' => $selector,
                 'erro' => $e->getMessage()
             ]);
             
-            // Implementação simplificada para seletores básicos (fallback)
-            $selector = trim($selector);
-            
-            // Substitui # por [@id='...']
-            $selector = preg_replace('/#([a-zA-Z0-9_-]+)/', "*[@id='$1']", $selector);
-            
-            // Substitui . por [@class='...']
-            $selector = preg_replace('/\.([a-zA-Z0-9_-]+)/', "*[contains(concat(' ', normalize-space(@class), ' '), ' $1 ')]", $selector);
-            
-            // Substitui espaços por /
-            $selector = preg_replace('/\s+/', '//', $selector);
-            
-            // Adiciona // no início se não começar com /
-            if (strpos($selector, '/') !== 0) {
-                $selector = '//' . $selector;
-            }
-            
-            return $selector;
+            // Retorna um XPath que não encontrará nenhum elemento
+            return '//null';
         }
     }
 

@@ -15,6 +15,11 @@ class WebcamCapture extends Field
         parent::setUp();
 
         $this->dehydrateStateUsing(function ($state) {
+            // Se o estado já for um nome de arquivo, simplesmente retorna
+            if (is_string($state) && !str_starts_with($state, 'data:image')) {
+                return $state;
+            }
+            
             // Se o estado for uma string base64, converte para arquivo
             if (is_string($state) && str_starts_with($state, 'data:image')) {
                 $docNumber = $this->getLivewire()->data['doc'] ?? null;
@@ -32,11 +37,18 @@ class WebcamCapture extends Field
                 // Cria o nome do arquivo: photo_tipo_numero.jpg
                 $filename = 'photo_' . strtolower($docType->type) . '_' . $safeDocNumber . '.jpg';
                 
+                // Verifica se o arquivo já existe
+                if (Storage::disk('private')->exists('visitors-photos/' . $filename)) {
+                    \Illuminate\Support\Facades\Log::info("WebcamCapture: Arquivo {$filename} já existe, usando o existente");
+                    return $filename;
+                }
+                
                 // Converte base64 para arquivo
                 $image = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $state));
                 
                 // Salva o arquivo no disco private
                 Storage::disk('private')->put('visitors-photos/' . $filename, $image);
+                \Illuminate\Support\Facades\Log::info("WebcamCapture: Salvando nova foto como {$filename}");
                 
                 return $filename;
             }

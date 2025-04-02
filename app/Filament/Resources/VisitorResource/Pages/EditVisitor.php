@@ -50,11 +50,11 @@ class EditVisitor extends EditRecord
         // Adiciona o botão de preview apenas se o visitante tiver uma visita em andamento
         if ($hasActiveVisit) {
             $actions[] = Actions\Action::make('previewCredential')
-                ->label('Preview da Credencial')
+                ->label('Imprimir Credencial')
                 ->color('info')
-                ->icon('heroicon-o-eye')
+                ->icon('heroicon-o-printer')
                 ->action(function () {
-                    $this->previewVisitorCredential();
+                    $this->printVisitorCredential();
                 });
         }
         
@@ -79,10 +79,10 @@ class EditVisitor extends EditRecord
         return $actions;
     }
 
-    protected function previewVisitorCredential()
+    protected function printVisitorCredential()
     {
         // Registra no log para debug
-        \Illuminate\Support\Facades\Log::info('Método previewVisitorCredential chamado', [
+        \Illuminate\Support\Facades\Log::info('Método printVisitorCredential chamado', [
             'visitor_id' => $this->record->id,
             'visitor_name' => $this->record->name,
         ]);
@@ -150,7 +150,7 @@ class EditVisitor extends EditRecord
 
         // Adiciona um script inline para carregar o script dinamicamente e então executar a função
         $this->js(<<<JS
-            console.log('Iniciando preview de credencial via JS inline');
+            console.log('Iniciando impressão de credencial');
             
             // Função para carregar o script dinamicamente
             function loadScript(url, callback) {
@@ -159,35 +159,32 @@ class EditVisitor extends EditRecord
                 script.type = 'text/javascript';
                 script.src = url;
                 script.onload = function() {
-                    console.log('Script carregado com sucesso:', url);
+                    console.log('Script carregado com sucesso');
                     callback();
                 };
                 script.onerror = function() {
-                    console.error('Erro ao carregar script:', url);
+                    console.error('Erro ao carregar script de impressão');
                 };
                 document.head.appendChild(script);
             }
             
             // Dados do visitante
             const visitorData = {$this->encodeVisitorData($visitorData)};
-            console.log('Dados do visitante:', visitorData);
-            console.log('URL da foto do visitante:', visitorData.photo);
+            console.log('Dados do visitante preparados para impressão');
             
             // Verifica se o script já está carregado
             if (typeof window.printVisitorCredential === 'function') {
-                console.log('Script já carregado, chamando função diretamente');
+                console.log('Script já carregado, iniciando impressão');
                 window.printVisitorCredential(visitorData);
             } else {
                 console.log('Script não carregado, carregando dinamicamente');
                 // Carrega o script e então executa a função
                 loadScript('/js/visitor-credential-print.js?v=' + new Date().getTime(), function() {
-                    console.log('Script carregado, verificando função');
-                    // Verifica novamente se a função está disponível
                     if (typeof window.printVisitorCredential === 'function') {
-                        console.log('Função encontrada após carregar script, chamando');
+                        console.log('Iniciando impressão');
                         window.printVisitorCredential(visitorData);
                     } else {
-                        console.error('Função ainda não encontrada após carregar script');
+                        console.error('Função de impressão não encontrada');
                         // Tenta disparar o evento diretamente
                         const event = new CustomEvent('print-visitor-credential', {
                             detail: {
@@ -202,8 +199,8 @@ class EditVisitor extends EditRecord
 
         Notification::make()
             ->success()
-            ->title('Preview da Credencial')
-            ->body('O preview da credencial foi aberto.')
+            ->title('Impressão de Credencial')
+            ->body('A credencial foi enviada para impressão.')
             ->send();
     }
     
@@ -260,11 +257,11 @@ class EditVisitor extends EditRecord
         // Adiciona o botão de preview apenas se o visitante tiver uma visita em andamento
         if ($hasActiveVisit) {
             $actions[] = Actions\Action::make('preview')
-                ->label('Preview da Credencial')
+                ->label('Imprimir Credencial')
                 ->color('info')
-                ->icon('heroicon-o-eye')
+                ->icon('heroicon-o-printer')
                 ->action(function () {
-                    $this->previewVisitorCredential();
+                    $this->printVisitorCredential();
                 });
         }
 
