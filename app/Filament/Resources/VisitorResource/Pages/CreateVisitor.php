@@ -16,7 +16,7 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use App\Models\PartialVisitorRestriction;
+use App\Models\PredictiveVisitorRestriction;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Resources\Pages\CreateRecord;
@@ -1226,7 +1226,7 @@ class CreateVisitor extends CreateRecord
         ]);
         
         // Busca restrições parciais ativas na tabela correta
-        $query = \App\Models\PartialVisitorRestriction::query()
+        $query = \App\Models\PredictiveVisitorRestriction::query()
             ->where('active', true)
             ->where(function ($query) {
                 // Restrições sem data de expiração ou com data futura

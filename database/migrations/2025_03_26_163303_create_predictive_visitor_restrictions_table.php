@@ -11,22 +11,22 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('visitor_restrictions', function (Blueprint $table) {
+        Schema::create('predictive_visitor_restrictions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('visitor_id')->nullable()->constrained()->onDelete('cascade');
-            $table->string('name')->nullable(); // Para visitantes não cadastrados
-            $table->string('doc')->nullable(); // Para visitantes não cadastrados
+            $table->string('partial_name')->nullable()->comment('Pode conter wildcards * e ?');
+            $table->string('partial_doc')->nullable()->comment('Pode conter wildcards * e ?');
             $table->foreignId('doc_type_id')->nullable()->constrained()->onDelete('cascade');
+            $table->string('phone')->nullable()->comment('Pode conter wildcards * e ?');
             $table->text('reason');
-            $table->enum('severity_level', ['low', 'medium', 'high', 'critical'])->default('medium');
+            $table->enum('severity_level', ['low', 'medium', 'high'])->default('low');
             $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
             $table->boolean('active')->default(true);
             $table->timestamp('expires_at')->nullable();
             $table->timestamps();
 
             // Índices para otimização
-            $table->index(['name']);
-            $table->index(['doc', 'doc_type_id']);
+            $table->index(['partial_name']);
+            $table->index(['partial_doc', 'doc_type_id']);
             $table->index(['active', 'expires_at']);
         });
     }
@@ -36,6 +36,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('visitor_restrictions');
+        Schema::dropIfExists('predictive_visitor_restrictions');
     }
 }; 
