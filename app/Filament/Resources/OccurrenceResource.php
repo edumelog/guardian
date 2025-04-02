@@ -63,7 +63,7 @@ class OccurrenceResource extends Resource
                             ->label('Severidade')
                             ->options([
                                 'green' => 'Baixa (Verde)',
-                                'amber' => 'Média (Âmbar)',
+                                'amber' => 'Média (Amarelo)',
                                 'red' => 'Alta (Vermelho)',
                             ])
                             ->required()
