@@ -290,7 +290,7 @@ class VisitorResource extends Resource
                                             // Usa uma notificação do Filament
                                             \Filament\Notifications\Notification::make()
                                                 ->$notificationType()
-                                                ->title('ALERTA: Restrição Detectada')
+                                                ->title('ALERTA: Restrição Detectada no VisitorResource')
                                                 ->body("O visitante {$visitor->name} possui uma restrição de severidade {$restriction->severity_text}: {$restriction->reason}")
                                                 ->persistent()
                                                 ->icon('heroicon-o-exclamation-triangle')

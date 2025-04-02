@@ -76,7 +76,7 @@ class CreateVisitor extends CreateRecord
                         Placeholder::make('restriction_alert')
                             ->label(function () {
                                 if (!$this->visitorRestriction) {
-                                    return 'ALERTA: Restrição Detectada';
+                                    return null;
                                 }
                                 
                                 $severityText = match ($this->visitorRestriction->severity_level) {
@@ -100,6 +100,66 @@ class CreateVisitor extends CreateRecord
                             ->content(function () {
                                 if (!$this->visitorRestriction) {
                                     return null;
+                                }
+                                
+                                // Log informando que a restrição foi encontrada será gerada uma Ocorrência Automática
+                                \Illuminate\Support\Facades\Log::warning('[Ocorrência Automática - VisitorResource]', [
+                                    'visitor_id' => $this->visitorRestriction->id,
+                                    'visitor_name' => $this->visitorRestriction->name,
+                                    'visitor_doc_name' => $this->visitorRestriction->docType->type,
+                                    'visitor_doc' => $this->visitorRestriction->doc,
+                                    'visitor_phone' => $this->visitorRestriction->phone,
+                                    'restriction_id' => $this->visitorRestriction->id,
+                                    'operator_name' => Auth::user()->name,
+                                    'operator_email' => Auth::user()->email,
+                                    'date_time' => now()->format('d/m/Y H:i:s'),
+                                    'occurrence_key' => 'common_visitor_restriction',
+                                    'occurrence_title' => 'Restrição de Acesso Comum Detectada',
+                                    'occurrence_description' => 'Registro de tentativa de cadastro de visitante com Restrição de Acesso Comum',
+                                    'occurrence_severity_level' => $this->visitorRestriction->severity_level,
+                                    'occurrence_expires_at_formatted' => $this->visitorRestriction->expires_at ? $this->visitorRestriction->expires_at->format('d/m/Y') : 'Nunca',
+                                    'occurrence_reason' => $this->visitorRestriction->reason,
+                                ]);
+                                
+                                // Verifica se a ocorrência automática está habilitada
+                                $automaticOccurrence = \App\Models\AutomaticOccurrence::where('key', 'common_visitor_restriction')->first();
+                                
+                                // Registra a ocorrência apenas se estiver habilitada
+                                if ($automaticOccurrence && $automaticOccurrence->enabled) {
+                                    // Registrar a ocorrência automática
+                                    $occurrence = \App\Models\Occurrence::create([
+                                        'description' => "Registro de tentativa de cadastro de visitante com Restrição de Acesso Comum:\n\nDados do visitante:\nNome: {$this->visitorRestriction->name}\nDocumento: {$this->visitorRestriction->doc}\nTelefone: {$this->visitorRestriction->phone}\nRestrição: {$this->visitorRestriction->reason}\nRegistrado por: " . Auth::user()->name . " - " . Auth::user()->email . "\n\nOcorrência gerada automaticamente pelo sistema de monitoramento de visitantes.",
+                                        'severity' => match ($this->visitorRestriction->severity_level) {
+                                            'low' => 'green',
+                                            'medium' => 'amber',
+                                            'high' => 'red',
+                                            default => 'amber',
+                                        },
+                                        'occurrence_datetime' => now(),
+                                        'created_by' => Auth::id(),
+                                        'updated_by' => null,
+                                    ]);
+
+                                    // Buscar o visitante pelo documento
+                                    $formData = $this->form->getRawState();
+                                    $visitor = \App\Models\Visitor::where('doc', $formData['doc'])
+                                        ->where('doc_type_id', $formData['doc_type_id'])
+                                        ->first();
+
+                                    // Vincular o visitante à ocorrência se ele existir
+                                    if ($visitor) {
+                                        $occurrence->visitors()->attach($visitor->id);
+                                    }
+
+                                    // Vincular o destino à ocorrência (se existir)
+                                    if (!empty($formData['destination_id'])) {
+                                        $occurrence->destinations()->attach($formData['destination_id']);
+                                    }
+                                } else {
+                                    \Illuminate\Support\Facades\Log::info('[Ocorrência Automática - VisitorResource] Ocorrência automática desabilitada', [
+                                        'key' => 'common_visitor_restriction',
+                                        'enabled' => $automaticOccurrence ? $automaticOccurrence->enabled : false
+                                    ]);
                                 }
                                 
                                 // Determina a cor do texto baseada na severidade

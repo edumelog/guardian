@@ -55,17 +55,7 @@ return [
         'pages' => true,
         'widgets' => true,
         'resources' => true,
-        'custom_permissions' => [
-            'manage_qz_certificates',
-            'manage_visitor_restrictions',
-            'view_visitor_restrictions',
-            'create_visitor_restrictions',
-            'update_visitor_restrictions',
-            'delete_visitor_restrictions',
-            'low_risk_approval',
-            'medium_risk_approval',
-            'high_risk_approval',
-        ],
+        'custom_permissions' => [],
     ],
 
     'generator' => [

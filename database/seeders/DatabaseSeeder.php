@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
             FilamentAdminSeeder::class,
             RiskAnalystRoleSeeder::class,
             RiskApprovalPermissionsSeeder::class,
+            AutomaticOccurrencesSeeder::class,
         ]);
     }
 }
