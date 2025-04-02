@@ -11,9 +11,15 @@ class AutomaticOccurrencesSeeder extends Seeder
     {
         $occurrences = [
             [
+                'key' => 'doc_expired',
+                'title' => 'Documento Vencido',
+                'description' => 'Bloqueia automaticamente a entrada de visitantes que possuem documentos com data de validade vencida',
+                'enabled' => true
+            ],
+            [
                 'key' => 'common_visitor_restriction',
-                'title' => 'Restrição de Visitantes Comuns',
-                'description' => 'Registro de tentativa de cadastro de visitantes com Restrição de Acesso Comum',
+                'title' => 'Restrição de Acesso Comum',
+                'description' => 'Registra automaticamente ocorrências quando um visitante com restrição de acesso comum tenta entrar',
                 'enabled' => true
             ]
         ];
