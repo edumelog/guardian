@@ -3,14 +3,17 @@
 namespace App\Filament\Pages;
 
 use Filament\Pages\Page;
+use App\Models\AutomaticOccurrence;
 use Filament\Support\Enums\MaxWidth;
 use Filament\Forms\Components\Toggle;
-use Illuminate\Support\Facades\Storage;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 class AutomaticOccurrences extends Page
 {
+    use HasPageShield;
+
     protected static ?string $navigationIcon = 'heroicon-o-shield-exclamation';
     protected static ?string $navigationGroup = 'Análise de Segurança';
     protected static ?string $navigationLabel = 'Ocorrências Automáticas';
@@ -20,50 +23,33 @@ class AutomaticOccurrences extends Page
 
     protected static string $view = 'filament.pages.automatic-occurrences';
 
-    // Array com as ocorrências automáticas
-    public array $occurrences = [
-        'doc_expired' => [
-            'title' => 'Documento Vencido',
-            'description' => 'Bloqueia automaticamente visitantes com documentos vencidos',
-            'enabled' => true
-        ],
-        'multiple_visits' => [
-            'title' => 'Múltiplas Visitas Simultâneas',
-            'description' => 'Bloqueia tentativas de entrada simultânea do mesmo visitante',
-            'enabled' => true
-        ],
-        'blacklist' => [
-            'title' => 'Lista Negra',
-            'description' => 'Bloqueia automaticamente visitantes que estão na lista negra',
-            'enabled' => true
-        ],
-        'time_restriction' => [
-            'title' => 'Restrição de Horário',
-            'description' => 'Bloqueia entrada fora do horário permitido',
-            'enabled' => false
-        ]
-    ];
+    public array $occurrences = [];
 
     public function mount(): void
     {
-        // Carrega as configurações salvas, se existirem
-        if (Storage::exists('automatic_occurrences.json')) {
-            $saved = json_decode(Storage::get('automatic_occurrences.json'), true);
-            foreach ($saved as $key => $value) {
-                if (isset($this->occurrences[$key])) {
-                    $this->occurrences[$key]['enabled'] = $value['enabled'];
-                }
-            }
-        }
+        // Carrega as ocorrências do banco de dados
+        $this->occurrences = AutomaticOccurrence::all()
+            ->keyBy('key')
+            ->map(function ($occurrence) {
+                return [
+                    'title' => $occurrence->title,
+                    'description' => $occurrence->description,
+                    'enabled' => $occurrence->enabled,
+                ];
+            })
+            ->toArray();
     }
 
     public function toggleOccurrence($key): void
     {
-        if (isset($this->occurrences[$key])) {
-            $this->occurrences[$key]['enabled'] = !$this->occurrences[$key]['enabled'];
-            
-            // Salva as configurações
-            Storage::put('automatic_occurrences.json', json_encode($this->occurrences));
+        $occurrence = AutomaticOccurrence::where('key', $key)->first();
+        
+        if ($occurrence) {
+            $occurrence->enabled = !$occurrence->enabled;
+            $occurrence->save();
+
+            // Atualiza o array local
+            $this->occurrences[$key]['enabled'] = $occurrence->enabled;
             
             // Notifica o usuário
             Notification::make()
@@ -78,21 +64,9 @@ class AutomaticOccurrences extends Page
         return MaxWidth::ExtraLarge;
     }
 
-    public static function shouldRegisterNavigation(): bool
-    {
-        return Auth::user()?->can('page_AutomaticOccurrences') ?? false;
-    }
-
     protected function getHeaderActions(): array
     {
         return [];
-    }
-
-    public function getViewData(): array
-    {
-        return [
-            'occurrences' => $this->occurrences
-        ];
     }
 
     protected function getViewComponents(): array
