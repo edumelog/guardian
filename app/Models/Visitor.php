@@ -93,32 +93,17 @@ class Visitor extends Model
     {
         $hasCommonRestrictions = $this->activeRestrictions()->exists();
         
-        if ($hasCommonRestrictions) {
-            Log::info('Visitor::hasActiveRestrictions - Restrições comuns encontradas', [
-                'visitor_id' => $this->id,
-                'active_restrictions_count' => $this->activeRestrictions()->count(),
-            ]);
-            
-            return true;
-        }
-        
-        // Verifica restrições preditivas
-        $predictiveRestrictions = \App\Models\PredictiveVisitorRestriction::findMatchingRestrictions($this);
-        
-        $hasPredictiveRestrictions = $predictiveRestrictions->isNotEmpty();
-        
-        Log::info('Visitor::hasActiveRestrictions - Resultado final', [
+        Log::info('Visitor::hasActiveRestrictions - Resultado', [
             'visitor_id' => $this->id,
-            'has_restrictions' => ($hasCommonRestrictions || $hasPredictiveRestrictions) ? 'Sim' : 'Não',
-            'common_restrictions_count' => $this->activeRestrictions()->count(),
-            'predictive_restrictions_count' => $predictiveRestrictions->count(),
+            'has_restrictions' => $hasCommonRestrictions ? 'Sim' : 'Não',
+            'active_restrictions_count' => $this->activeRestrictions()->count(),
         ]);
         
-        return $hasCommonRestrictions || $hasPredictiveRestrictions;
+        return $hasCommonRestrictions;
     }
 
     /**
-     * Retorna a restrição mais crítica ativa (incluindo restrições preditivas)
+     * Retorna a restrição mais crítica ativa
      */
     public function getMostCriticalRestrictionAttribute()
     {
@@ -131,13 +116,7 @@ class Visitor extends Model
         // Busca restrições comuns
         $commonRestrictions = $this->activeRestrictions()->get();
         
-        // Busca restrições preditivas
-        $predictiveRestrictions = \App\Models\PredictiveVisitorRestriction::findMatchingRestrictions($this);
-        
-        // Combina as coleções
-        $allRestrictions = $commonRestrictions->concat($predictiveRestrictions);
-        
-        $restriction = $allRestrictions
+        $restriction = $commonRestrictions
             ->sortByDesc(function ($restriction) use ($severityOrder) {
                 return $severityOrder[$restriction->severity_level] ?? 0;
             })
@@ -147,7 +126,7 @@ class Visitor extends Model
             'visitor_id' => $this->id,
             'restriction_encontrada' => $restriction ? 'Sim' : 'Não',
             'restriction_id' => $restriction?->id,
-            'restriction_type' => $restriction ? (get_class($restriction) === 'App\Models\CommonVisitorRestriction' ? 'Comum' : 'Preditiva') : null,
+            'restriction_type' => 'Comum',
             'severity_level' => $restriction?->severity_level,
         ]);
         
