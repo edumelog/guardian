@@ -10,12 +10,7 @@ class AutomaticOccurrencesSeeder extends Seeder
     public function run(): void
     {
         $occurrences = [
-            [
-                'key' => 'doc_expired',
-                'title' => 'Documento Vencido',
-                'description' => 'Bloqueia automaticamente a entrada de visitantes que possuem documentos com data de validade vencida',
-                'enabled' => true
-            ],
+
             [
                 'key' => 'common_visitor_restriction',
                 'title' => 'Restrição de Acesso Comum',
