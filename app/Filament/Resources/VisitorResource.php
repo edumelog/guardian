@@ -71,15 +71,15 @@ class VisitorResource extends Resource
         ];
     }
     
-    public static function getNavigationBadge(): ?string
-    {
-        $activeCount = \App\Models\CommonVisitorRestriction::query()
-            ->whereHas('visitor')
-            ->active()
-            ->count();
+    // public static function getNavigationBadge(): ?string
+    // {
+    //     $activeCount = \App\Models\CommonVisitorRestriction::query()
+    //         ->whereHas('visitor')
+    //         ->active()
+    //         ->count();
             
-        return $activeCount > 0 ? (string) $activeCount : null;
-    }
+    //     return $activeCount > 0 ? (string) $activeCount : null;
+    // }
     
     public static function getNavigationBadgeColor(): ?string
     {
