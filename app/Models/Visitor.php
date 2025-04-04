@@ -78,12 +78,12 @@ class Visitor extends Model
 
     public function restrictions(): HasMany
     {
-        return $this->hasMany(VisitorRestriction::class);
+        return $this->hasMany(CommonVisitorRestriction::class);
     }
 
     public function activeRestrictions(): HasMany
     {
-        return $this->hasMany(VisitorRestriction::class)->active();
+        return $this->hasMany(CommonVisitorRestriction::class)->active();
     }
 
     /**
@@ -91,34 +91,19 @@ class Visitor extends Model
      */
     public function hasActiveRestrictions(): bool
     {
-        $hasExactRestrictions = $this->activeRestrictions()->exists();
+        $hasCommonRestrictions = $this->activeRestrictions()->exists();
         
-        if ($hasExactRestrictions) {
-            Log::info('Visitor::hasActiveRestrictions - Restrições exatas encontradas', [
-                'visitor_id' => $this->id,
-                'active_restrictions_count' => $this->activeRestrictions()->count(),
-            ]);
-            
-            return true;
-        }
-        
-        // Verifica restrições parciais
-        $partialRestrictions = \App\Models\PartialVisitorRestriction::findMatchingRestrictions($this);
-        
-        $hasPartialRestrictions = $partialRestrictions->isNotEmpty();
-        
-        Log::info('Visitor::hasActiveRestrictions - Resultado final', [
+        Log::info('Visitor::hasActiveRestrictions - Resultado', [
             'visitor_id' => $this->id,
-            'has_restrictions' => ($hasExactRestrictions || $hasPartialRestrictions) ? 'Sim' : 'Não',
-            'exact_restrictions_count' => $this->activeRestrictions()->count(),
-            'partial_restrictions_count' => $partialRestrictions->count(),
+            'has_restrictions' => $hasCommonRestrictions ? 'Sim' : 'Não',
+            'active_restrictions_count' => $this->activeRestrictions()->count(),
         ]);
         
-        return $hasExactRestrictions || $hasPartialRestrictions;
+        return $hasCommonRestrictions;
     }
 
     /**
-     * Retorna a restrição mais crítica ativa (incluindo restrições parciais)
+     * Retorna a restrição mais crítica ativa
      */
     public function getMostCriticalRestrictionAttribute()
     {
@@ -128,16 +113,10 @@ class Visitor extends Model
             'low' => 1,
         ];
 
-        // Busca restrições exatas
-        $exactRestrictions = $this->activeRestrictions()->get();
+        // Busca restrições comuns
+        $commonRestrictions = $this->activeRestrictions()->get();
         
-        // Busca restrições parciais
-        $partialRestrictions = \App\Models\PartialVisitorRestriction::findMatchingRestrictions($this);
-        
-        // Combina as coleções
-        $allRestrictions = $exactRestrictions->concat($partialRestrictions);
-        
-        $restriction = $allRestrictions
+        $restriction = $commonRestrictions
             ->sortByDesc(function ($restriction) use ($severityOrder) {
                 return $severityOrder[$restriction->severity_level] ?? 0;
             })
@@ -147,7 +126,7 @@ class Visitor extends Model
             'visitor_id' => $this->id,
             'restriction_encontrada' => $restriction ? 'Sim' : 'Não',
             'restriction_id' => $restriction?->id,
-            'restriction_type' => $restriction ? (get_class($restriction) === 'App\Models\VisitorRestriction' ? 'Exata' : 'Parcial') : null,
+            'restriction_type' => 'Comum',
             'severity_level' => $restriction?->severity_level,
         ]);
         

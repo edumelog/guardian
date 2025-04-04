@@ -210,7 +210,7 @@
                 @endif
             </div>
             <div class="header-center">
-                <h2>RELATÓRIO DE VISITANTES - GUARDIAN</h2>
+                <h2>RELATÓRIO DE VISITAS - GUARDIAN</h2>
                 <p>Gerado em: {{ $filterInfo['generated_at'] }} por {{ $filterInfo['generated_by'] }}</p>
             </div>
             <div class="header-right">

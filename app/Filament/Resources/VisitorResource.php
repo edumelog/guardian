@@ -71,15 +71,15 @@ class VisitorResource extends Resource
         ];
     }
     
-    public static function getNavigationBadge(): ?string
-    {
-        $activeCount = \App\Models\VisitorRestriction::query()
-            ->whereHas('visitor')
-            ->active()
-            ->count();
+    // public static function getNavigationBadge(): ?string
+    // {
+    //     $activeCount = \App\Models\CommonVisitorRestriction::query()
+    //         ->whereHas('visitor')
+    //         ->active()
+    //         ->count();
             
-        return $activeCount > 0 ? (string) $activeCount : null;
-    }
+    //     return $activeCount > 0 ? (string) $activeCount : null;
+    // }
     
     public static function getNavigationBadgeColor(): ?string
     {
@@ -247,7 +247,7 @@ class VisitorResource extends Resource
                                         ]);
 
                                         // Verifica diretamente as restrições associadas
-                                        $activeRestrictions = \App\Models\VisitorRestriction::where('visitor_id', $visitor->id)
+                                        $activeRestrictions = \App\Models\CommonVisitorRestriction::where('visitor_id', $visitor->id)
                                             ->active()
                                             ->get();
 
@@ -290,7 +290,7 @@ class VisitorResource extends Resource
                                             // Usa uma notificação do Filament
                                             \Filament\Notifications\Notification::make()
                                                 ->$notificationType()
-                                                ->title('ALERTA: Restrição Detectada')
+                                                ->title('ALERTA: Restrição Detectada no VisitorResource')
                                                 ->body("O visitante {$visitor->name} possui uma restrição de severidade {$restriction->severity_text}: {$restriction->reason}")
                                                 ->persistent()
                                                 ->icon('heroicon-o-exclamation-triangle')

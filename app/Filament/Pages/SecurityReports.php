@@ -37,8 +37,8 @@ class SecurityReports extends Page implements HasForms
     use HasPageShield;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-chart-bar';
-    protected static ?string $navigationLabel = 'Relatórios';
-    protected static ?string $title = 'Relatórios de Segurança';
+    protected static ?string $navigationLabel = 'Relatório de Visitas';
+    protected static ?string $title = 'Relatório de Visitas';
     protected static ?string $slug = 'security-reports';
     protected static ?string $navigationGroup = 'Análise de Segurança';
     protected static ?int $navigationSort = 3;
@@ -653,7 +653,7 @@ class SecurityReports extends Page implements HasForms
         }
 
         // Exporta todos os resultados, não apenas a página atual
-        $filename = 'relatorio_visitantes_' . now()->format('YmdHis') . '.csv';
+        $filename = 'relatorio_visitas_' . now()->format('YmdHis') . '.csv';
         
         // Usar uma closure para gerar o CSV no momento do download
         return response()->streamDownload(function () {
@@ -677,7 +677,7 @@ class SecurityReports extends Page implements HasForms
             
             // Incluir informações de ordenação como primeira linha do CSV
             fputcsv($handle, [
-                'Relatório de Visitantes - ' . now()->format('d/m/Y H:i:s'),
+                'Relatório de Visitas - ' . now()->format('d/m/Y H:i:s'),
                 'Ordenado por: ' . $sortFieldDescription,
                 'Ordem: ' . $sortDirectionDescription
             ]);
@@ -860,7 +860,7 @@ class SecurityReports extends Page implements HasForms
             
         return response()->streamDownload(
             fn () => print($pdfOutput),
-            'relatorio_visitantes_' . now()->format('YmdHis') . '.pdf',
+            'relatorio_visitas_' . now()->format('YmdHis') . '.pdf',
             ['Content-Type' => 'application/pdf']
         );
     }

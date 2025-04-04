@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('occurrences', function (Blueprint $table) {
             $table->id();
             $table->text('description')->comment('Descrição da ocorrência');
-            $table->enum('severity', ['green', 'amber', 'red'])->comment('Severidade: Verde, Âmbar ou Vermelho');
+            $table->enum('severity', ['gray', 'green', 'amber', 'red'])->comment('Severidade: Cinza, Verde, Âmbar ou Vermelho');
             $table->timestamp('occurrence_datetime')->comment('Data e hora da ocorrência');
             $table->unsignedBigInteger('created_by')->comment('ID do usuário que criou o registro');
             $table->unsignedBigInteger('updated_by')->nullable()->comment('ID do usuário que atualizou o registro');
