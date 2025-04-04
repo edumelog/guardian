@@ -106,11 +106,11 @@ class CreateVisitor extends CreateRecord
                                 }
                                 
                                 $severityText = match ($maxSeverity) {
-                                    'none' => 'Nenhuma',
+                                    'none' => 'Nenhuma (Apenas Informativa)',
                                     'low' => 'Baixa',
                                     'medium' => 'Média',
                                     'high' => 'Alta',
-                                    default => 'Nenhuma',
+                                    default => 'Nenhuma (Apenas Informativa)',
                                 };
                                 
                                 $colorClass = match ($maxSeverity) {
@@ -176,7 +176,7 @@ class CreateVisitor extends CreateRecord
                                         <div class='flex justify-between items-start'>
                                             <h3 class='font-bold {$severityClass}'>Restrição #" . ($index + 1) . " ({$restrictionType})</h3>
                                             <span class='font-medium {$severityClass}'>" . match ($restriction->severity_level) {
-                                                'none' => 'Severidade: Nenhuma',
+                                                'none' => 'Severidade: Nenhuma (Apenas Informativa)',
                                                 'low' => 'Severidade: Baixa',
                                                 'medium' => 'Severidade: Média',
                                                 'high' => 'Severidade: Alta',
@@ -1131,12 +1131,13 @@ class CreateVisitor extends CreateRecord
                                 'none' => 'gray',
                                 'low' => 'green',
                                 'medium' => 'amber',
-                                'high', 'critical' => 'red',
+                                'high' => 'red',
                                 default => 'gray',
                             },
                             'occurrence_datetime' => now(),
                             'created_by' => Auth::id(),
                             'updated_by' => null,
+                            'is_editable' => false,
                         ]);
                         
                         // Vincular o visitante à ocorrência
@@ -1297,12 +1298,13 @@ class CreateVisitor extends CreateRecord
                             'none' => 'gray',
                             'low' => 'green',
                             'medium' => 'amber',
-                            'high', 'critical' => 'red',
+                            'high' => 'red',
                             default => 'gray',
                         },
                         'occurrence_datetime' => now(),
                         'created_by' => Auth::id(),
                         'updated_by' => null,
+                        'is_editable' => false,
                     ]);
                     
                     // Vincular o visitante à ocorrência (se já existir)

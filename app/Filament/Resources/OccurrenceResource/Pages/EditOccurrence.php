@@ -3,19 +3,36 @@
 namespace App\Filament\Resources\OccurrenceResource\Pages;
 
 use Filament\Actions;
+use Filament\Forms\Form;
+use Illuminate\Support\Carbon;
 use Filament\Support\Enums\MaxWidth;
+use Illuminate\Database\Eloquent\Model;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use App\Filament\Resources\OccurrenceResource;
-use Filament\Notifications\Notification;
-use Illuminate\Support\Carbon;
-use Illuminate\Database\Eloquent\Model;
-use Filament\Forms\Form;
 
 class EditOccurrence extends EditRecord
 {
     protected static string $resource = OccurrenceResource::class;
     // Max width
     protected ?string $maxContentWidth = MaxWidth::Full->value;
+
+    protected function getFormActions(): array
+    {
+        return [
+            Actions\Action::make('save')
+                ->label('Salvar alterações')
+                ->submit('save')
+                ->keyBindings(['mod+s'])
+                ->color('primary')
+                ->disabled(fn() => !$this->record->is_editable),
+                
+            Actions\Action::make('cancel')
+                ->label('Cancelar')
+                ->color('gray')
+                ->url($this->getResource()::getUrl('index')),
+        ];
+    }
 
     protected function getHeaderActions(): array
     {

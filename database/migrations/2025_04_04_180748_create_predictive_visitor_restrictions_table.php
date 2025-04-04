@@ -20,7 +20,7 @@ return new class extends Migration
             $table->boolean('any_destination')->default(true)->comment('Se true, qualquer destino');
             $table->json('destinations')->nullable()->comment('Destinos específicos a restringir em formato JSON');
             $table->text('reason')->comment('Motivo da restrição preditiva');
-            $table->enum('severity_level', ['none', 'low', 'medium', 'high'])->default('medium');
+            $table->enum('severity_level', ['none', 'low', 'medium', 'high'])->default('none');
             $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
             $table->boolean('active')->default(true);
             $table->timestamp('expires_at')->nullable();

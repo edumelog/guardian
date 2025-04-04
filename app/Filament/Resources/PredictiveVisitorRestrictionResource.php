@@ -106,10 +106,10 @@ class PredictiveVisitorRestrictionResource extends Resource
                         Select::make('severity_level')
                             ->label('Nível de Severidade')
                             ->options([
-                                'none' => 'Nenhum (Apenas Informativo)',
-                                'low' => 'Baixo (Alerta)',
-                                'medium' => 'Médio (Requer Aprovação)',
-                                'high' => 'Alto (Requer Aprovação de Superior)',
+                                'none' => 'Nenhuma (Apenas Informativa)',
+                                'low' => 'Baixa',
+                                'medium' => 'Média',
+                                'high' => 'Alta',
                             ])
                             ->default('medium')
                             ->required(),
@@ -159,15 +159,24 @@ class PredictiveVisitorRestrictionResource extends Resource
                     ->searchable()
                     ->placeholder('Qualquer documento'),
                     
-                BadgeColumn::make('severity_level')
+                TextColumn::make('severity_level')
                     ->label('Severidade')
                     ->sortable()
-                    ->colors([
-                        'gray' => 'none',
-                        'success' => 'low',
-                        'warning' => 'medium',
-                        'danger' => 'high',
-                    ]),
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'none' => 'Nenhuma',
+                        'low' => 'Baixa',
+                        'medium' => 'Média',
+                        'high' => 'Alta',
+                        default => ucfirst($state),
+                    })
+                    ->color(fn (string $state): string => match ($state) {
+                        'none' => 'gray',
+                        'low' => 'success',
+                        'medium' => 'warning',
+                        'high' => 'danger',
+                        default => 'gray',
+                    }),
                     
                 IconColumn::make('active')
                     ->label('Ativa')
@@ -196,7 +205,7 @@ class PredictiveVisitorRestrictionResource extends Resource
                 Tables\Filters\SelectFilter::make('severity_level')
                     ->label('Severidade')
                     ->options([
-                        'none' => 'Nenhum',
+                        'none' => 'Nenhuma (Apenas Informativa)',
                         'low' => 'Baixo',
                         'medium' => 'Médio',
                         'high' => 'Alto',

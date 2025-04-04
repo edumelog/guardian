@@ -181,12 +181,13 @@ class PredictiveRestrictionService
                     'none' => 'gray',
                     'low' => 'green',
                     'medium' => 'amber',
-                    'high', 'critical' => 'red',
+                    'high' => 'red',
                     default => 'gray',
                 },
                 'occurrence_datetime' => now(),
                 'created_by' => Auth::id(),
                 'updated_by' => null,
+                'is_editable' => false,
             ]);
             
             // Vincular o visitante à ocorrência (se já existir)
