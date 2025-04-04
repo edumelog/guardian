@@ -47,6 +47,16 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+### v1.5.0
+- **Implementação do Registro Automático de Ocorrências para Restrições Comuns de Acesso** - principal funcionalidade desta versão
+- Aprimoramento do sistema de Restrições de Acesso com múltiplos níveis de severidade (none, low, medium, high)
+- Novo fluxo de aprovação simplificado para visitantes com restrições, agora exibindo contagem por nível de severidade
+- Suporte a múltiplas restrições desativadas para o mesmo visitante com validação aprimorada
+- Correção da formatação de datas em relatórios para o padrão brasileiro (dd/mm/aaaa)
+- Implementação de validação avançada para períodos de pesquisa nos relatórios de segurança
+- Melhoria na interface com valores padrão para campos de data vazios nos formulários de pesquisa
+- Otimização da experiência do usuário na validação de formulários de restrições
+
 ### v1.4.0
 - Implementação do módulo "Registro de Ocorrências" para registrar eventos de segurança
 - Melhorias nos relatórios de visitantes com opções avançadas de exportação em PDF e CSV
