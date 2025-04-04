@@ -1005,7 +1005,7 @@ class CreateVisitor extends CreateRecord
                     'occurrence_reason' => $restriction->reason,
                 ]);
                 
-                // Verifica se a ocorrência automática está habilitada
+                // Verifica se a ocorrência automática está habilitada para Restrição Comum
                 $automaticOccurrence = \App\Models\AutomaticOccurrence::where('key', 'common_visitor_restriction')->first();
                 
                 // Registra a ocorrência apenas se estiver habilitada
@@ -1015,16 +1015,16 @@ class CreateVisitor extends CreateRecord
                     
                     $description = "Tentativa de cadastro de visitante com Restrição de Acesso Comum:
 
-Dados do visitante:
-Nome: " . $visitor->name . "
-Documento: " . $visitor->doc . " (" . $docTypeName . ")
-Telefone: " . ($visitor->phone ?? 'N/A') . "
+                                    Dados do visitante:
+                                    Nome: " . $visitor->name . "
+                                    Documento: " . $visitor->doc . " (" . $docTypeName . ")
+                                    Telefone: " . ($visitor->phone ?? 'N/A') . "
 
-Detalhes da restrição:
-Motivo: " . $restriction->reason . "
-Severidade: " . $restriction->severity_level . "
-Operador: " . Auth::user()->name . " - " . Auth::user()->email . "
-OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitantes.";
+                                    Detalhes da restrição:
+                                    Motivo: " . $restriction->reason . "
+                                    Severidade: " . $restriction->severity_level . "
+                                    Operador: " . Auth::user()->name . " - " . Auth::user()->email . "
+                                    OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitantes.";
 
                     $occurrence = \App\Models\Occurrence::create([
                         'description' => $description,
