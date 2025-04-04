@@ -276,9 +276,10 @@ class VisitorResource extends Resource
                                             
                                             // Determina a cor baseada na severidade
                                             $notificationType = match ($restriction->severity_level) {
-                                                'low' => 'success',
-                                                'medium' => 'warning',
-                                                'high' => 'danger',
+                                                'none' => 'info',
+                                                'baixa' => 'success',
+                                                'média' => 'warning',
+                                                'alta' => 'danger',
                                                 default => 'warning',
                                             };
                                             

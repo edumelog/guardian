@@ -26,6 +26,9 @@ class Occurrence extends Model
         'description',
         'severity',
         'occurrence_datetime',
+        'created_by',
+        'updated_by',
+        'is_editable',
     ];
     
     /**
@@ -33,13 +36,14 @@ class Occurrence extends Model
      */
     protected $casts = [
         'occurrence_datetime' => 'datetime',
+        'is_editable' => 'boolean',
     ];
     
     /**
      * Mapeia os valores de severidade para cores/nível
      */
     const SEVERITY_LEVELS = [
-        'gray' => 'Nenhuma',
+        'gray' => 'Nenhuma (Apenas Informativa)',
         'green' => 'Baixa',
         'amber' => 'Média',
         'red' => 'Alta',

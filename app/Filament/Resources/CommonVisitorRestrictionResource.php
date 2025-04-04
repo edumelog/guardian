@@ -24,7 +24,7 @@ class CommonVisitorRestrictionResource extends Resource
 
     protected static ?string $navigationGroup = 'Análise de Segurança';
 
-    protected static ?string $navigationLabel = 'Restrições Comuns';
+    protected static ?string $navigationLabel = 'Restrição Comum';
 
     protected static ?string $pluralModelLabel = 'Restrições Comuns';
 

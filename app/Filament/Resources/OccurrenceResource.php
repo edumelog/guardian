@@ -69,11 +69,18 @@ class OccurrenceResource extends Resource
                             ])
                             ->required()
                             ->default('gray')
+                            ->disabled(fn (Get $get, $record) => $record && !$record->is_editable)
+                            ->helperText(fn (Get $get, $record) => 
+                                $record && !$record->is_editable 
+                                    ? 'A severidade não pode ser alterada nesta ocorrência.'
+                                    : null
+                            )
                             ->reactive(),
                             
                         Textarea::make('description')
                             ->label('Descrição da Ocorrência')
                             ->required()
+                            ->disabled(fn (Get $get, $record) => $record && !$record->is_editable)
                             ->columnSpan(2)
                             ->rows(5),
                     ])
@@ -81,6 +88,7 @@ class OccurrenceResource extends Resource
                     
                 Section::make('Vínculos (Opcional)')
                     ->description('Vincule visitantes e/ou destinos relacionados a esta ocorrência')
+                    ->disabled(fn (Get $get, $record) => $record && !$record->is_editable)
                     ->schema([
                         Select::make('visitors')
                             ->label('Visitantes Relacionados')
