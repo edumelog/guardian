@@ -13,21 +13,24 @@ return new class extends Migration
     {
         Schema::create('common_visitor_restrictions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('visitor_id')->nullable()->constrained()->onDelete('cascade');
-            $table->string('name')->nullable(); // Para visitantes não cadastrados
-            $table->string('doc')->nullable(); // Para visitantes não cadastrados
-            $table->foreignId('doc_type_id')->nullable()->constrained()->onDelete('cascade');
+            $table->foreignId('visitor_id')->constrained()->onDelete('cascade');
             $table->text('reason');
-            $table->enum('severity_level', ['low', 'medium', 'high', 'critical'])->default('medium');
+            $table->enum('severity_level', ['none', 'low', 'medium', 'high', 'critical'])->default('none');
             $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
             $table->boolean('active')->default(true);
             $table->timestamp('expires_at')->nullable();
             $table->timestamps();
 
             // Índices para otimização
-            $table->index(['name']);
-            $table->index(['doc', 'doc_type_id']);
             $table->index(['active', 'expires_at']);
+            
+            // Cria um índice na coluna visitor_id 
+            // Em vez de usar unique(['visitor_id', 'active']) que causaria problemas
+            // com múltiplas restrições desativadas, vamos usar um índice simples
+            $table->index('visitor_id');
+            
+            // Não usamos mais esta restrição única que afeta tanto active=true quanto active=false
+            // $table->unique(['visitor_id', 'active'], 'unique_active_restriction_per_visitor');
         });
     }
 

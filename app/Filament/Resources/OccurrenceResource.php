@@ -62,12 +62,13 @@ class OccurrenceResource extends Resource
                         Select::make('severity')
                             ->label('Severidade')
                             ->options([
+                                'gray' => 'Nenhuma (Cinza)',
                                 'green' => 'Baixa (Verde)',
                                 'amber' => 'Média (Amarelo)',
                                 'red' => 'Alta (Vermelho)',
                             ])
                             ->required()
-                            ->default('green')
+                            ->default('gray')
                             ->reactive(),
                             
                         Textarea::make('description')
