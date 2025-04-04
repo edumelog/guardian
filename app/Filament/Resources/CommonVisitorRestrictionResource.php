@@ -126,7 +126,7 @@ class CommonVisitorRestrictionResource extends Resource
                                     ->label('Nível de Severidade')
                                     ->options(CommonVisitorRestriction::SEVERITY_LEVELS)
                                     ->required()
-                                    ->default('medium'),
+                                    ->default('none'),
 
                                 Forms\Components\DatePicker::make('expires_at')
                                     ->label('Data de Expiração')

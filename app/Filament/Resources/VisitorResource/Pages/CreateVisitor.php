@@ -87,28 +87,34 @@ class CreateVisitor extends CreateRecord
                                 }
 
                                 // Determina a maior severidade entre todas as restrições
-                                $maxSeverity = 'low';
+                                $maxSeverity = 'none';
                                 foreach ($this->visitorRestrictions as $restriction) {
                                     if ($restriction->severity_level === 'high') {
                                         $maxSeverity = 'high';
                                         break; // Alta severidade é a máxima, podemos parar aqui
                                     } elseif ($restriction->severity_level === 'medium' && $maxSeverity !== 'high') {
                                         $maxSeverity = 'medium';
+                                    } elseif ($restriction->severity_level === 'low' && $maxSeverity !== 'high' && $maxSeverity !== 'medium') {
+                                        $maxSeverity = 'low';
+                                    }elseif ($restriction->severity_level === 'none') {
+                                        $maxSeverity = 'none';
                                     }
                                 }
                                 
                                 $severityText = match ($maxSeverity) {
+                                    'none' => 'Nenhuma',
                                     'low' => 'Baixa',
                                     'medium' => 'Média',
                                     'high' => 'Alta',
-                                    default => 'Desconhecida',
+                                    default => 'Nenhuma',
                                 };
                                 
                                 $colorClass = match ($maxSeverity) {
+                                    'none' => 'text-gray-400 dark:text-gray-400 font-bold',
                                     'low' => 'text-green-600 dark:text-success-400 font-bold',
                                     'medium' => 'text-amber-600 dark:text-warning-400 font-bold',
                                     'high' => 'text-red-600 dark:text-danger-400 font-bold',
-                                    default => 'text-amber-600 dark:text-warning-400 font-bold',
+                                    default => 'text-gray-400 dark:text-gray-400 font-bold',
                                 };
                                 
                                 // Define o texto do alerta incluindo o número de restrições
@@ -132,20 +138,22 @@ class CreateVisitor extends CreateRecord
                                 
                                 foreach ($this->visitorRestrictions as $index => $restriction) {
                                     $severityClass = match ($restriction->severity_level) {
-                                        'low' => 'text-green-600 dark:text-success-400',
-                                        'medium' => 'text-amber-600 dark:text-amber-400',
-                                        'high' => 'text-red-600 dark:text-danger-400',
-                                        default => 'text-gray-600 dark:text-gray-400',
+                                        'none' => 'text-gray-400 dark:text-gray-400',
+                                    'low' => 'text-green-600 dark:text-success-400',
+                                    'medium' => 'text-amber-600 dark:text-amber-400',
+                                    'high' => 'text-red-600 dark:text-danger-400',
+                                        default => 'text-gray-400 dark:text-gray-400',
                                     };
                                     
                                     $borderClass = match ($restriction->severity_level) {
+                                        'none' => 'border-gray-400 dark:border-gray-400',
                                         'low' => 'border-green-600 dark:border-success-400',
                                         'medium' => 'border-amber-600 dark:border-amber-400',
                                         'high' => 'border-red-600 dark:border-danger-400',
-                                        default => 'border-gray-600 dark:border-gray-400',
-                                    };
-                                    
-                                    $expirationInfo = '';
+                                        default => 'border-gray-400 dark:border-gray-400',
+                                };
+                                
+                                $expirationInfo = '';
                                     if (isset($restriction->expires_at) && $restriction->expires_at) {
                                         $expirationDate = is_string($restriction->expires_at) 
                                             ? date('d/m/Y', strtotime($restriction->expires_at))
@@ -164,6 +172,7 @@ class CreateVisitor extends CreateRecord
                                         <div class='flex justify-between items-start'>
                                             <h3 class='font-bold {$severityClass}'>Restrição #" . ($index + 1) . " ({$restrictionType})</h3>
                                             <span class='font-medium {$severityClass}'>" . match ($restriction->severity_level) {
+                                                'none' => 'Severidade: Nenhuma',
                                                 'low' => 'Severidade: Baixa',
                                                 'medium' => 'Severidade: Média',
                                                 'high' => 'Severidade: Alta',
@@ -553,6 +562,7 @@ class CreateVisitor extends CreateRecord
                     
                 // Mensagem de aviso sobre restrição no rodapé
                 Placeholder::make('restriction_warning')
+                // Esta é a msg que aparece no rodapé quando um visitante tem uma restrição
                     ->label('Visitante com Restrição')
                     ->content(function() {
                         if (!$this->activeRestriction) {
@@ -569,6 +579,7 @@ class CreateVisitor extends CreateRecord
                         }
                         
                         $colorClass = match ($this->activeRestriction->severity_level) {
+                            'none' => 'text-gray-400 dark:text-gray-400',
                             'low' => 'text-green-600 dark:text-success-400',
                             'medium' => 'text-amber-600 dark:text-amber-400',
                             'high' => 'text-red-600 dark:text-danger-400',
@@ -581,7 +592,7 @@ class CreateVisitor extends CreateRecord
                             </div>"
                         );
                     })
-                    ->visible(fn() => $this->activeRestriction !== null)
+                    ->visible(fn() => $this->activeRestriction !== null && $this->activeRestriction->severity_level !== 'none')
                     ->columnSpanFull(),
             ]);
     }
@@ -712,6 +723,7 @@ class CreateVisitor extends CreateRecord
                                         }
 
                                         $severityClass = match ($this->activeRestriction->severity_level) {
+                                            'none' => 'text-gray-600',
                                             'low' => 'text-green-600',
                                             'medium' => 'text-amber-600',
                                             'high' => 'text-red-600',
@@ -838,6 +850,7 @@ class CreateVisitor extends CreateRecord
         ];
     }
 
+    // Função para buscar o visitante e registrar uma ocorrência automática caso a restrição seja comum
     public function searchVisitor(): void
     {
         // Se o formulário ainda não foi inicializado, retorna
@@ -943,7 +956,7 @@ class CreateVisitor extends CreateRecord
             'count' => $activeRestrictions->count(),
             'restrições' => $activeRestrictions->toArray(),
         ]);
-
+        // Achou restrições ativas
         if ($visitor->hasActiveRestrictions() || $activeRestrictions->count() > 0) {
             // Limpa o array de restrições
             $this->visitorRestrictions = [];
@@ -1009,10 +1022,11 @@ Ocorrência gerada automaticamente pelo sistema de monitoramento de visitantes."
                     $occurrence = \App\Models\Occurrence::create([
                         'description' => $description,
                         'severity' => match ($restriction->severity_level) {
+                            'none' => 'gray',
                             'low' => 'green',
                             'medium' => 'amber',
                             'high', 'critical' => 'red',
-                            default => 'amber',
+                            default => 'gray',
                         },
                         'occurrence_datetime' => now(),
                         'created_by' => Auth::id(),
@@ -1043,13 +1057,13 @@ Ocorrência gerada automaticamente pelo sistema de monitoramento de visitantes."
             // Se encontrou restrições, define a mais crítica como principal para compatibilidade
             if (count($this->visitorRestrictions) > 0) {
                 // Obtém a restrição mais crítica para compatibilidade
-                $restriction = $visitor->getMostCriticalRestrictionAttribute();
-                
-                if (!$restriction && $activeRestrictions->count() > 0) {
-                    $restriction = $activeRestrictions->first();
-                }
-                
-                if ($restriction) {
+            $restriction = $visitor->getMostCriticalRestrictionAttribute();
+            
+            if (!$restriction && $activeRestrictions->count() > 0) {
+                $restriction = $activeRestrictions->first();
+            }
+            
+            if ($restriction) {
                     // Converte para objeto padrão
                     $restrictionArray = $restriction->toArray();
                     $restrictionArray['is_predictive'] = false;

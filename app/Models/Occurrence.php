@@ -39,6 +39,7 @@ class Occurrence extends Model
      * Mapeia os valores de severidade para cores/nível
      */
     const SEVERITY_LEVELS = [
+        'gray' => 'Nenhuma',
         'green' => 'Baixa',
         'amber' => 'Média',
         'red' => 'Alta',
@@ -58,6 +59,7 @@ class Occurrence extends Model
     public function getSeverityColorAttribute(): string
     {
         return match($this->severity) {
+            'gray' => 'gray',
             'green' => 'success',
             'amber' => 'warning',
             'red' => 'danger',

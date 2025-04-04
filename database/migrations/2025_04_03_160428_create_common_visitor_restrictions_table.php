@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('visitor_id')->constrained()->onDelete('cascade');
             $table->text('reason');
-            $table->enum('severity_level', ['low', 'medium', 'high', 'critical'])->default('medium');
+            $table->enum('severity_level', ['none', 'low', 'medium', 'high', 'critical'])->default('none');
             $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
             $table->boolean('active')->default(true);
             $table->timestamp('expires_at')->nullable();

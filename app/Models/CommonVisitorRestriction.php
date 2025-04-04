@@ -29,6 +29,7 @@ class CommonVisitorRestriction extends Model
      * Níveis de severidade disponíveis
      */
     public const SEVERITY_LEVELS = [
+        'none' => 'Nenhum',
         'low' => 'Baixo',
         'medium' => 'Médio',
         'high' => 'Alto',
