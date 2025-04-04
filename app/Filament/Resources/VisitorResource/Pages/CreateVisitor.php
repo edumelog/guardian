@@ -648,9 +648,11 @@ class CreateVisitor extends CreateRecord
                     // Verifica restrições parciais antes de salvar
                     $this->checkPredictiveRestrictions($formData);
                     
-                    // Se não houver restrições parciais ou já foram autorizadas, cria o visitante
-                    if (!$this->activeRestriction || $this->authorization_granted) {
-                    $this->create();
+                    // Se não houver restrições parciais, ou se a restrição for de severidade 'none', ou se já foi autorizada, cria o visitante
+                    if (!$this->activeRestriction || 
+                        $this->activeRestriction->severity_level === 'none' || 
+                        $this->authorization_granted) {
+                        $this->create();
                     }
                 }),
 
@@ -658,7 +660,22 @@ class CreateVisitor extends CreateRecord
                 ->label(fn() => count($this->visitorRestrictions) > 1 ? 'Autorizar Restrições' : 'Autorizar Restrição')
                 ->color('warning')
                 ->icon('heroicon-o-key')
-                ->visible(fn() => !empty($this->visitorRestrictions) && !$this->authorization_granted)
+                ->visible(function() {
+                    // Se não há restrições ou já foi autorizado, não mostra o botão
+                    if (empty($this->visitorRestrictions) || $this->authorization_granted) {
+                        return false;
+                    }
+                    
+                    // Verifica se há pelo menos uma restrição que não seja de severidade 'none'
+                    foreach ($this->visitorRestrictions as $restriction) {
+                        if ($restriction->severity_level !== 'none') {
+                            return true;
+                        }
+                    }
+                    
+                    // Se todas as restrições forem de severidade 'none', não mostra o botão
+                    return false;
+                })
                 ->form(function () {
                     $restrictionInfo = '';
                     $expirationInfo = '';
@@ -705,6 +722,7 @@ class CreateVisitor extends CreateRecord
                                         }
                                         
                                         $severityClass = match ($this->activeRestriction->severity_level) {
+                                            'none' => 'text-gray-600',
                                             'low' => 'text-green-600',
                                             'medium' => 'text-amber-600',
                                             'high' => 'text-red-600',
@@ -712,6 +730,7 @@ class CreateVisitor extends CreateRecord
                                         };
                                         
                                         $severityText = match ($this->activeRestriction->severity_level) {
+                                            'none' => 'Nenhuma',
                                             'low' => 'Baixa',
                                             'medium' => 'Média',
                                             'high' => 'Alta',
