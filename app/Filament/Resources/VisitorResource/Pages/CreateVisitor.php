@@ -657,7 +657,7 @@ class CreateVisitor extends CreateRecord
                 }),
 
             Actions\Action::make('authorize_restriction')
-                ->label(fn() => count($this->visitorRestrictions) > 1 ? 'Autorizar Restrições' : 'Autorizar Restrição')
+                ->label(fn() => count($this->visitorRestrictions) > 1 ? 'Liberar Restrições' : 'Liberar Restrição')
                 ->color('warning')
                 ->icon('heroicon-o-key')
                 ->visible(function() {
@@ -677,113 +677,49 @@ class CreateVisitor extends CreateRecord
                     return false;
                 })
                 ->form(function () {
-                    $restrictionInfo = '';
-                    $expirationInfo = '';
+                    // Contar as restrições por nível de severidade
+                    $countLow = 0;
+                    $countMedium = 0;
+                    $countHigh = 0;
                     
-                    if ($this->activeRestriction) {
-                        $restrictionInfo = "Restrição: {$this->activeRestriction->reason}";
-                        
-                        if ($this->activeRestriction->expires_at) {
-                            $expirationInfo = "Expira em: " . (is_object($this->activeRestriction->expires_at) ? 
-                                $this->activeRestriction->expires_at->format('d/m/Y') : 
-                                date('d/m/Y', strtotime($this->activeRestriction->expires_at)));
+                    foreach ($this->visitorRestrictions as $restriction) {
+                        if ($restriction->severity_level === 'low') {
+                            $countLow++;
+                        } elseif ($restriction->severity_level === 'medium') {
+                            $countMedium++;
+                        } elseif ($restriction->severity_level === 'high') {
+                            $countHigh++;
                         }
                     }
                     
+                    // Gerar texto de resumo
+                    // $warningText = "<p class='font-bold text-base mb-3'>Atenção:</p>";
+                    $warningText = "<p class='mb-3'>Você está liberando as seguintes Restrições de Acesso:</p>";
+                    $warningText .= "<ul class='list-disc pl-4 mb-4 space-y-1'>";
+                    
+                    if ($countLow > 0) {
+                        $warningText .= "<li class='text-green-600 dark:text-success-400 font-medium'>{$countLow} de severidade baixa</li>";
+                    }
+                    
+                    if ($countMedium > 0) {
+                        $warningText .= "<li class='text-amber-600 dark:text-warning-400 font-medium'>{$countMedium} de severidade média</li>";
+                    }
+                    
+                    if ($countHigh > 0) {
+                        $warningText .= "<li class='text-red-600 dark:text-danger-400 font-medium'>{$countHigh} de severidade alta</li>";
+                    }
+                    
+                    $warningText .= "</ul>";
+                    $warningText .= "<p class='font-medium text-red-600 dark:text-danger-400'>Assegure-se de ter lido as restrições e concordado antes da aprovação.</p>";
+                    
                     return [
-                        \Filament\Forms\Components\Section::make('Detalhes da Restrição')
+                        \Filament\Forms\Components\Section::make('Atenção')
                             ->schema([
-                                \Filament\Forms\Components\Placeholder::make('restriction_type')
-                                    ->label('Tipo de Restrição')
-                                    ->content(function () {
-                                        if (!$this->activeRestriction) {
-                                            return '-';
-                                        }
-                                        
-                                        // Todas as restrições são comuns nesta versão
-                                        $type = 'Restrição Comum';
-                                        
-                                        // Adiciona logs para debug
-                                        \Illuminate\Support\Facades\Log::info('Tipo de restrição determinado', [
-                                            'tipo' => $type,
-                                            'is_predictive' => $this->activeRestriction->is_predictive,
-                                            'classe' => get_class($this->activeRestriction),
-                                            'atributos' => array_keys((array)$this->activeRestriction)
-                                        ]);
-                                        
-                                        return $type;
-                                    }),
-                                    
-                                \Filament\Forms\Components\Placeholder::make('severity_level')
-                                    ->label('Nível de Severidade')
-                                    ->content(function () {
-                                        if (!$this->activeRestriction) {
-                                            return '-';
-                                        }
-                                        
-                                        $severityClass = match ($this->activeRestriction->severity_level) {
-                                            'none' => 'text-gray-600',
-                                            'low' => 'text-green-600',
-                                            'medium' => 'text-amber-600',
-                                            'high' => 'text-red-600',
-                                            default => 'text-gray-600',
-                                        };
-                                        
-                                        $severityText = match ($this->activeRestriction->severity_level) {
-                                            'none' => 'Nenhuma',
-                                            'low' => 'Baixa',
-                                            'medium' => 'Média',
-                                            'high' => 'Alta',
-                                            default => 'Desconhecida',
-                                        };
-                                        
+                                \Filament\Forms\Components\Placeholder::make('restriction_warning')
+                                    ->label('')  // Removendo o label para melhorar o design
+                                    ->content(function () use ($warningText) {
                                         return new \Illuminate\Support\HtmlString(
-                                            "<span class='{$severityClass} font-medium'>{$severityText}</span>"
-                                        );
-                                    }),
-                                    
-                                \Filament\Forms\Components\Placeholder::make('restriction_reason')
-                                    ->label('Motivo da Restrição')
-                                    ->content(function () {
-                                        if (!$this->activeRestriction) {
-                                            return '-';
-                                        }
-
-                                        $severityClass = match ($this->activeRestriction->severity_level) {
-                                            'none' => 'text-gray-600',
-                                            'low' => 'text-green-600',
-                                            'medium' => 'text-amber-600',
-                                            'high' => 'text-red-600',
-                                            default => 'text-gray-600',
-                                        };
-
-                                        return new \Illuminate\Support\HtmlString(
-                                            "<span class='{$severityClass}'>{$this->activeRestriction->reason}</span>"
-                                        );
-                                    }),
-                                    
-                                \Filament\Forms\Components\Placeholder::make('restriction_expiration')
-                                    ->label('Data de Expiração')
-                                    ->content(function () {
-                                        if (!$this->activeRestriction) {
-                                            return '-';
-                                        }
-
-                                        $severityClass = match ($this->activeRestriction->severity_level) {
-                                            'low' => 'text-green-600',
-                                            'medium' => 'text-amber-600',
-                                            'high' => 'text-red-600',
-                                            default => 'text-gray-600',
-                                        };
-
-                                        $expirationText = $this->activeRestriction->expires_at 
-                                            ? (is_object($this->activeRestriction->expires_at) ? 
-                                                $this->activeRestriction->expires_at->format('d/m/Y') : 
-                                                date('d/m/Y', strtotime($this->activeRestriction->expires_at)))
-                                            : 'Sem data de expiração';
-
-                                        return new \Illuminate\Support\HtmlString(
-                                            "<span class='{$severityClass}'>{$expirationText}</span>"
+                                            "<div class='text-sm space-y-2 py-2'>{$warningText}</div>"
                                         );
                                     }),
                             ]),
