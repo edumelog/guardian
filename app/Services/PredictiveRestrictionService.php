@@ -95,11 +95,6 @@ class PredictiveRestrictionService
                 ];
 
                 $matchedRestrictions[] = $restrictionObj;
-
-                // Registrar ocorrência automaticamente se habilitado
-                if ($restriction->auto_occurrence) {
-                    $this->registerOccurrence($restriction, $visitorData);
-                }
             }
         }
 
@@ -116,9 +111,15 @@ class PredictiveRestrictionService
      * @param PredictiveVisitorRestriction $restriction A restrição preditiva
      * @param array $visitorData Dados do visitante para documentação
      * @return Occurrence|null A ocorrência criada ou null
+     * @deprecated Esse método está obsoleto. As ocorrências agora são geradas no CreateVisitor.php
      */
     protected function registerOccurrence(PredictiveVisitorRestriction $restriction, array $visitorData): ?Occurrence
     {
+        // Log para indicar que o método está obsoleto
+        Log::warning('PredictiveRestrictionService: Método registerOccurrence está obsoleto. As ocorrências agora são geradas no CreateVisitor.php', [
+            'restriction_id' => $restriction->id
+        ]);
+        
         // Verifica se a ocorrência automática está habilitada
         $automaticOccurrence = AutomaticOccurrence::where('key', 'predictive_visitor_restriction')->first();
         
@@ -154,7 +155,7 @@ class PredictiveRestrictionService
             
             if ($docTypeId) {
                 $docType = \App\Models\DocType::find($docTypeId);
-                $description .= "Tipo de Documento: " . ($docType ? $docType->name : "Tipo #{$docTypeId}") . "\n";
+                $description .= "Tipo de Documento: " . ($docType ? $docType->type : "Tipo #{$docTypeId}") . "\n";
             }
             
             if ($destinationId) {
@@ -173,18 +174,32 @@ class PredictiveRestrictionService
             $description .= "\nRegistrado por: " . Auth::user()->name . " (" . Auth::user()->email . ")\n";
             $description .= "Data/Hora: " . now()->format('d/m/Y H:i:s');
 
-            // Cria a ocorrência
+            // Cria a ocorrência com a severidade mapeada corretamente
             $occurrence = Occurrence::create([
-                'title' => 'Restrição Preditiva Detectada',
                 'description' => $description,
-                'severity_level' => $restriction->severity_level,
-                'visitor_id' => $visitor ? $visitor->id : null,
-                'destination_id' => $destinationId,
+                'severity' => match ($restriction->severity_level) {
+                    'none' => 'gray',
+                    'low' => 'green',
+                    'medium' => 'amber',
+                    'high', 'critical' => 'red',
+                    default => 'gray',
+                },
+                'occurrence_datetime' => now(),
                 'created_by' => Auth::id(),
-                'occurrence_type' => 'predictive_restriction',
+                'updated_by' => null,
             ]);
+            
+            // Vincular o visitante à ocorrência (se já existir)
+            if ($visitor) {
+                $occurrence->visitors()->attach($visitor->id);
+            }
+            
+            // Vincular o destino à ocorrência (se existir)
+            if ($destinationId) {
+                $occurrence->destinations()->attach($destinationId);
+            }
 
-            Log::info('PredictiveRestrictionService: Ocorrência registrada com sucesso', [
+            Log::info('PredictiveRestrictionService: Ocorrência registrada com sucesso (obsoleto)', [
                 'occurrence_id' => $occurrence->id,
                 'restriction_id' => $restriction->id
             ]);
