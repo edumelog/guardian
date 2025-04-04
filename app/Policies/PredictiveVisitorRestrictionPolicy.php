@@ -15,7 +15,7 @@ class PredictiveVisitorRestrictionPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->can('view_any_partial::visitor::restriction');
+        return $user->can('view_any_predictive::visitor::restriction');
     }
 
     /**
@@ -23,7 +23,7 @@ class PredictiveVisitorRestrictionPolicy
      */
     public function view(User $user, PredictiveVisitorRestriction $predictiveVisitorRestriction): bool
     {
-        return $user->can('view_partial::visitor::restriction');
+        return $user->can('view_predictive::visitor::restriction');
     }
 
     /**
@@ -31,7 +31,7 @@ class PredictiveVisitorRestrictionPolicy
      */
     public function create(User $user): bool
     {
-        return $user->can('create_partial::visitor::restriction');
+        return $user->can('create_predictive::visitor::restriction');
     }
 
     /**
@@ -39,7 +39,7 @@ class PredictiveVisitorRestrictionPolicy
      */
     public function update(User $user, PredictiveVisitorRestriction $predictiveVisitorRestriction): bool
     {
-        return $user->can('update_partial::visitor::restriction');
+        return $user->can('update_predictive::visitor::restriction');
     }
 
     /**
@@ -47,7 +47,7 @@ class PredictiveVisitorRestrictionPolicy
      */
     public function delete(User $user, PredictiveVisitorRestriction $predictiveVisitorRestriction): bool
     {
-        return $user->can('delete_partial::visitor::restriction');
+        return $user->can('delete_predictive::visitor::restriction');
     }
 
     /**
@@ -55,7 +55,7 @@ class PredictiveVisitorRestrictionPolicy
      */
     public function deleteAny(User $user): bool
     {
-        return $user->can('delete_any_partial::visitor::restriction');
+        return $user->can('delete_any_predictive::visitor::restriction');
     }
 
     /**
@@ -63,7 +63,7 @@ class PredictiveVisitorRestrictionPolicy
      */
     public function forceDelete(User $user, PredictiveVisitorRestriction $predictiveVisitorRestriction): bool
     {
-        return $user->can('force_delete_partial::visitor::restriction');
+        return $user->can('force_delete_predictive::visitor::restriction');
     }
 
     /**
@@ -71,7 +71,7 @@ class PredictiveVisitorRestrictionPolicy
      */
     public function forceDeleteAny(User $user): bool
     {
-        return $user->can('force_delete_any_partial::visitor::restriction');
+        return $user->can('force_delete_any_predictive::visitor::restriction');
     }
 
     /**
@@ -79,7 +79,7 @@ class PredictiveVisitorRestrictionPolicy
      */
     public function restore(User $user, PredictiveVisitorRestriction $predictiveVisitorRestriction): bool
     {
-        return $user->can('restore_partial::visitor::restriction');
+        return $user->can('restore_predictive::visitor::restriction');
     }
 
     /**
@@ -87,7 +87,7 @@ class PredictiveVisitorRestrictionPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('restore_any_partial::visitor::restriction');
+        return $user->can('restore_any_predictive::visitor::restriction');
     }
 
     /**
@@ -95,7 +95,7 @@ class PredictiveVisitorRestrictionPolicy
      */
     public function replicate(User $user, PredictiveVisitorRestriction $predictiveVisitorRestriction): bool
     {
-        return $user->can('replicate_partial::visitor::restriction');
+        return $user->can('replicate_predictive::visitor::restriction');
     }
 
     /**
@@ -103,6 +103,6 @@ class PredictiveVisitorRestrictionPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('reorder_partial::visitor::restriction');
+        return $user->can('reorder_predictive::visitor::restriction');
     }
 }
