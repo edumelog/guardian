@@ -173,14 +173,16 @@ class CommonVisitorRestrictionResource extends Resource
                         return $record->reason;
                     }),
 
-                Tables\Columns\BadgeColumn::make('severity_level')
+                Tables\Columns\TextColumn::make('severity_level')
                     ->label('Severidade')
                     ->formatStateUsing(fn (string $state): string => CommonVisitorRestriction::SEVERITY_LEVELS[$state] ?? $state)
-                    ->colors([
-                        'success' => fn ($state) => $state === 'low',
-                        'warning' => fn ($state) => $state === 'medium',
-                        'danger' => fn ($state) => $state === 'high',
-                    ]),
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'low' => 'success',
+                        'medium' => 'warning',
+                        'high' => 'danger',
+                        default => 'gray',
+                    }),
 
                 Tables\Columns\IconColumn::make('active')
                     ->label('Ativo')

@@ -138,14 +138,16 @@ class OccurrenceResource extends Resource
                     ->tooltip(fn (Occurrence $record): string => $record->description)
                     ->searchable(),
                     
-                Tables\Columns\BadgeColumn::make('severity')
+                Tables\Columns\TextColumn::make('severity')
                     ->label('Severidade')
                     ->formatStateUsing(fn (string $state): string => Occurrence::SEVERITY_LEVELS[$state] ?? $state)
-                    ->colors([
-                        'success' => 'green',
-                        'warning' => 'amber',
-                        'danger' => 'red',
-                    ]),
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'green' => 'success',
+                        'amber' => 'warning',
+                        'red' => 'danger',
+                        default => 'gray',
+                    }),
                     
                 TextColumn::make('creator.name')
                     ->label('Registrado por')
