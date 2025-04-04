@@ -79,10 +79,10 @@ class CreateVisitor extends CreateRecord
             ->schema([
                 Section::make('Informações do Visitante')
                     ->schema([
-                        // Campo de alerta de restrição que aparece apenas quando há restrições
+                        // Campo de ALERTA de restrição que aparece apenas quando há restrições comuns != NENHUMA
                         Placeholder::make('restriction_alert')
                             ->label(function () {
-                                if (empty($this->visitorRestrictions)) {
+                                if (empty($this->visitorRestrictions) || $this->activeRestriction->severity_level === 'none') {
                                     return null;
                                 }
 
@@ -129,7 +129,7 @@ class CreateVisitor extends CreateRecord
                                 );
                             })
                             ->content(function () {
-                                if (empty($this->visitorRestrictions)) {
+                                if (empty($this->visitorRestrictions) || $this->activeRestriction->severity_level === 'none') {
                                     return null;
                                 }
                                 
@@ -199,7 +199,7 @@ class CreateVisitor extends CreateRecord
                                 
                                 return new \Illuminate\Support\HtmlString($html);
                             })
-                            ->visible(fn () => !empty($this->visitorRestrictions))
+                            ->visible(fn () => !empty($this->visitorRestrictions) && $this->activeRestriction->severity_level !== 'none')
                             ->columnSpanFull(),
 
                         Select::make('doc_type_id')
@@ -592,7 +592,8 @@ class CreateVisitor extends CreateRecord
                             </div>"
                         );
                     })
-                    ->visible(fn() => $this->activeRestriction !== null && $this->activeRestriction->severity_level !== 'none')
+                    // Visibilidade da mensagem de restrição: oculta se a restrição for nenhuma, se não houver restrição ou se já foi autorizada
+                    ->visible(fn() => $this->activeRestriction !== null && $this->activeRestriction->severity_level !== 'none' && !$this->authorization_granted)
                     ->columnSpanFull(),
             ]);
     }
@@ -605,13 +606,20 @@ class CreateVisitor extends CreateRecord
     protected function getFormActions(): array
     {
         // Sempre mostra o botão de criar com impressão e o botão cancelar
+        // O botão de criar com impressão só aparece habillitado se não houver restrição, se a restrição for do tipo none ou se já foi autorizada
+        
+        // Tem que dar true para que o botão seja desabilitado
+        // dd(($this->activeRestriction !== null && $this->activeRestriction->severity_level !== 'none' && !$this->authorization_granted)); // true
+        // dd($this->activeRestriction !== null); // true
+        // dd($this->activeRestriction->severity_level); // none
         return [
             $this->getCreateFormAction()
                 ->label('Salvar dados do Visitante')
                 ->color('success')
                 ->icon('heroicon-o-printer')
                 ->visible(fn () => true) // Sempre visível
-                ->disabled(fn() => ($this->activeRestriction !== null && !$this->authorization_granted) || !$this->showAllFields)
+                // ->disabled(fn() => ($this->activeRestriction !== null && !$this->authorization_granted) || !$this->showAllFields)
+                ->disabled(fn() => ($this->activeRestriction !== null && $this->activeRestriction->severity_level !== 'none' && !$this->authorization_granted) || !$this->showAllFields)
                 ->action(function () {
                     // Verifica se há visita em andamento
                     $formData = $this->form->getState();
@@ -991,7 +999,7 @@ class CreateVisitor extends CreateRecord
                     'date_time' => now()->format('d/m/Y H:i:s'),
                     'occurrence_key' => 'common_visitor_restriction',
                     'occurrence_title' => 'Restrição de Acesso Comum Detectada',
-                    'occurrence_description' => 'Registro de tentativa de cadastro de visitante que possui uma Restrição de Acesso Comum',
+                    'occurrence_description' => 'Tentativa de cadastro de visitante com Restrição de Acesso Comum',
                     'occurrence_severity_level' => $restriction->severity_level,
                     'occurrence_expires_at_formatted' => $restriction->expires_at ? $restriction->expires_at->format('d/m/Y') : 'Nunca',
                     'occurrence_reason' => $restriction->reason,
@@ -1005,7 +1013,7 @@ class CreateVisitor extends CreateRecord
                     // Registrar a ocorrência automática
                     $docTypeName = \App\Models\DocType::find($visitor->doc_type_id)?->type ?? 'Desconhecido';
                     
-                    $description = "Registro de tentativa de cadastro de visitante que possui uma Restrição de Acesso Comum:
+                    $description = "Tentativa de cadastro de visitante com Restrição de Acesso Comum:
 
 Dados do visitante:
 Nome: " . $visitor->name . "
@@ -1015,9 +1023,8 @@ Telefone: " . ($visitor->phone ?? 'N/A') . "
 Detalhes da restrição:
 Motivo: " . $restriction->reason . "
 Severidade: " . $restriction->severity_level . "
-Registrado por: " . Auth::user()->name . " - " . Auth::user()->email . "
-
-Ocorrência gerada automaticamente pelo sistema de monitoramento de visitantes.";
+Operador: " . Auth::user()->name . " - " . Auth::user()->email . "
+OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitantes.";
 
                     $occurrence = \App\Models\Occurrence::create([
                         'description' => $description,
