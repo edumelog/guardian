@@ -15,31 +15,34 @@ class CreateCommonVisitorRestriction extends CreateRecord
     
     /**
      * Método que executa antes de criar um registro
-     * Verifica se já existe uma restrição ativa para o visitante
+     * Verifica se já existe uma restrição ativa para o visitante e se a nova restrição está sendo ativada
      */
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // Verifica se já existe uma restrição ativa para este visitante
-        $existingRestriction = CommonVisitorRestriction::where('visitor_id', $data['visitor_id'])
-            ->where('active', true)
-            ->first();
-            
-        if ($existingRestriction) {
-            // Exibe notificação e interrompe a criação
-            Notification::make()
-                ->danger()
-                ->title('Não foi possível criar a restrição')
-                ->body('Este visitante já possui uma restrição ativa. Desative-a antes de criar uma nova.')
-                ->persistent()
-                ->actions([
-                    \Filament\Notifications\Actions\Action::make('view')
-                        ->label('Ver Restrição Existente')
-                        ->url(route('filament.dashboard.resources.common-visitor-restrictions.edit', $existingRestriction))
-                        ->button(),
-                ])
-                ->send();
+        // Só verificamos se a nova restrição está sendo definida como ativa
+        if (isset($data['active']) && $data['active']) {
+            // Verifica se já existe uma restrição ativa para este visitante
+            $existingRestriction = CommonVisitorRestriction::where('visitor_id', $data['visitor_id'])
+                ->where('active', true)
+                ->first();
                 
-            $this->halt();
+            if ($existingRestriction) {
+                // Exibe notificação e interrompe a criação
+                Notification::make()
+                    ->danger()
+                    ->title('Não foi possível criar a restrição como ativa')
+                    ->body('Este visitante já possui uma restrição ativa. Desative-a antes de criar uma nova ativa, ou crie uma restrição desativada.')
+                    ->persistent()
+                    ->actions([
+                        \Filament\Notifications\Actions\Action::make('view')
+                            ->label('Ver Restrição Existente')
+                            ->url(route('filament.dashboard.resources.common-visitor-restrictions.edit', $existingRestriction))
+                            ->button(),
+                    ])
+                    ->send();
+                    
+                $this->halt();
+            }
         }
         
         return $data;

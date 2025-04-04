@@ -71,14 +71,14 @@ class CommonVisitorRestrictionResource extends Resource
                                         ->first();
                                         
                                     if ($existingRestriction) {
+                                        // Exibe notificação informativa, mas não impede a criação/edição
                                         \Filament\Notifications\Notification::make()
                                             ->warning()
                                             ->title('Visitante já possui restrição ativa')
-                                            ->body("Este visitante já possui uma restrição ativa. Desative-a antes de criar uma nova ou edite a existente.")
-                                            ->persistent()
+                                            ->body("Este visitante já possui uma restrição ativa. Se desejar criar uma nova restrição, deixe-a desativada ou desative a existente antes.")
                                             ->actions([
                                                 \Filament\Notifications\Actions\Action::make('view')
-                                                    ->label('Ver Restrição')
+                                                    ->label('Ver Restrição Ativa')
                                                     ->url(route('filament.dashboard.resources.common-visitor-restrictions.edit', $existingRestriction))
                                                     ->button(),
                                             ])
