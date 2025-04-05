@@ -184,7 +184,7 @@ class CreateVisitor extends CreateRecord
                                             } . "</span>
                                         </div>
                                         <p class='my-2 {$severityClass}'>{$restriction->reason}</p>
-                                        <div class='flex flex-col sm:flex-row sm:gap-4 text-sm'>
+                                        <div class='flex flex-col gap-2 text-sm'>
                                             <p>{$expirationInfo}</p>" .
                                             (isset($restriction->match_reason) && $restriction->match_reason 
                                                 ? "<p><span class='font-medium'>Correspondência:</span> {$restriction->match_reason}</p>" 

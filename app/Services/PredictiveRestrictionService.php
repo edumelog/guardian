@@ -81,6 +81,15 @@ class PredictiveRestrictionService
                     'reason' => $restriction->reason
                 ]);
 
+                // Cria a razão da correspondência
+                $matchReasons = [];
+                if (!empty($restriction->name_pattern)) {
+                    $matchReasons[] = "Nome corresponde ao padrão '{$restriction->name_pattern}'";
+                }
+                if (!empty($restriction->document_number_pattern)) {
+                    $matchReasons[] = "Documento corresponde ao padrão '{$restriction->document_number_pattern}'";
+                }
+                
                 // Cria um objeto com os dados da restrição
                 $restrictionObj = (object) [
                     'id' => $restriction->id,
@@ -91,6 +100,7 @@ class PredictiveRestrictionService
                     'name_pattern' => $restriction->name_pattern,
                     'document_pattern' => $restriction->document_number_pattern,
                     'auto_occurrence' => $restriction->auto_occurrence,
+                    'match_reason' => !empty($matchReasons) ? implode(', ', $matchReasons) : 'Corresponde aos critérios definidos',
                 ];
 
                 $matchedRestrictions[] = $restrictionObj;
