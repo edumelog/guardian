@@ -141,6 +141,11 @@ class CommonVisitorRestrictionResource extends Resource
                             ->helperText('Indica se esta restrição está ativa')
                             ->default(true),
 
+                        Forms\Components\Toggle::make('auto_occurrence')
+                            ->label('Gerar Ocorrência Automática')
+                            ->helperText('Se marcado, o sistema vai gerar uma ocorrência automaticamente quando este visitante tentar entrar')
+                            ->default(false),
+
                         Forms\Components\Hidden::make('created_by')
                             ->default(Auth::id())
                             ->dehydrated(fn ($state) => filled($state)),
@@ -173,17 +178,23 @@ class CommonVisitorRestrictionResource extends Resource
                         return $record->reason;
                     }),
 
-                Tables\Columns\BadgeColumn::make('severity_level')
+                Tables\Columns\TextColumn::make('severity_level')
                     ->label('Severidade')
                     ->formatStateUsing(fn (string $state): string => CommonVisitorRestriction::SEVERITY_LEVELS[$state] ?? $state)
-                    ->colors([
-                        'success' => fn ($state) => $state === 'low',
-                        'warning' => fn ($state) => $state === 'medium',
-                        'danger' => fn ($state) => $state === 'high',
-                    ]),
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'low' => 'success',
+                        'medium' => 'warning',
+                        'high' => 'danger',
+                        default => 'gray',
+                    }),
 
                 Tables\Columns\IconColumn::make('active')
                     ->label('Ativo')
+                    ->boolean(),
+
+                Tables\Columns\IconColumn::make('auto_occurrence')
+                    ->label('Auto Ocorrência')
                     ->boolean(),
 
                 Tables\Columns\TextColumn::make('expires_at')

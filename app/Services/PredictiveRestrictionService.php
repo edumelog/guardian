@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\PredictiveVisitorRestriction;
 use App\Models\Occurrence;
 use App\Models\Visitor;
-use App\Models\AutomaticOccurrence;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -120,12 +119,11 @@ class PredictiveRestrictionService
             'restriction_id' => $restriction->id
         ]);
         
-        // Verifica se a ocorrência automática está habilitada
-        $automaticOccurrence = AutomaticOccurrence::where('key', 'predictive_visitor_restriction')->first();
-        
-        if (!$automaticOccurrence || !$automaticOccurrence->enabled) {
-            Log::info('PredictiveRestrictionService: Ocorrência automática desabilitada', [
-                'restriction_id' => $restriction->id
+        // Verifica se esta restrição está configurada para gerar ocorrência automática
+        if (!$restriction->auto_occurrence) {
+            Log::info('PredictiveRestrictionService: Ocorrência automática desabilitada na restrição', [
+                'restriction_id' => $restriction->id,
+                'auto_occurrence' => false
             ]);
             return null;
         }

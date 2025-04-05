@@ -11,6 +11,16 @@ class PredictiveVisitorRestriction extends Model
     use HasFactory;
 
     /**
+     * Níveis de severidade disponíveis
+     */
+    public const SEVERITY_LEVELS = [
+        'none' => 'Nenhuma (Apenas Informativa)',
+        'low' => 'Baixa',
+        'medium' => 'Média',
+        'high' => 'Alta',
+    ];
+
+    /**
      * Os atributos que são atribuíveis em massa.
      *
      * @var array<int, string>
