@@ -18,11 +18,13 @@ class CommonVisitorRestriction extends Model
         'created_by',
         'active',
         'expires_at',
+        'auto_occurrence',
     ];
 
     protected $casts = [
         'active' => 'boolean',
         'expires_at' => 'datetime',
+        'auto_occurrence' => 'boolean',
     ];
 
     /**

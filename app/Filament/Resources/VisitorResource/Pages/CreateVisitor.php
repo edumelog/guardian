@@ -1103,11 +1103,9 @@ class CreateVisitor extends CreateRecord
                         'occurrence_reason' => $restriction->reason,
                     ]);
                     
-                    // Verifica se a ocorrência automática está habilitada para Restrição Comum
-                    $automaticOccurrence = \App\Models\AutomaticOccurrence::where('key', 'common_visitor_restriction')->first();
-                    
-                    // Registra a ocorrência apenas se estiver habilitada
-                    if ($automaticOccurrence && $automaticOccurrence->enabled) {
+                    // Verifica se a restrição está configurada para gerar ocorrência automática
+                    // Registra a ocorrência apenas se auto_occurrence estiver habilitado na restrição
+                    if ($restriction->auto_occurrence) {
                         // Registrar a ocorrência automática
                         $docTypeName = \App\Models\DocType::find($visitor->doc_type_id)?->type ?? 'Desconhecido';
                         
@@ -1154,9 +1152,9 @@ class CreateVisitor extends CreateRecord
                             'visitor_id' => $visitor->id
                         ]);
                     } else {
-                        \Illuminate\Support\Facades\Log::info('[Ocorrência Automática - VisitorResource] Ocorrência automática desabilitada', [
-                            'key' => 'common_visitor_restriction',
-                            'enabled' => $automaticOccurrence ? $automaticOccurrence->enabled : false
+                        \Illuminate\Support\Facades\Log::info('[Ocorrência Automática - VisitorResource] Ocorrência automática desabilitada na restrição', [
+                            'restriction_id' => $restriction->id,
+                            'auto_occurrence' => false
                         ]);
                     }
                 }
@@ -1263,34 +1261,27 @@ class CreateVisitor extends CreateRecord
                     'occurrence_reason' => $restrictionObj->reason,
                     'occurrence_match_reason' => $restrictionObj->match_reason ?? 'N/A',
                 ]);
+                // Verifica se a restrição preditiva está configurada para gerar ocorrência automática
                 
-                // Verifica se a ocorrência automática está habilitada para Restrição Preditiva
-                $automaticOccurrence = \App\Models\AutomaticOccurrence::where('key', 'predictive_visitor_restriction')->first();
-                
-                // Se não houver configuração específica para preditiva, usa a mesma da comum
-                if (!$automaticOccurrence) {
-                    $automaticOccurrence = \App\Models\AutomaticOccurrence::where('key', 'common_visitor_restriction')->first();
-                }
-                
-                // Registra a ocorrência apenas se estiver habilitada
-                if ($automaticOccurrence && $automaticOccurrence->enabled) {
+                // Registra a ocorrência apenas se auto_occurrence estiver habilitado
+                if ($restrictionObj->auto_occurrence) {
                     // Registrar a ocorrência automática
                     $docTypeName = \App\Models\DocType::find($formData['doc_type_id'])?->type ?? 'Desconhecido';
                     
                     $description = "Tentativa de cadastro de visitante com Restrição de Acesso Preditiva:
 
-                                    Dados do visitante:
-                                    Nome: " . ($formData['name'] ?? 'N/A') . "
-                                    Documento: " . ($formData['doc'] ?? 'N/A') . " (" . $docTypeName . ")
-                                    Telefone: " . ($formData['phone'] ?? 'N/A') . "
-                                    Destino: " . ($destination ? $destination->name : 'Não informado') . "
+Dados do visitante:
+Nome: " . ($formData['name'] ?? 'N/A') . "
+Documento: " . ($formData['doc'] ?? 'N/A') . " (" . $docTypeName . ")
+Telefone: " . ($formData['phone'] ?? 'N/A') . "
+Destino: " . ($destination ? $destination->name : 'Não informado') . "
 
-                                    Detalhes da restrição:
-                                    Motivo: " . $restrictionObj->reason . "
-                                    Severidade: " . $restrictionObj->severity_level . "
-                                    Correspondência: " . ($restrictionObj->match_reason ?? 'N/A') . "
-                                    Operador: " . Auth::user()->name . " - " . Auth::user()->email . "
-                                    OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitantes.";
+Detalhes da restrição:
+Motivo: " . $restrictionObj->reason . "
+Severidade: " . (\App\Models\PredictiveVisitorRestriction::SEVERITY_LEVELS[$restrictionObj->severity_level] ?? $restrictionObj->severity_level) . "
+Correspondência: " . ($restrictionObj->match_reason ?? 'N/A') . "
+Operador: " . Auth::user()->name . " - " . Auth::user()->email . "
+OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitantes.";
 
                     $occurrence = \App\Models\Occurrence::create([
                         'description' => $description,
@@ -1324,8 +1315,8 @@ class CreateVisitor extends CreateRecord
                     ]);
                 } else {
                     \Illuminate\Support\Facades\Log::info('[Ocorrência Automática - VisitorResource] Ocorrência automática para restrição preditiva desabilitada', [
-                        'key' => $automaticOccurrence ? $automaticOccurrence->key : 'predictive_visitor_restriction',
-                        'enabled' => $automaticOccurrence ? $automaticOccurrence->enabled : false
+                        'restriction_id' => $restrictionObj->id,
+                        'auto_occurrence' => false
                     ]);
                 }
             }
@@ -1334,10 +1325,6 @@ class CreateVisitor extends CreateRecord
             // if ($this->activeRestriction) {
             //     \Filament\Notifications\Notification::make()
             //         ->warning()
-            //         ->title('Restrição Detectada')
-            //         ->body('Este visitante corresponde a um padrão de restrição que requer aprovação. ' . 
-            //               'Motivo: ' . $this->activeRestriction->reason)
-            //         ->send();
             // }
         }
         

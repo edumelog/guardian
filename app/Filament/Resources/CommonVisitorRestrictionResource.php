@@ -141,6 +141,11 @@ class CommonVisitorRestrictionResource extends Resource
                             ->helperText('Indica se esta restrição está ativa')
                             ->default(true),
 
+                        Forms\Components\Toggle::make('auto_occurrence')
+                            ->label('Gerar Ocorrência Automática')
+                            ->helperText('Se marcado, o sistema vai gerar uma ocorrência automaticamente quando este visitante tentar entrar')
+                            ->default(false),
+
                         Forms\Components\Hidden::make('created_by')
                             ->default(Auth::id())
                             ->dehydrated(fn ($state) => filled($state)),
@@ -186,6 +191,10 @@ class CommonVisitorRestrictionResource extends Resource
 
                 Tables\Columns\IconColumn::make('active')
                     ->label('Ativo')
+                    ->boolean(),
+
+                Tables\Columns\IconColumn::make('auto_occurrence')
+                    ->label('Auto Ocorrência')
                     ->boolean(),
 
                 Tables\Columns\TextColumn::make('expires_at')
