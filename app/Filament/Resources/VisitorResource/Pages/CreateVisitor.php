@@ -33,6 +33,7 @@ use App\Services\PredictiveRestrictionService;
 use Filament\Forms\Components\Component;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use App\Services\OccurrenceService;
 
 class CreateVisitor extends CreateRecord
 {
@@ -789,6 +790,74 @@ class CreateVisitor extends CreateRecord
                     // Se chegou até aqui, tem permissão
                     $this->authorization_granted = true;
                     
+                    // Armazena dados do autorizador para a ocorrência
+                    $authorizerData = [
+                        'authorizer_name' => $user->name,
+                        'authorizer_email' => $user->email,
+                    ];
+                    
+                    // Registra uma ocorrência se auto_occurrence estiver habilitado
+                    $occurrenceService = new \App\Services\OccurrenceService();
+                    
+                    // Acessa os dados diretamente das propriedades da classe
+                    // (o que já estiver disponível no momento da autorização)
+                    $formData = $this->form->getState();
+                    
+                    // Adiciona dados do autorizador ao formData
+                    $formData = array_merge($formData, $authorizerData);
+                    
+                    // Obtém os dados diretamente dos componentes
+                    foreach ($this->form->getFlatComponents() as $component) {
+                        if (method_exists($component, 'getName') && method_exists($component, 'getState')) {
+                            $name = $component->getName();
+                            $value = $component->getState();
+                            if ($name && $value && !isset($formData[$name])) {
+                                $formData[$name] = $value;
+                            }
+                        }
+                    }
+                    
+                    // Busca valores de todos os inputs disponíveis no $_POST
+                    foreach ($_POST as $key => $value) {
+                        if (strpos($key, 'data.') === 0) {
+                            $fieldName = str_replace('data.', '', $key);
+                            if (!isset($formData[$fieldName]) && !empty($value)) {
+                                $formData[$fieldName] = $value;
+                            }
+                        }
+                    }
+                    
+                    // Log para depuração
+                    \Illuminate\Support\Facades\Log::info('Dados completos do formulário para ocorrência', [
+                        'formData' => $formData,
+                        'rawPost' => $_POST
+                    ]);
+                    
+                    // Busca o visitante novamente se existir
+                    $visitor = null;
+                    $doc = $formData['doc'] ?? null;
+                    $docTypeId = $formData['doc_type_id'] ?? null;
+                    
+                    if (!empty($doc) && !empty($docTypeId)) {
+                        $visitor = \App\Models\Visitor::where('doc', $doc)
+                            ->where('doc_type_id', $docTypeId)
+                            ->first();
+                    }
+                    
+                    // Busca o destino se estiver definido
+                    $destination = null;
+                    $destinationId = $formData['destination_id'] ?? null;
+                    if (!empty($destinationId)) {
+                        $destination = \App\Models\Destination::find($destinationId);
+                    }
+                    
+                    $occurrenceService->registerAuthorizationOccurrence(
+                        $visitor,
+                        $formData,
+                        $this->visitorRestrictions,
+                        $destination
+                    );
+                    
                     \Filament\Notifications\Notification::make()
                         ->success()
                         ->title('Autorização Concedida')
@@ -1070,7 +1139,9 @@ class CreateVisitor extends CreateRecord
                 // Adiciona todas as restrições ativas ao array
                 foreach ($activeRestrictions as $restriction) {
                     // Converte a restrição para um formato padrão de objeto
-                    $restrictionArray = $restriction->toArray();
+                    $restrictionArray = $restriction instanceof \Illuminate\Database\Eloquent\Model 
+                        ? $restriction->toArray() 
+                        : (array)$restriction;
                     $restrictionArray['is_predictive'] = false;
                     $restrictionArray['restriction_type'] = 'Restrição Comum';
                     $restrictionObj = (object)$restrictionArray;
@@ -1170,7 +1241,9 @@ OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitan
                 
                     if ($restriction) {
                         // Converte para objeto padrão
-                        $restrictionArray = $restriction->toArray();
+                        $restrictionArray = $restriction instanceof \Illuminate\Database\Eloquent\Model 
+                            ? $restriction->toArray() 
+                            : (array)$restriction;
                         $restrictionArray['is_predictive'] = false;
                         $restrictionArray['restriction_type'] = 'Restrição Comum';
                         $restrictionObj = (object)$restrictionArray;
