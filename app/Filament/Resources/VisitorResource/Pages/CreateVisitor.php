@@ -1111,17 +1111,17 @@ class CreateVisitor extends CreateRecord
                         
                         $description = "Tentativa de cadastro de visitante com Restrição de Acesso Comum:
 
-                                        Dados do visitante:
-                                        Nome: " . $visitor->name . "
-                                        Documento: " . $visitor->doc . " (" . $docTypeName . ")
-                                        Telefone: " . ($visitor->phone ?? 'N/A') . "
-                                        Destino: " . ($destination ? $destination->name : 'Não informado') . "
+Dados do visitante:
+Nome: " . $visitor->name . "
+Documento: " . $visitor->doc . " (" . $docTypeName . ")
+Telefone: " . ($visitor->phone ?? 'N/A') . "
+Destino: " . ($destination ? $destination->name : 'Não informado') . "
 
-                                        Detalhes da restrição:
-                                        Motivo: " . $restriction->reason . "
-                                        Severidade: " . $restriction->severity_level . "
-                                        Operador: " . Auth::user()->name . " - " . Auth::user()->email . "
-                                        OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitantes.";
+Detalhes da restrição:
+Motivo: " . $restriction->reason . "
+Severidade: " . $restriction->severity_level . "
+Operador: " . Auth::user()->name . " - " . Auth::user()->email . "
+OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitantes.";
 
                         $occurrence = \App\Models\Occurrence::create([
                             'description' => $description,
