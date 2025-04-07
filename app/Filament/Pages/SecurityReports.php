@@ -56,9 +56,11 @@ class SecurityReports extends Page implements HasForms
     public $currentPage = 1;
     public $sortField = 'in_date';
     public $sortDirection = 'desc';
+    public $occurrencesResults = [];
+    public $activeTab = 'visitors';
 
     protected $listeners = ['refreshData' => '$refresh'];
-    protected $queryString = ['currentPage', 'perPage', 'sortField', 'sortDirection'];
+    protected $queryString = ['currentPage', 'perPage', 'sortField', 'sortDirection', 'activeTab'];
 
     #[Computed]
     public function hasResults()
@@ -305,6 +307,71 @@ class SecurityReports extends Page implements HasForms
         ]);
     }
 
+    /**
+     * Método para buscar ocorrências com base nos filtros aplicados
+     */
+    protected function searchOccurrences($startDateTime, $endDateTime, $formData)
+    {
+        Log::info('Buscando ocorrências para o período', [
+            'startDateTime' => $startDateTime,
+            'endDateTime' => $endDateTime
+        ]);
+
+        // Query base para buscar ocorrências
+        $query = \App\Models\Occurrence::query()
+            ->with(['visitors', 'visitors.docType', 'destinations', 'creator', 'updater'])
+            ->whereBetween('occurrence_datetime', [$startDateTime, $endDateTime]);
+
+        // Filtrar por visitante (nome)
+        if (!empty($formData['visitor_name'])) {
+            Log::info('Filtrando ocorrências por nome de visitante', ['visitor_name' => $formData['visitor_name']]);
+            $query->whereHas('visitors', function ($q) use ($formData) {
+                $q->whereRaw('name COLLATE utf8mb4_bin LIKE ?', ['%' . $formData['visitor_name'] . '%']);
+            });
+        }
+
+        // Filtrar por tipo de documento
+        if (!empty($formData['doc_type_id'])) {
+            Log::info('Filtrando ocorrências por tipo de documento', ['doc_type_id' => $formData['doc_type_id']]);
+            $query->whereHas('visitors', function ($q) use ($formData) {
+                $q->where('doc_type_id', $formData['doc_type_id']);
+            });
+        }
+
+        // Filtrar por número de documento
+        if (!empty($formData['doc'])) {
+            Log::info('Filtrando ocorrências por número de documento', ['doc' => $formData['doc']]);
+            $query->whereHas('visitors', function ($q) use ($formData) {
+                $q->whereRaw('doc COLLATE utf8mb4_bin LIKE ?', ['%' . $formData['doc'] . '%']);
+            });
+        }
+
+        // Filtrar por destino
+        if (!empty($formData['destination_id'])) {
+            Log::info('Filtrando ocorrências por destino', ['destination_id' => $formData['destination_id']]);
+            $query->whereHas('destinations', function ($q) use ($formData) {
+                $q->where('destinations.id', $formData['destination_id']);
+            });
+        }
+
+        // Log da query SQL para debug
+        $sqlWithBindings = $query->toSql();
+        $bindings = $query->getBindings();
+        Log::info('SQL da consulta de ocorrências', [
+            'sql' => $sqlWithBindings,
+            'bindings' => $bindings
+        ]);
+
+        // Obter resultados ordenados
+        $this->occurrencesResults = $query->orderBy('occurrence_datetime', 'desc')->get();
+        
+        Log::info('Ocorrências encontradas', [
+            'count' => count($this->occurrencesResults)
+        ]);
+
+        return $this->occurrencesResults;
+    }
+
     #[On('refreshView')]
     public function refreshView()
     {
@@ -414,6 +481,14 @@ class SecurityReports extends Page implements HasForms
                                     })
                                     ->searchable()
                                     ->placeholder('Todos os destinos'),
+                            ]),
+
+                        Grid::make(1)
+                            ->schema([
+                                \Filament\Forms\Components\Checkbox::make('include_occurrences')
+                                    ->label('Incluir ocorrências registradas no período')
+                                    ->helperText('Quando marcado, o relatório incluirá também as ocorrências registradas conforme os filtros selecionados.')
+                                    ->default(false),
                             ]),
                     ])
                     ->columns(1),
@@ -605,17 +680,38 @@ class SecurityReports extends Page implements HasForms
                 ]);
             }
 
+            // Buscar ocorrências se a opção estiver marcada
+            $this->occurrencesResults = [];
+            if (!empty($data['include_occurrences'])) {
+                $this->searchOccurrences($startDateTime, $endDateTime, $data);
+            }
+
             // Notificar o usuário sobre os resultados
             $count = count($this->results);
-            $message = $count > 0 
-                ? "Foram encontrados {$count} registros que correspondem aos critérios de busca." 
-                : "Nenhum registro encontrado para os critérios selecionados.";
+            $occurrencesCount = count($this->occurrencesResults);
             
-            $status = $count > 0 ? 'success' : 'warning';
+            $message = '';
+            if ($count > 0) {
+                $message .= "Foram encontrados {$count} registros de visitas que correspondem aos critérios de busca.";
+            } else {
+                $message .= "Nenhum registro de visita encontrado para os critérios selecionados.";
+            }
+            
+            if (!empty($data['include_occurrences'])) {
+                if ($occurrencesCount > 0) {
+                    $message .= " Também foram encontradas {$occurrencesCount} ocorrências.";
+                } else {
+                    $message .= " Nenhuma ocorrência encontrada para os critérios selecionados.";
+                }
+            }
+            
+            $status = ($count > 0 || $occurrencesCount > 0) ? 'success' : 'warning';
 
             Log::info('Notificação de pesquisa', [
                 'message' => $message,
-                'status' => $status
+                'status' => $status,
+                'visitas_count' => $count,
+                'ocorrencias_count' => $occurrencesCount
             ]);
 
             Notification::make()
@@ -747,122 +843,210 @@ class SecurityReports extends Page implements HasForms
             ->send();
     }
 
-    public function exportPdf()
+    public function exportToPdf()
     {
-        if (empty($this->results)) {
+        $this->validate();
+        $formData = $this->form->getState();
+        
+        // Formatar datas para exibição
+        $formattedStartDate = date('d/m/Y H:i', strtotime($formData['start_date']));
+        $formattedEndDate = date('d/m/Y H:i', strtotime($formData['end_date']));
+        
+        // Título do relatório
+        $reportTitle = "Relatório de Visitas - Período: {$formattedStartDate} até {$formattedEndDate}";
+        
+        // Obter filtros aplicados para exibição
+        $filters = $this->getAppliedFilters($formData);
+        
+        // Formatar resultados para o relatório
+        $headers = ['Nome', 'Documento', 'Destino', 'Entrada', 'Saída', 'Duração', 'Operador'];
+        $visitorsResults = $this->formatResultsForReport();
+        
+        // Ocorrências
+        $occurrencesHeaders = [];
+        $occurrencesResults = [];
+        
+        if (!empty($formData['include_occurrences']) && count($this->occurrencesResults) > 0) {
+            $occurrencesHeaders = ['Título', 'Descrição', 'Visitante', 'Destino', 'Data/Hora', 'Operador'];
+            $occurrencesResults = $this->formatOccurrencesForReport();
+        }
+        
+        // Verificar se temos resultados
+        if (empty($visitorsResults) && empty($occurrencesResults)) {
+            // Notificar se não há resultados
             Notification::make()
                 ->warning()
-                ->title('Nenhum dado para exportar')
-                ->body('Realize uma pesquisa antes de exportar os dados.')
+                ->title('Sem resultados para exportar')
+                ->body('Não há resultados para exportar com os filtros aplicados.')
                 ->send();
+                
             return;
         }
-
-        // Exporta todos os resultados, não apenas a página atual
-        // Obter os critérios de filtro para incluir no relatório
-        $data = $this->form->getState();
         
-        // Obter a descrição do campo de ordenação para incluir na exportação
-        $sortFieldDescription = match($this->sortField) {
-            'visitor_name' => 'Nome do Visitante',
-            'document' => 'Documento',
-            'destination' => 'Destino',
-            'in_date' => 'Data de Entrada',
-            'out_date' => 'Data de Saída',
-            'duration' => 'Duração da Visita',
-            'operator' => 'Operador',
-            default => 'Data de Entrada'
-        };
+        // Nome do arquivo de saída
+        $filename = 'relatorio_visitas_' . date('YmdHis') . '.pdf';
         
-        $sortDirectionDescription = $this->sortDirection === 'asc' ? 'Crescente' : 'Decrescente';
+        try {
+            // Gerar PDF usando Browsershot
+            $html = view('reports.visitor-report-pdf', [
+                'title' => $reportTitle,
+                'filters' => $filters,
+                'headers' => $headers,
+                'results' => $visitorsResults,
+                'hasOccurrences' => !empty($formData['include_occurrences']) && count($this->occurrencesResults) > 0,
+                'occurrencesHeaders' => $occurrencesHeaders,
+                'occurrencesResults' => $occurrencesResults,
+                'date' => date('d/m/Y H:i:s')
+            ])->render();
+            
+            $pdf = Browsershot::html($html)
+                ->format('A4')
+                ->landscape()
+                ->showBackground()
+                ->margins(10, 10, 10, 10)
+                ->waitUntilNetworkIdle()
+                ->pdf();
+                
+            // Forçar download do PDF
+            return response()->streamDownload(
+                fn () => print($pdf),
+                $filename,
+                [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => "attachment; filename={$filename}",
+                ]
+            );
+            
+        } catch (\Exception $e) {
+            // Notificar erro
+            Notification::make()
+                ->danger()
+                ->title('Erro ao gerar PDF')
+                ->body('Ocorreu um erro ao gerar o PDF: ' . $e->getMessage())
+                ->send();
+                
+            Log::error('Erro ao gerar PDF', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+    
+    /**
+     * Formata as ocorrências para o relatório
+     */
+    protected function formatOccurrencesForReport()
+    {
+        $formattedResults = [];
         
-        $filterInfo = [
-            'start_date' => !empty($data['start_date']) ? \Carbon\Carbon::parse($data['start_date'])->format('d/m/Y') : '01/01/1900',
-            'end_date' => !empty($data['end_date']) ? \Carbon\Carbon::parse($data['end_date'])->format('d/m/Y') : \Carbon\Carbon::now()->format('d/m/Y'),
-            'start_time' => $data['start_time'],
-            'end_time' => $data['end_time'],
-            'visitor_name' => $data['visitor_name'] ?? 'Todos',
-            'doc_type' => !empty($data['doc_type_id']) ? DocType::find($data['doc_type_id'])?->type : 'Todos',
-            'doc' => $data['doc'] ?? 'Todos',
-            'destination' => !empty($data['destination_id']) ? Destination::find($data['destination_id'])?->name : 'Todos',
-            'generated_at' => \Carbon\Carbon::now()->locale('pt_BR')->isoFormat('DD/MM/YYYY HH:mm:ss'),
-            'generated_by' => Auth::user() ? Auth::user()->name : 'Sistema',
-            'total_records' => count($this->results),
-            'sort_field' => $sortFieldDescription,
-            'sort_direction' => $sortDirectionDescription
-        ];
-        
-        // Formatar todas as datas dos resultados antes de enviar para a view
-        $formattedResults = collect($this->results)->map(function ($log) {
-            $log->formatted_in_date = $log->in_date ? \Carbon\Carbon::parse($log->in_date)->format('d/m/Y H:i') : 'N/A';
-            $log->formatted_out_date = $log->out_date ? \Carbon\Carbon::parse($log->out_date)->format('d/m/Y H:i') : 'Em andamento';
-            return $log;
-        });
-        
-        // Prepara a imagem do logo como base64
-        $logoPath = public_path('images/logo-cmrj-horizontal.jpg');
-        $logoBase64 = '';
-        if (file_exists($logoPath)) {
-            $logoBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($logoPath));
+        foreach ($this->occurrencesResults as $occurrence) {
+            $visitors = $occurrence->visitors->map(function ($visitor) {
+                return $visitor->name;
+            })->join(', ');
+            
+            $destinations = $occurrence->destinations->map(function ($destination) {
+                return $destination->name;
+            })->join(', ');
+            
+            $formattedResults[] = [
+                'title' => $occurrence->title,
+                'description' => strip_tags($occurrence->description), // Remove HTML tags for PDF
+                'visitor' => $visitors ?: 'N/A',
+                'destination' => $destinations ?: 'N/A',
+                'datetime' => date('d/m/Y H:i:s', strtotime($occurrence->occurrence_datetime)),
+                'creator' => $occurrence->creator->name ?? 'N/A'
+            ];
         }
         
-        // Gera o HTML do relatório
-        $html = view('reports.visitors-report', [
-            'results' => $formattedResults,
-            'filterInfo' => $filterInfo,
-            'logoBase64' => $logoBase64,
-            'showFooter' => false // Usar o footer do Browsershot em vez de usar o footer do HTML
-        ])->render();
+        return $formattedResults;
+    }
+    
+    /**
+     * Formata os resultados das visitas para o relatório
+     */
+    protected function formatResultsForReport()
+    {
+        $formattedResults = [];
+        
+        foreach ($this->results as $log) {
+            $formattedResults[] = [
+                'visitor_name' => $log->visitor->name ?? 'N/A',
+                'document' => $log->visitor->docType->type ?? 'N/A',
+                'destination' => $log->destination->name ?? 'N/A',
+                'in_date' => $log->in_date ? date('d/m/Y H:i', strtotime($log->in_date)) : 'N/A',
+                'out_date' => $log->out_date ? date('d/m/Y H:i', strtotime($log->out_date)) : 'Em andamento',
+                'duration' => $this->calculateDuration($log),
+                'operator' => $log->operator->name ?? 'N/A'
+            ];
+        }
+        
+        return $formattedResults;
+    }
+    
+    /**
+     * Calcula a duração de uma visita
+     */
+    protected function calculateDuration($log)
+    {
+        if (empty($log->in_date) || empty($log->out_date)) {
+            return 'Em andamento';
+        }
+        
+        $inDate = new \DateTime($log->in_date);
+        $outDate = new \DateTime($log->out_date);
+        $interval = $inDate->diff($outDate);
+        
+        $duration = '';
+        if ($interval->days > 0) {
+            $duration = $interval->days . 'd ' . $interval->h . 'h';
+        } elseif ($interval->h > 0) {
+            $duration = $interval->h . 'h ' . $interval->i . 'm';
+        } else {
+            $duration = $interval->i . 'm ' . $interval->s . 's';
+        }
+        
+        return $duration;
+    }
 
-        // Prepara o footer com a numeração de páginas
-            $footerHtml = '
-            <div style="width: 100%; font-size: 9px; text-align: center; color: #6b7280; font-family: Arial, sans-serif; padding: 0 15mm;">
-                <div style="display: inline-block; width: 33%; text-align: left;">DTI - Diretoria de Tecnologia da Informação</div>
-                <div style="display: inline-block; width: 33%; text-align: center;">Sistema Guardian - Relatório de Visitantes</div>
-                <div style="display: inline-block; width: 33%; text-align: right;"><span class="pageNumber"></span> de <span class="totalPages"></span></div>
-            </div>';
+    /**
+     * Obtém os filtros aplicados para exibição no relatório
+     */
+    protected function getAppliedFilters($formData)
+    {
+        $filters = [];
         
-        // Usa o Browsershot para gerar o PDF
-        $pdfOutput = Browsershot::html($html)
-            ->setNodeBinary('/usr/bin/node')
-            ->setChromePath('/opt/google/chrome/chrome') // Caminho direto para o executável chrome (não o script)
-            ->paperSize(297, 210, 'mm') // A4 em modo paisagem (landscape)
-            ->margins(15, 15, 20, 15, 'mm') // Margem inferior aumentada para acomodar o footer
-            ->showBackground()
-            ->noSandbox()
-            ->deviceScaleFactor(2)
-            ->dismissDialogs()
-            ->waitUntilNetworkIdle()
-            ->emulateMedia('print')
-            ->setScreenshotOptions([
-                'printBackground' => true,
-                'preferCSSPageSize' => true,
-                'displayHeaderFooter' => false, // Desativar header e footer automáticos
-                'landscape' => true,
-                'format' => 'A4',
-                'margin' => [
-                    'top' => '15mm',
-                    'right' => '15mm',
-                    'bottom' => '20mm',
-                    'left' => '15mm',
-                ],
-            ])
-            ->showBrowserHeaderAndFooter()
-            ->headerHtml('<div style="width: 100%; height: 0;"></div>')
-            ->footerHtml($footerHtml)
-            ->pdf();
+        // Datas e horários
+        $filters['Período'] = date('d/m/Y', strtotime($formData['start_date'])) . ' ' . $formData['start_time'] . 
+                             ' até ' . date('d/m/Y', strtotime($formData['end_date'])) . ' ' . $formData['end_time'];
+                             
+        // Nome do visitante
+        if (!empty($formData['visitor_name'])) {
+            $filters['Visitante'] = $formData['visitor_name'];
+        }
         
-        Notification::make()
-            ->success()
-            ->title('Exportação Concluída')
-            ->body('O arquivo PDF foi gerado com sucesso.')
-            ->send();
-            
-        return response()->streamDownload(
-            fn () => print($pdfOutput),
-            'relatorio_visitas_' . now()->format('YmdHis') . '.pdf',
-            ['Content-Type' => 'application/pdf']
-        );
+        // Tipo de documento
+        if (!empty($formData['doc_type_id'])) {
+            $docType = \App\Models\DocType::find($formData['doc_type_id']);
+            $filters['Tipo de Documento'] = $docType ? $docType->type : 'N/A';
+        }
+        
+        // Número do documento
+        if (!empty($formData['doc'])) {
+            $filters['Documento'] = $formData['doc'];
+        }
+        
+        // Destino
+        if (!empty($formData['destination_id'])) {
+            $destination = \App\Models\Destination::find($formData['destination_id']);
+            $filters['Destino'] = $destination ? $destination->name : 'N/A';
+        }
+        
+        // Ocorrências incluídas
+        if (!empty($formData['include_occurrences'])) {
+            $filters['Ocorrências'] = 'Incluídas';
+        }
+        
+        return $filters;
     }
 
     public function getFormAction(): Action
@@ -893,7 +1077,7 @@ class SecurityReports extends Page implements HasForms
     {
         return Action::make('exportPdf')
             ->label('Exportar PDF')
-            ->action('exportPdf')
+            ->action('exportToPdf')
             ->disabled(fn() => empty($this->results))
             ->color('danger')
             ->tooltip('Exporta todos os resultados da pesquisa em formato PDF, não apenas a página atual')
