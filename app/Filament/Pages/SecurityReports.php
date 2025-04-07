@@ -862,9 +862,9 @@ class SecurityReports extends Page implements HasForms
         $this->validate();
         $formData = $this->form->getState();
         
-        // Formatar datas para exibição
-        $formattedStartDate = date('d/m/Y H:i', strtotime($formData['start_date']));
-        $formattedEndDate = date('d/m/Y H:i', strtotime($formData['end_date']));
+        // Formatar datas para exibição incluindo os horários definidos no filtro
+        $formattedStartDate = date('d/m/Y', strtotime($formData['start_date'])) . ' ' . $formData['start_time'];
+        $formattedEndDate = date('d/m/Y', strtotime($formData['end_date'])) . ' ' . $formData['end_time'];
         
         // Título do relatório
         $reportTitle = "Relatório de Visitas - Período: {$formattedStartDate} até {$formattedEndDate}";
