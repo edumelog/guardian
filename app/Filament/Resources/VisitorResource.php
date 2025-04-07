@@ -43,6 +43,7 @@ use Illuminate\Support\Facades\Log;
 use Filament\Support\Facades\FilamentView;
 use Filament\Notifications\Actions\Action as NotificationAction;
 use Illuminate\Database\Eloquent\Model;
+use App\Services\OccurrenceService;
 
 class VisitorResource extends Resource
 {
@@ -627,6 +628,7 @@ class VisitorResource extends Resource
                         ->modalSubmitActionLabel('Sim, registrar saída')
                         ->action(function (Collection $records) {
                             $count = 0;
+                            $occurrenceService = new \App\Services\OccurrenceService();
                             
                             foreach ($records as $visitor) {
                                 $lastLog = $visitor->visitorLogs()
@@ -636,6 +638,10 @@ class VisitorResource extends Resource
 
                                 if ($lastLog) {
                                     $lastLog->update(['out_date' => now()]);
+                                    
+                                    // Registra ocorrência se necessário
+                                    $occurrenceService->registerExitOccurrence($visitor, $lastLog);
+                                    
                                     $count++;
                                 }
                             }

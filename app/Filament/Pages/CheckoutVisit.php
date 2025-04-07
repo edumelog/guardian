@@ -76,6 +76,10 @@ class CheckoutVisit extends Page implements HasTable
             'out_date' => now()
         ]);
 
+        // Registra ocorrência se necessário
+        $occurrenceService = new \App\Services\OccurrenceService();
+        $occurrenceService->registerExitOccurrence($visitor, $visitorLog);
+
         // Limpa o campo
         $this->quickCheckoutDoc = '';
 
@@ -162,6 +166,10 @@ class CheckoutVisit extends Page implements HasTable
                         if (!$record->out_date) {
                             $record->update(['out_date' => now()]);
                             
+                            // Registra ocorrência se necessário
+                            $occurrenceService = new \App\Services\OccurrenceService();
+                            $occurrenceService->registerExitOccurrence($record->visitor, $record);
+                            
                             Notification::make()
                                 ->success()
                                 ->title('Saída registrada')
@@ -181,9 +189,15 @@ class CheckoutVisit extends Page implements HasTable
                     ->color('warning')
                     ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
                         $count = 0;
+                        $occurrenceService = new \App\Services\OccurrenceService();
+                        
                         foreach ($records as $record) {
                             if (!$record->out_date) {
                                 $record->update(['out_date' => now()]);
+                                
+                                // Registra ocorrência se necessário
+                                $occurrenceService->registerExitOccurrence($record->visitor, $record);
+                                
                                 $count++;
                             }
                         }

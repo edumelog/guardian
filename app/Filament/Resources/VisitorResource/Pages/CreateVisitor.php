@@ -1097,7 +1097,7 @@ class CreateVisitor extends CreateRecord
                         'date_time' => now()->format('d/m/Y H:i:s'),
                         'occurrence_key' => 'common_visitor_restriction',
                         'occurrence_title' => 'Restrição de Acesso Comum Detectada',
-                        'occurrence_description' => 'Tentativa de cadastro de visitante com Restrição de Acesso Comum',
+                        'occurrence_description' => 'Cadastro de visitante com Restrição de Acesso Comum',
                         'occurrence_severity_level' => $restriction->severity_level,
                         'occurrence_expires_at_formatted' => $restriction->expires_at ? $restriction->expires_at->format('d/m/Y') : 'Nunca',
                         'occurrence_reason' => $restriction->reason,
@@ -1105,23 +1105,23 @@ class CreateVisitor extends CreateRecord
                     
                     // Verifica se a restrição está configurada para gerar ocorrência automática
                     // Registra a ocorrência apenas se auto_occurrence estiver habilitado na restrição
-                    if ($restriction->auto_occurrence) {
+                    if ($restriction->auto_occurrence && !$this->authorization_granted) {
                         // Registrar a ocorrência automática
                         $docTypeName = \App\Models\DocType::find($visitor->doc_type_id)?->type ?? 'Desconhecido';
                         
-                        $description = "Tentativa de cadastro de visitante com Restrição de Acesso Comum:
+                        $description = "Cadastro de visitante com Restrição de Acesso Comum:
 
-                                        Dados do visitante:
-                                        Nome: " . $visitor->name . "
-                                        Documento: " . $visitor->doc . " (" . $docTypeName . ")
-                                        Telefone: " . ($visitor->phone ?? 'N/A') . "
-                                        Destino: " . ($destination ? $destination->name : 'Não informado') . "
+Dados do visitante:
+Nome: " . $visitor->name . "
+Documento: " . $visitor->doc . " (" . $docTypeName . ")
+Telefone: " . ($visitor->phone ?? 'N/A') . "
+Destino: " . ($destination ? $destination->name : 'Não informado') . "
 
-                                        Detalhes da restrição:
-                                        Motivo: " . $restriction->reason . "
-                                        Severidade: " . $restriction->severity_level . "
-                                        Operador: " . Auth::user()->name . " - " . Auth::user()->email . "
-                                        OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitantes.";
+Detalhes da restrição:
+Motivo: " . $restriction->reason . "
+Severidade: " . $restriction->severity_level . "
+Operador: " . Auth::user()->name . " - " . Auth::user()->email . "
+OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitantes.";
 
                         $occurrence = \App\Models\Occurrence::create([
                             'description' => $description,
@@ -1256,7 +1256,7 @@ class CreateVisitor extends CreateRecord
                     'date_time' => now()->format('d/m/Y H:i:s'),
                     'occurrence_key' => 'predictive_visitor_restriction',
                     'occurrence_title' => 'Restrição de Acesso Preditiva Detectada',
-                    'occurrence_description' => 'Tentativa de cadastro de visitante com Restrição de Acesso Preditiva',
+                    'occurrence_description' => 'Cadastro de visitante com Restrição de Acesso Preditiva',
                     'occurrence_severity_level' => $restrictionObj->severity_level,
                     'occurrence_reason' => $restrictionObj->reason,
                     'occurrence_match_reason' => $restrictionObj->match_reason ?? 'N/A',
@@ -1264,11 +1264,11 @@ class CreateVisitor extends CreateRecord
                 // Verifica se a restrição preditiva está configurada para gerar ocorrência automática
                 
                 // Registra a ocorrência apenas se auto_occurrence estiver habilitado
-                if ($restrictionObj->auto_occurrence) {
+                if ($restrictionObj->auto_occurrence && !$this->authorization_granted) {
                     // Registrar a ocorrência automática
                     $docTypeName = \App\Models\DocType::find($formData['doc_type_id'])?->type ?? 'Desconhecido';
                     
-                    $description = "Tentativa de cadastro de visitante com Restrição de Acesso Preditiva:
+                    $description = "Cadastro de visitante com Restrição de Acesso Preditiva:
 
 Dados do visitante:
 Nome: " . ($formData['name'] ?? 'N/A') . "
