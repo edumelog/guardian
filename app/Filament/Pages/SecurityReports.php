@@ -347,10 +347,10 @@ class SecurityReports extends Page implements HasForms
         }
 
         // Filtrar por destino - apenas se o filtro for fornecido
-        if (!empty($formData['destination_id'])) {
-            Log::info('Filtrando ocorrências por destino', ['destination_id' => $formData['destination_id']]);
+        if (!empty($formData['destination_ids'])) {
+            Log::info('Filtrando ocorrências por destinos', ['destination_ids' => $formData['destination_ids']]);
             $query->whereHas('destinations', function ($q) use ($formData) {
-                $q->where('destinations.id', $formData['destination_id']);
+                $q->whereIn('destinations.id', $formData['destination_ids']);
             });
         }
 
@@ -472,8 +472,9 @@ class SecurityReports extends Page implements HasForms
 
                         Grid::make(1)
                             ->schema([
-                                Select::make('destination_id')
+                                Select::make('destination_ids')
                                     ->label('Destino')
+                                    ->multiple()
                                     ->options(function () {
                                         return Destination::all()->mapWithKeys(fn ($destination) => [
                                             $destination->id => $destination->address 
@@ -546,8 +547,8 @@ class SecurityReports extends Page implements HasForms
             });
         }
         
-        if (!empty($data['destination_id'])) {
-            $query->where('destination_id', $data['destination_id']);
+        if (!empty($data['destination_ids'])) {
+            $query->whereIn('destination_id', $data['destination_ids']);
         }
         
         // Executar a consulta
@@ -959,9 +960,11 @@ class SecurityReports extends Page implements HasForms
         }
         
         // Destino
-        if (!empty($formData['destination_id'])) {
-            $destination = \App\Models\Destination::find($formData['destination_id']);
-            $filters['Destino'] = $destination ? $destination->name : 'N/A';
+        if (!empty($formData['destination_ids'])) {
+            $destinations = \App\Models\Destination::whereIn('id', $formData['destination_ids'])->get();
+            $filters['Destinos'] = $destinations->map(function ($destination) {
+                return $destination->name;
+            })->join(', ');
         }
         
         // Ocorrências incluídas
@@ -1028,7 +1031,7 @@ class SecurityReports extends Page implements HasForms
                     'visitor_name' => null,
                     'doc_type_id' => null,
                     'doc' => null,
-                    'destination_id' => null,
+                    'destination_ids' => [],
                 ]);
                 
                 Notification::make()
