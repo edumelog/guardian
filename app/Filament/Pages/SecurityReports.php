@@ -450,8 +450,10 @@ class SecurityReports extends Page implements HasForms
                                         'style' => 'text-transform: uppercase;',
                                         'x-on:keypress' => "if (!/[A-Za-zÀ-ÖØ-öø-ÿ\s\.\-\']/.test(event.key)) { event.preventDefault(); }"
                                     ])
-                                    ->afterStateUpdated(function (string $state, callable $set) {
-                                        $set('visitor_name', mb_strtoupper($state));
+                                    ->afterStateUpdated(function ($state, callable $set) {
+                                        if ($state !== null) {
+                                            $set('visitor_name', mb_strtoupper($state));
+                                        }
                                     })
                                     ->validationMessages([
                                         'regex' => 'O nome deve conter apenas letras, espaços e caracteres especiais (. - \').',
@@ -751,12 +753,19 @@ class SecurityReports extends Page implements HasForms
         // Exporta todos os resultados, não apenas a página atual
         $filename = 'relatorio_visitas_' . now()->format('YmdHis') . '.csv';
         
+        // Obter os filtros aplicados
+        $formData = $this->form->getState();
+        $filters = $this->getAppliedFilters($formData);
+        
         // Usar uma closure para gerar o CSV no momento do download
-        return response()->streamDownload(function () {
+        return response()->streamDownload(function () use ($filters) {
             $handle = fopen('php://output', 'w');
             // BOM para UTF-8 - garante que acentos sejam exibidos corretamente
             fputs($handle, $bom = (chr(0xEF) . chr(0xBB) . chr(0xBF)));
 
+            // Incluir título do relatório
+            fputcsv($handle, ['Relatório de Visitas - ' . now()->format('d/m/Y H:i:s')]);
+            
             // Obter a descrição do campo de ordenação para incluir na exportação
             $sortFieldDescription = match($this->sortField) {
                 'visitor_name' => 'Nome do Visitante',
@@ -771,12 +780,17 @@ class SecurityReports extends Page implements HasForms
             
             $sortDirectionDescription = $this->sortDirection === 'asc' ? 'Crescente' : 'Decrescente';
             
-            // Incluir informações de ordenação como primeira linha do CSV
+            // Incluir informações de ordenação
             fputcsv($handle, [
-                'Relatório de Visitas - ' . now()->format('d/m/Y H:i:s'),
                 'Ordenado por: ' . $sortFieldDescription,
                 'Ordem: ' . $sortDirectionDescription
             ]);
+            
+            // Incluir filtros aplicados
+            fputcsv($handle, ['Filtros aplicados:']);
+            foreach ($filters as $label => $value) {
+                fputcsv($handle, [$label, $value]);
+            }
             
             // Linha em branco para separar o cabeçalho
             fputcsv($handle, ['']);
@@ -867,7 +881,7 @@ class SecurityReports extends Page implements HasForms
         $occurrencesResults = [];
         
         if (!empty($formData['include_occurrences']) && count($this->occurrencesResults) > 0) {
-            $occurrencesHeaders = ['Título', 'Descrição', 'Visitante', 'Destino', 'Data/Hora', 'Operador'];
+            $occurrencesHeaders = ['Título', 'Descrição', 'Visitante', 'Destino', 'Data/Hora', 'Criado por'];
             $occurrencesResults = $this->formatOccurrencesForReport();
         }
         
@@ -886,6 +900,14 @@ class SecurityReports extends Page implements HasForms
         // Nome do arquivo de saída
         $filename = 'relatorio_visitas_' . date('YmdHis') . '.pdf';
         
+        // Prepara o footer com a numeração de páginas
+        $footerHtml = '
+        <div style="width: 100%; font-size: 9px; text-align: center; color: #6b7280; font-family: Arial, sans-serif; padding: 0 15mm;">
+            <div style="display: inline-block; width: 33%; text-align: left;">DTI - Diretoria de Tecnologia da Informação</div>
+            <div style="display: inline-block; width: 33%; text-align: center;">Sistema Guardian - Relatório de Visitas</div>
+            <div style="display: inline-block; width: 33%; text-align: right;"><span class="pageNumber"></span> de <span class="totalPages"></span></div>
+        </div>';
+        
         try {
             // Gerar PDF usando Browsershot
             $html = view('reports.visitor-report-pdf', [
@@ -899,17 +921,40 @@ class SecurityReports extends Page implements HasForms
                 'date' => date('d/m/Y H:i:s')
             ])->render();
             
-            $pdf = Browsershot::html($html)
-                ->format('A4')
-                ->landscape()
+            // Usa o Browsershot para gerar o PDF com configurações detalhadas
+            $pdfOutput = Browsershot::html($html)
+                ->setNodeBinary('/usr/bin/node')
+                ->setNpmBinary('/usr/bin/npm')
+                ->setChromePath('/usr/bin/google-chrome')
+                ->paperSize(297, 210, 'mm') // A4 em modo paisagem (landscape)
+                ->margins(15, 15, 20, 15, 'mm') // Margem inferior aumentada para acomodar o footer
                 ->showBackground()
-                ->margins(10, 10, 10, 10)
+                ->noSandbox()
+                ->deviceScaleFactor(2)
+                ->dismissDialogs()
                 ->waitUntilNetworkIdle()
+                ->emulateMedia('print')
+                ->setScreenshotOptions([
+                    'printBackground' => true,
+                    'preferCSSPageSize' => true,
+                    'displayHeaderFooter' => true,
+                    'landscape' => true,
+                    'format' => 'A4',
+                    'margin' => [
+                        'top' => '15mm',
+                        'right' => '15mm',
+                        'bottom' => '20mm',
+                        'left' => '15mm',
+                    ],
+                ])
+                ->showBrowserHeaderAndFooter()
+                ->headerHtml('<div style="width: 100%; height: 0;"></div>')
+                ->footerHtml($footerHtml)
                 ->pdf();
                 
             // Forçar download do PDF
             return response()->streamDownload(
-                fn () => print($pdf),
+                fn () => print($pdfOutput),
                 $filename,
                 [
                     'Content-Type' => 'application/pdf',
