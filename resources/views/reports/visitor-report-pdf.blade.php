@@ -116,7 +116,7 @@
             border-radius: 5px;
             padding: 15px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            width: 30%;
+            width: 22%;
             text-align: center;
         }
         .stats-card-title {
@@ -208,6 +208,10 @@
     
     <div class="date">Gerado em: {{ $date }}</div>
     
+    <div style="text-align: right; font-size: 10px; color: #666; margin-bottom: 10px;">
+        Ordenado por: {{ $sortField }} | Ordem: {{ $sortDirection }}
+    </div>
+    
     <div class="filters">
         <div><strong>Filtros aplicados:</strong></div>
         @foreach($filters as $label => $value)
@@ -232,6 +236,11 @@
             <div class="stats-card">
                 <div class="stats-card-title">Visitantes Únicos</div>
                 <div class="stats-card-value">{{ $visitorStats['unique_visitors'] }}</div>
+            </div>
+            
+            <div class="stats-card">
+                <div class="stats-card-title">Visitas em Andamento</div>
+                <div class="stats-card-value">{{ $visitorStats['ongoing_visits'] }}</div>
             </div>
             
             @if($hasOccurrences)
@@ -344,6 +353,7 @@
                         <td>{{ $result['out_date'] }}</td>
                         <td>{{ $result['duration'] }}</td>
                         <td>{{ $result['operator'] }}</td>
+                        <td>{{ $result['operator_email'] }}</td>
                     </tr>
                 @endforeach
             </tbody>

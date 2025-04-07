@@ -390,6 +390,7 @@ class SecurityReports extends Page implements HasForms
             'end_date' => now()->format('Y-m-d'),
             'start_time' => '00:00',
             'end_time' => '23:59',
+            'include_occurrences' => true,
         ]);
         
         Log::info('Página de relatórios montada', [
@@ -491,7 +492,7 @@ class SecurityReports extends Page implements HasForms
                                 \Filament\Forms\Components\Checkbox::make('include_occurrences')
                                     ->label('Incluir ocorrências registradas no período')
                                     ->helperText('Quando marcado, o relatório incluirá também as ocorrências registradas conforme os filtros selecionados.')
-                                    ->default(false),
+                                    ->default(true),
                             ]),
                     ])
                     ->columns(1),
@@ -603,9 +604,9 @@ class SecurityReports extends Page implements HasForms
         }
     }
 
-    public function exportCsv()
+    public function exportExcel()
     {
-        if (empty($this->results)) {
+        if (empty($this->results) && (empty($this->occurrencesResults) || count($this->occurrencesResults) === 0)) {
             Notification::make()
                 ->warning()
                 ->title('Nenhum dado para exportar')
@@ -614,111 +615,199 @@ class SecurityReports extends Page implements HasForms
             return;
         }
 
-        // Exporta todos os resultados, não apenas a página atual
-        $filename = 'relatorio_visitas_' . now()->format('YmdHis') . '.csv';
+        // Importações necessárias para Excel
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $formData = $this->form->getState();
+        $hasOccurrences = !empty($formData['include_occurrences']) && count($this->occurrencesResults) > 0;
+        
+        // Aba 1: Visitas
+        $visitsSheet = $spreadsheet->getActiveSheet();
+        $visitsSheet->setTitle('Visitas');
+        
+        // Cabeçalho com título
+        $visitsSheet->setCellValue('A1', 'Relatório de Visitas - ' . now()->format('d/m/Y H:i:s'));
+        $visitsSheet->mergeCells('A1:I1');
+        
+        // Obter a descrição do campo de ordenação para incluir na exportação
+        $sortFieldDescription = match($this->sortField) {
+            'visitor_name' => 'Nome do Visitante',
+            'document' => 'Documento',
+            'destination' => 'Destino',
+            'in_date' => 'Data de Entrada',
+            'out_date' => 'Data de Saída',
+            'duration' => 'Duração da Visita',
+            'operator' => 'Operador',
+            default => 'Data de Entrada'
+        };
+        
+        $sortDirectionDescription = $this->sortDirection === 'asc' ? 'Crescente' : 'Decrescente';
+        
+        // Incluir informações de ordenação
+        $visitsSheet->setCellValue('A2', 'Ordenado por: ' . $sortFieldDescription);
+        $visitsSheet->setCellValue('B2', 'Ordem: ' . $sortDirectionDescription);
+        $visitsSheet->mergeCells('A2:B2');
+        $visitsSheet->mergeCells('C2:I2');
         
         // Obter os filtros aplicados
-        $formData = $this->form->getState();
         $filters = $this->getAppliedFilters($formData);
         
-        // Usar uma closure para gerar o CSV no momento do download
-        return response()->streamDownload(function () use ($filters) {
-            $handle = fopen('php://output', 'w');
-            // BOM para UTF-8 - garante que acentos sejam exibidos corretamente
-            fputs($handle, $bom = (chr(0xEF) . chr(0xBB) . chr(0xBF)));
-
-            // Incluir título do relatório
-            fputcsv($handle, ['Relatório de Visitas - ' . now()->format('d/m/Y H:i:s')]);
+        // Incluir filtros aplicados
+        $visitsSheet->setCellValue('A3', 'Filtros aplicados:');
+        $visitsSheet->mergeCells('A3:I3');
+        
+        $row = 4;
+        foreach ($filters as $label => $value) {
+            $visitsSheet->setCellValue('A' . $row, $label . ':');
+            $visitsSheet->setCellValue('B' . $row, $value);
+            $visitsSheet->mergeCells('B' . $row . ':I' . $row);
+            $row++;
+        }
+        
+        // Linha em branco
+        $row++;
+        
+        // Cabeçalhos das colunas
+        $headers = [
+            'Nome do Visitante',
+            'Tipo de Documento',
+            'Número do Documento',
+            'Destino',
+            'Data de Entrada',
+            'Data de Saída',
+            'Operador',
+            'E-mail do Operador',
+            'Duração da Visita'
+        ];
+        
+        $col = 'A';
+        foreach ($headers as $header) {
+            $visitsSheet->setCellValue($col . $row, $header);
+            $col++;
+        }
+        $row++;
+        
+        // Dados das visitas
+        foreach ($this->results as $log) {
+            $duracao = '';
+            if (!empty($log->in_date) && !empty($log->out_date)) {
+                $inDate = new \DateTime($log->in_date);
+                $outDate = new \DateTime($log->out_date);
+                $interval = $inDate->diff($outDate);
+                
+                // Cálculo da duração em dias, horas, minutos
+                $dias = $interval->days;
+                $horas = $interval->h;
+                $minutos = $interval->i;
+                $segundos = $interval->s;
+                
+                // Formata a duração dependendo do tempo total
+                if ($dias > 0) {
+                    $duracao = $dias.'d '.$horas.'h';
+                } elseif ($horas > 0) {
+                    $duracao = $horas.'h '.$minutos.'m';
+                } else {
+                    $duracao = $minutos.'m '.$segundos.'s';
+                }
+            }
             
-            // Obter a descrição do campo de ordenação para incluir na exportação
-            $sortFieldDescription = match($this->sortField) {
-                'visitor_name' => 'Nome do Visitante',
-                'document' => 'Documento',
-                'destination' => 'Destino',
-                'in_date' => 'Data de Entrada',
-                'out_date' => 'Data de Saída',
-                'duration' => 'Duração da Visita',
-                'operator' => 'Operador',
-                default => 'Data de Entrada'
-            };
+            $visitsSheet->setCellValue('A' . $row, $log->visitor->name ?? 'N/A');
+            $visitsSheet->setCellValue('B' . $row, $log->visitor->docType->type ?? 'N/A');
+            $visitsSheet->setCellValue('C' . $row, $log->visitor->doc ?? 'N/A');
+            $visitsSheet->setCellValue('D' . $row, $log->destination->name ?? 'N/A');
+            $visitsSheet->setCellValue('E' . $row, $log->in_date ? date('d/m/Y H:i', strtotime($log->in_date)) : 'N/A');
+            $visitsSheet->setCellValue('F' . $row, $log->out_date ? date('d/m/Y H:i', strtotime($log->out_date)) : 'Em andamento');
+            $visitsSheet->setCellValue('G' . $row, $log->operator->name ?? 'N/A');
+            $visitsSheet->setCellValue('H' . $row, $log->operator->email ?? 'N/A');
+            $visitsSheet->setCellValue('I' . $row, $duracao ?: 'Em andamento');
             
-            $sortDirectionDescription = $this->sortDirection === 'asc' ? 'Crescente' : 'Decrescente';
+            $row++;
+        }
+        
+        // Auto-dimensionar colunas
+        foreach (range('A', 'I') as $col) {
+            $visitsSheet->getColumnDimension($col)->setAutoSize(true);
+        }
+        
+        // Aba 2: Ocorrências (se solicitado)
+        if ($hasOccurrences) {
+            // Criar nova aba para ocorrências
+            $occurrencesSheet = $spreadsheet->createSheet();
+            $occurrencesSheet->setTitle('Ocorrências');
             
-            // Incluir informações de ordenação
-            fputcsv($handle, [
-                'Ordenado por: ' . $sortFieldDescription,
-                'Ordem: ' . $sortDirectionDescription
-            ]);
+            // Cabeçalho com título
+            $occurrencesSheet->setCellValue('A1', 'Relatório de Ocorrências - ' . now()->format('d/m/Y H:i:s'));
+            $occurrencesSheet->mergeCells('A1:F1');
             
             // Incluir filtros aplicados
-            fputcsv($handle, ['Filtros aplicados:']);
+            $occurrencesSheet->setCellValue('A2', 'Filtros aplicados:');
+            $occurrencesSheet->mergeCells('A2:F2');
+            
+            $row = 3;
             foreach ($filters as $label => $value) {
-                fputcsv($handle, [$label, $value]);
+                $occurrencesSheet->setCellValue('A' . $row, $label . ':');
+                $occurrencesSheet->setCellValue('B' . $row, $value);
+                $occurrencesSheet->mergeCells('B' . $row . ':F' . $row);
+                $row++;
             }
             
-            // Linha em branco para separar o cabeçalho
-            fputcsv($handle, ['']);
-    
-            // Cabeçalhos do CSV
-            fputcsv($handle, [
-                'Nome do Visitante',
-                'Tipo de Documento',
-                'Número do Documento',
+            // Linha em branco
+            $row++;
+            
+            // Cabeçalhos das colunas para ocorrências
+            $occurrenceHeaders = [
+                'ID',
+                'Descrição',
+                'Visitante',
                 'Destino',
-                'Data de Entrada',
-                'Data de Saída',
-                'Operador',
-                'Duração da Visita'
-            ]);
-    
-            // Linhas de dados
-            foreach ($this->results as $log) {
-                $duracao = '';
-                if (!empty($log->in_date) && !empty($log->out_date)) {
-                    $inDate = new \DateTime($log->in_date);
-                    $outDate = new \DateTime($log->out_date);
-                    $interval = $inDate->diff($outDate);
-                    
-                    // Cálculo da duração em dias, horas, minutos
-                    $dias = $interval->days;
-                    $horas = $interval->h;
-                    $minutos = $interval->i;
-                    $segundos = $interval->s;
-                    
-                    // Formata a duração dependendo do tempo total
-                    if ($dias > 0) {
-                        $duracao = $dias.'d '.$horas.'h';
-                    } elseif ($horas > 0) {
-                        $duracao = $horas.'h '.$minutos.'m';
-                    } else {
-                        $duracao = $minutos.'m '.$segundos.'s';
-                    }
-                }
-    
-                fputcsv($handle, [
-                    $log->visitor->name ?? 'N/A',
-                    $log->visitor->docType->type ?? 'N/A',
-                    $log->visitor->doc ?? 'N/A',
-                    $log->destination->name ?? 'N/A',
-                    $log->in_date ? date('d/m/Y H:i', strtotime($log->in_date)) : 'N/A',
-                    $log->out_date ? date('d/m/Y H:i', strtotime($log->out_date)) : 'Em andamento',
-                    $log->operator->name ?? 'N/A',
-                    $duracao ?: 'Em andamento'
-                ]);
+                'Data/Hora',
+                'Criado por'
+            ];
+            
+            $col = 'A';
+            foreach ($occurrenceHeaders as $header) {
+                $occurrencesSheet->setCellValue($col . $row, $header);
+                $col++;
+            }
+            $row++;
+            
+            // Formatar ocorrências para o relatório
+            $occurrencesResults = $this->formatOccurrencesForReport();
+            
+            // Dados das ocorrências
+            foreach ($occurrencesResults as $occurrence) {
+                $occurrencesSheet->setCellValue('A' . $row, $occurrence['id']);
+                $occurrencesSheet->setCellValue('B' . $row, $occurrence['description']);
+                $occurrencesSheet->setCellValue('C' . $row, $occurrence['visitor']);
+                $occurrencesSheet->setCellValue('D' . $row, $occurrence['destination']);
+                $occurrencesSheet->setCellValue('E' . $row, $occurrence['datetime']);
+                $occurrencesSheet->setCellValue('F' . $row, $occurrence['creator']);
+                
+                $row++;
             }
             
-            fclose($handle);
-        }, $filename, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-        ]);
-
-        // Notificação será mostrada na interface pelo Filament após o download iniciar
-        Notification::make()
-            ->success()
-            ->title('Exportação Concluída')
-            ->body('O arquivo CSV foi gerado com sucesso.')
-            ->send();
+            // Auto-dimensionar colunas
+            foreach (range('A', 'F') as $col) {
+                $occurrencesSheet->getColumnDimension($col)->setAutoSize(true);
+            }
+        }
+        
+        // Voltar para a primeira aba
+        $spreadsheet->setActiveSheetIndex(0);
+        
+        // Nome do arquivo de saída
+        $filename = 'relatorio_visitas_' . now()->format('YmdHis') . '.xlsx';
+        
+        // Criar writer para Excel
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        
+        // Salvar em arquivo temporário
+        $tempFile = tempnam(sys_get_temp_dir(), 'excel');
+        $writer->save($tempFile);
+        
+        // Forçar download
+        return response()->download($tempFile, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
     }
 
     public function exportToPdf()
@@ -736,8 +825,22 @@ class SecurityReports extends Page implements HasForms
         // Obter filtros aplicados para exibição
         $filters = $this->getAppliedFilters($formData);
         
+        // Obter a descrição do campo de ordenação para incluir na exportação
+        $sortFieldDescription = match($this->sortField) {
+            'visitor_name' => 'Nome do Visitante',
+            'document' => 'Documento',
+            'destination' => 'Destino',
+            'in_date' => 'Data de Entrada',
+            'out_date' => 'Data de Saída',
+            'duration' => 'Duração da Visita',
+            'operator' => 'Operador',
+            default => 'Data de Entrada'
+        };
+        
+        $sortDirectionDescription = $this->sortDirection === 'asc' ? 'Crescente' : 'Decrescente';
+        
         // Formatar resultados para o relatório
-        $headers = ['Nome', 'Documento', 'Destino', 'Entrada', 'Saída', 'Duração', 'Operador'];
+        $headers = ['Nome', 'Documento', 'Destino', 'Entrada', 'Saída', 'Duração', 'Operador', 'E-mail do Operador'];
         $visitorsResults = $this->formatResultsForReport();
         
         // Ocorrências
@@ -790,6 +893,8 @@ class SecurityReports extends Page implements HasForms
                 'visitorStats' => $visitorStats,
                 'occurrenceStats' => $occurrenceStats,
                 'showStats' => true,
+                'sortField' => $sortFieldDescription,
+                'sortDirection' => $sortDirectionDescription,
             ])->render();
             
             // Usa o Browsershot para gerar o PDF com configurações detalhadas
@@ -900,7 +1005,8 @@ class SecurityReports extends Page implements HasForms
                 'in_date' => $log->in_date ? date('d/m/Y H:i', strtotime($log->in_date)) : 'N/A',
                 'out_date' => $log->out_date ? date('d/m/Y H:i', strtotime($log->out_date)) : 'Em andamento',
                 'duration' => $this->calculateDuration($log),
-                'operator' => $log->operator->name ?? 'N/A'
+                'operator' => $log->operator->name ?? 'N/A',
+                'operator_email' => $log->operator->email ?? 'N/A'
             ];
         }
         
@@ -991,12 +1097,12 @@ class SecurityReports extends Page implements HasForms
     public function getExportAction(): Action
     {
         return Action::make('export')
-            ->label('Exportar CSV')
-            ->action('exportCsv')
-            ->disabled(fn() => empty($this->results))
+            ->label('Exportar Excel')
+            ->action('exportExcel')
+            ->disabled(fn() => empty($this->results) && (empty($this->occurrencesResults) || count($this->occurrencesResults) === 0))
             ->color('success')
-            ->tooltip('Exporta todos os resultados da pesquisa em formato CSV, não apenas a página atual')
-            ->icon('heroicon-o-arrow-down-tray');
+            ->tooltip('Exporta todos os resultados da pesquisa em formato Excel, não apenas a página atual')
+            ->icon('heroicon-o-document-text');
     }
 
     public function getPdfExportAction(): Action
@@ -1004,10 +1110,10 @@ class SecurityReports extends Page implements HasForms
         return Action::make('exportPdf')
             ->label('Exportar PDF')
             ->action('exportToPdf')
-            ->disabled(fn() => empty($this->results))
+            ->disabled(fn() => empty($this->results) && (empty($this->occurrencesResults) || count($this->occurrencesResults) === 0))
             ->color('danger')
             ->tooltip('Exporta todos os resultados da pesquisa em formato PDF, não apenas a página atual')
-            ->icon('heroicon-o-document-arrow-down');
+            ->icon('heroicon-o-document');
     }
 
     public function getClearFiltersAction(): Action
@@ -1032,6 +1138,7 @@ class SecurityReports extends Page implements HasForms
                     'doc_type_id' => null,
                     'doc' => null,
                     'destination_ids' => [],
+                    'include_occurrences' => true,
                 ]);
                 
                 Notification::make()
@@ -1066,6 +1173,7 @@ class SecurityReports extends Page implements HasForms
             'total_visitors' => 0,
             'visitors_by_destination' => [],
             'unique_visitors' => 0,
+            'ongoing_visits' => 0,
         ];
         
         // Se não houver resultados, retornar estatísticas vazias
@@ -1076,6 +1184,7 @@ class SecurityReports extends Page implements HasForms
         // Conjunto de IDs de visitantes únicos
         $uniqueVisitorIds = [];
         $destinationCounts = [];
+        $ongoingVisits = 0;
         
         foreach ($this->results as $log) {
             if (isset($log->visitor) && isset($log->visitor->id)) {
@@ -1088,6 +1197,11 @@ class SecurityReports extends Page implements HasForms
                     $destinationCounts[$destinationName] = 0;
                 }
                 $destinationCounts[$destinationName]++;
+                
+                // Contabilizar visitas em andamento (sem data de saída)
+                if (empty($log->out_date)) {
+                    $ongoingVisits++;
+                }
             }
         }
         
@@ -1097,6 +1211,7 @@ class SecurityReports extends Page implements HasForms
         $stats['total_visitors'] = count($this->results);
         $stats['unique_visitors'] = count($uniqueVisitorIds);
         $stats['visitors_by_destination'] = $destinationCounts;
+        $stats['ongoing_visits'] = $ongoingVisits;
         
         return $stats;
     }

@@ -10,6 +10,32 @@
         <div class="mt-6">
             <h2 class="text-xl font-bold mb-4">Resultados da Pesquisa</h2>
             
+            <!-- Estatísticas Resumidas -->
+            <div class="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-white overflow-hidden shadow rounded-lg border">
+                    <div class="px-4 py-5 sm:p-6">
+                        <dt class="text-sm font-medium text-gray-500 truncate">Total de Registros</dt>
+                        <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ $this->resultsCount() }}</dd>
+                    </div>
+                </div>
+                
+                <div class="bg-white overflow-hidden shadow rounded-lg border">
+                    <div class="px-4 py-5 sm:p-6">
+                        <dt class="text-sm font-medium text-gray-500 truncate">Visitas em Andamento</dt>
+                        <dd class="mt-1 text-3xl font-semibold text-blue-600">{{ $this->calculateVisitorStats()['ongoing_visits'] }}</dd>
+                    </div>
+                </div>
+                
+                @if(count($this->occurrencesResults) > 0)
+                <div class="bg-white overflow-hidden shadow rounded-lg border">
+                    <div class="px-4 py-5 sm:p-6">
+                        <dt class="text-sm font-medium text-gray-500 truncate">Total de Ocorrências</dt>
+                        <dd class="mt-1 text-3xl font-semibold text-amber-600">{{ count($this->occurrencesResults) }}</dd>
+                    </div>
+                </div>
+                @endif
+            </div>
+            
             <div class="text-sm text-gray-600 dark:text-gray-400 mb-3">
                 Os resultados estão paginados para melhor visualização. Você pode alterar o número de registros por página no final da tabela.
                 <span class="ml-1 text-indigo-600 dark:text-indigo-400">Clique nos títulos das colunas para ordenar os resultados.</span>
@@ -142,6 +168,11 @@
                                     @endif
                                 </div>
                             </th>
+                            <th class="px-4 py-3 font-bold text-white text-left">
+                                <div class="flex items-center">
+                                    E-mail do Operador
+                                </div>
+                            </th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
@@ -212,6 +243,7 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap text-gray-900">{{ $log->operator->name ?? 'N/A' }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-gray-900">{{ $log->operator->email ?? 'N/A' }}</td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -312,7 +344,7 @@
             <table class="w-full text-start divide-y divide-gray-200 dark:divide-gray-700 table-auto">
                 <thead>
                     <tr class="bg-primary-600 dark:bg-primary-700">
-                        <th class="px-4 py-3 font-bold text-white text-left">Título</th>
+                        <th class="px-4 py-3 font-bold text-white text-left">ID</th>
                         <th class="px-4 py-3 font-bold text-white text-left">Descrição</th>
                         <th class="px-4 py-3 font-bold text-white text-left">Visitante</th>
                         <th class="px-4 py-3 font-bold text-white text-left">Destino</th>
@@ -323,7 +355,7 @@
                 <tbody class="divide-y divide-gray-200">
                     @foreach($this->occurrencesResults as $occurrence)
                         <tr class="{{ $loop->even ? 'bg-gray-50' : 'bg-white' }}">
-                            <td class="px-4 py-3 text-gray-900">{{ $occurrence->title }}</td>
+                            <td class="px-4 py-3 text-gray-900">{{ $occurrence->id }}</td>
                             <td class="px-4 py-3 text-gray-900">{!! $occurrence->description !!}</td>
                             <td class="px-4 py-3 text-gray-900">
                                 @if($occurrence->visitors->count() > 0)
