@@ -1105,7 +1105,7 @@ class CreateVisitor extends CreateRecord
                     
                     // Verifica se a restrição está configurada para gerar ocorrência automática
                     // Registra a ocorrência apenas se auto_occurrence estiver habilitado na restrição
-                    if ($restriction->auto_occurrence) {
+                    if ($restriction->auto_occurrence && !$this->authorization_granted) {
                         // Registrar a ocorrência automática
                         $docTypeName = \App\Models\DocType::find($visitor->doc_type_id)?->type ?? 'Desconhecido';
                         
@@ -1264,7 +1264,7 @@ OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitan
                 // Verifica se a restrição preditiva está configurada para gerar ocorrência automática
                 
                 // Registra a ocorrência apenas se auto_occurrence estiver habilitado
-                if ($restrictionObj->auto_occurrence) {
+                if ($restrictionObj->auto_occurrence && !$this->authorization_granted) {
                     // Registrar a ocorrência automática
                     $docTypeName = \App\Models\DocType::find($formData['doc_type_id'])?->type ?? 'Desconhecido';
                     
