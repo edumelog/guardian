@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -33,6 +34,11 @@
             color: #2563eb;
             border-bottom: 1px solid #2563eb;
             padding-bottom: 5px;
+        }
+        h3 {
+            font-size: 14px;
+            margin: 15px 0 10px 0;
+            color: #374151;
         }
         .filters {
             margin-bottom: 20px;
@@ -90,6 +96,108 @@
         .page-break {
             page-break-after: always;
         }
+        .stats-container {
+            margin-bottom: 30px;
+            background-color: #f9fafb;
+            padding: 15px;
+            border-radius: 5px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .stats-summary {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .stats-card {
+            background: white;
+            border-radius: 5px;
+            padding: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            width: 30%;
+            text-align: center;
+        }
+        .stats-card-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #374151;
+            margin-bottom: 5px;
+        }
+        .stats-card-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2563eb;
+        }
+        .charts-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .chart-box {
+            flex: 1;
+            background: white;
+            border-radius: 5px;
+            padding: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .chart-title {
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 10px;
+            color: #374151;
+        }
+        .chart-canvas {
+            width: 100%;
+            height: 250px;
+        }
+        .severity-badge {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .severity-high {
+            background-color: #ef4444;
+        }
+        .severity-medium {
+            background-color: #f59e0b;
+        }
+        .severity-low {
+            background-color: #3b82f6;
+        }
+        .severity-info {
+            background-color: #10b981;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .destination-bar {
+            height: 30px;
+            background-color: #3b82f6;
+            margin-bottom: 5px;
+            border-radius: 3px;
+        }
+        .destination-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        .severity-bar {
+            height: 30px;
+            margin-bottom: 5px;
+            border-radius: 3px;
+        }
     </style>
 </head>
 <body>
@@ -110,8 +218,112 @@
         @endforeach
     </div>
     
+    @if(isset($showStats) && $showStats)
+    <!-- Seção de Estatísticas -->
+    <h2 style="break-before: page; page-break-before: always;">Estatísticas</h2>
+    
+    <div class="stats-container">
+        <div class="stats-summary">
+            <div class="stats-card">
+                <div class="stats-card-title">Total de Registros</div>
+                <div class="stats-card-value">{{ $visitorStats['total_visitors'] }}</div>
+            </div>
+            
+            <div class="stats-card">
+                <div class="stats-card-title">Visitantes Únicos</div>
+                <div class="stats-card-value">{{ $visitorStats['unique_visitors'] }}</div>
+            </div>
+            
+            @if($hasOccurrences)
+            <div class="stats-card">
+                <div class="stats-card-title">Total de Ocorrências</div>
+                <div class="stats-card-value">{{ $occurrenceStats['total_occurrences'] }}</div>
+            </div>
+            @endif
+        </div>
+        
+        <div class="charts-container" style="{{ $hasOccurrences ? '' : 'flex-direction: column;' }}">
+            <!-- Gráfico de Visitantes por Destino -->
+            <div class="chart-box">
+                <div class="chart-title">Visitantes por Destino</div>
+                @if(count($visitorStats['visitors_by_destination']) > 0)
+                    @php
+                        // Limitar a 5 destinos para melhor visualização
+                        $destinationData = array_slice($visitorStats['visitors_by_destination'], 0, 5, true);
+                        $maxValue = max($destinationData);
+                    @endphp
+                    
+                    @foreach($destinationData as $destination => $count)
+                        @php
+                            $percentage = ($count / $maxValue) * 100;
+                        @endphp
+                        <div class="destination-label">
+                            <span title="{{ $destination }}">{{ Str::limit($destination, 25) }}</span>
+                            <span>{{ $count }}</span>
+                        </div>
+                        <div class="destination-bar" style="width: {{ $percentage }}%"></div>
+                    @endforeach
+                    
+                    @if(count($visitorStats['visitors_by_destination']) > 5)
+                        <div style="text-align: center; font-style: italic; margin-top: 10px;">
+                            E mais {{ count($visitorStats['visitors_by_destination']) - 5 }} destinos
+                        </div>
+                    @endif
+                @else
+                    <div class="no-results">Sem dados para exibir</div>
+                @endif
+            </div>
+            
+            <!-- Gráfico de Ocorrências por Severidade (apenas quando hasOccurrences for true) -->
+            @if($hasOccurrences)
+            <div class="chart-box">
+                <div class="chart-title">Ocorrências por Severidade</div>
+                @if($occurrenceStats['total_occurrences'] > 0)
+                    @php
+                        $severities = $occurrenceStats['occurrences_by_severity'];
+                        $totalOccurrences = $occurrenceStats['total_occurrences'];
+                        
+                        $colors = [
+                            'alta' => '#ef4444',    // vermelho
+                            'média' => '#f59e0b',   // laranja/amarelo
+                            'baixa' => '#10b981',   // verde
+                            'informativa' => '#6b7280', // cinza
+                        ];
+                        
+                        $labels = [
+                            'alta' => 'Alta (Vermelho)',
+                            'média' => 'Média (Amarelo)',
+                            'baixa' => 'Baixa (Verde)',
+                            'informativa' => 'Informativa (Cinza)',
+                        ];
+                    @endphp
+                    
+                    @foreach($severities as $severity => $count)
+                        @if($count > 0)
+                            @php
+                                $percentage = ($count / $totalOccurrences) * 100;
+                            @endphp
+                            <div class="destination-label">
+                                <span>
+                                    <span class="severity-badge" style="background-color: {{ $colors[$severity] }}"></span>
+                                    {{ $labels[$severity] }}
+                                </span>
+                                <span>{{ $count }} ({{ number_format($percentage, 1) }}%)</span>
+                            </div>
+                            <div class="severity-bar" style="width: {{ $percentage }}%; background-color: {{ $colors[$severity] }}"></div>
+                        @endif
+                    @endforeach
+                @else
+                    <div class="no-results">Sem ocorrências para exibir</div>
+                @endif
+            </div>
+            @endif
+        </div>
+    </div>
+    @endif
+    
     <!-- Seção de Visitas -->
-    <h2>Visitas ({{ count($results) }})</h2>
+    <h2 style="break-before: page; page-break-before: always;">Visitas ({{ count($results) }})</h2>
     
     @if(count($results) > 0)
         <table>
@@ -142,9 +354,7 @@
     
     <!-- Seção de Ocorrências (se aplicável) -->
     @if($hasOccurrences)
-        @if(count($results) > 10)
-            <div class="page-break"></div>
-        @endif
+        <div class="page-break"></div>
         
         <h2>Ocorrências ({{ count($occurrencesResults) }})</h2>
         
@@ -160,7 +370,7 @@
                 <tbody>
                     @foreach($occurrencesResults as $occurrence)
                         <tr>
-                            <td>{{ $occurrence['title'] }}</td>
+                            <td>{{ $occurrence['id'] }}</td>
                             <td>{{ $occurrence['description'] }}</td>
                             <td>{{ $occurrence['visitor'] }}</td>
                             <td>{{ $occurrence['destination'] }}</td>

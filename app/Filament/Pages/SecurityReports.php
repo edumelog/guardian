@@ -322,7 +322,7 @@ class SecurityReports extends Page implements HasForms
             ->with(['visitors', 'visitors.docType', 'destinations', 'creator', 'updater'])
             ->whereBetween('occurrence_datetime', [$startDateTime, $endDateTime]);
 
-        // Filtrar por visitante (nome)
+        // Filtrar por visitante (nome) - apenas se o filtro for fornecido
         if (!empty($formData['visitor_name'])) {
             Log::info('Filtrando ocorrências por nome de visitante', ['visitor_name' => $formData['visitor_name']]);
             $query->whereHas('visitors', function ($q) use ($formData) {
@@ -330,7 +330,7 @@ class SecurityReports extends Page implements HasForms
             });
         }
 
-        // Filtrar por tipo de documento
+        // Filtrar por tipo de documento - apenas se o filtro for fornecido
         if (!empty($formData['doc_type_id'])) {
             Log::info('Filtrando ocorrências por tipo de documento', ['doc_type_id' => $formData['doc_type_id']]);
             $query->whereHas('visitors', function ($q) use ($formData) {
@@ -338,7 +338,7 @@ class SecurityReports extends Page implements HasForms
             });
         }
 
-        // Filtrar por número de documento
+        // Filtrar por número de documento - apenas se o filtro for fornecido
         if (!empty($formData['doc'])) {
             Log::info('Filtrando ocorrências por número de documento', ['doc' => $formData['doc']]);
             $query->whereHas('visitors', function ($q) use ($formData) {
@@ -346,7 +346,7 @@ class SecurityReports extends Page implements HasForms
             });
         }
 
-        // Filtrar por destino
+        // Filtrar por destino - apenas se o filtro for fornecido
         if (!empty($formData['destination_id'])) {
             Log::info('Filtrando ocorrências por destino', ['destination_id' => $formData['destination_id']]);
             $query->whereHas('destinations', function ($q) use ($formData) {
@@ -500,242 +500,105 @@ class SecurityReports extends Page implements HasForms
 
     public function search(): void
     {
-        Log::info('Iniciando pesquisa de relatório de segurança');
+        $this->validate();
         
-        try {
-            // Resetar para a primeira página quando fizer uma nova pesquisa
-            $this->currentPage = 1;
-            
-            // Verificar se existem registros no banco de dados
-            $totalVisitorLogs = VisitorLog::count();
-            $totalVisitors = Visitor::count();
-            
-            Log::info('Contagem total de registros no sistema', [
-                'total_visitor_logs' => $totalVisitorLogs,
-                'total_visitors' => $totalVisitors
-            ]);
-            
-            // Validar os dados do formulário
-            $data = $this->form->getState();
-            Log::info('Dados do formulário antes da validação', $data);
-            
-            // Definir regras de validação
-            $rules = [
-                'start_date' => ['nullable', 'date'],
-                'end_date' => ['nullable', 'date'],
-                'start_time' => ['required', 'string'],
-                'end_time' => ['required', 'string'],
-            ];
-            
-            // Validar manualmente
-            $validator = Validator::make($data, $rules);
-            if ($validator->fails()) {
-                Log::warning('Falha na validação', ['errors' => $validator->errors()->toArray()]);
-                foreach ($validator->errors()->all() as $error) {
-                    Notification::make()
-                        ->title('Erro de validação')
-                        ->body($error)
-                        ->danger()
-                        ->send();
-                }
-                return;
-            }
-            
-            // Verificar se a data final é maior ou igual à data inicial (quando ambas estão preenchidas)
-            if (!empty($data['start_date']) && !empty($data['end_date'])) {
-                $startDate = \Carbon\Carbon::parse($data['start_date']);
-                $endDate = \Carbon\Carbon::parse($data['end_date']);
-                
-                if ($endDate->lt($startDate)) {
-                    Log::warning('Data final menor que data inicial', [
-                        'start_date' => $data['start_date'],
-                        'end_date' => $data['end_date']
-                    ]);
-                    
-                    Notification::make()
-                        ->title('Erro de validação')
-                        ->body('A data final deve ser maior ou igual à data inicial.')
-                        ->danger()
-                        ->send();
-                    return;
-                }
-                
-                // Se as datas são iguais, verificar também o horário
-                if ($startDate->eq($endDate)) {
-                    $startTime = \Carbon\Carbon::createFromFormat('H:i', $data['start_time']);
-                    $endTime = \Carbon\Carbon::createFromFormat('H:i', $data['end_time']);
-                    
-                    if ($endTime->lt($startTime)) {
-                        Log::warning('Horário final menor que horário inicial quando as datas são iguais', [
-                            'start_time' => $data['start_time'],
-                            'end_time' => $data['end_time']
-                        ]);
-                        
-                        Notification::make()
-                            ->title('Erro de validação')
-                            ->body('Quando as datas são iguais, o horário final deve ser maior ou igual ao horário inicial.')
-                            ->danger()
-                            ->send();
-                        return;
-                    }
-                }
-            }
-            
-            Log::info('Validação concluída com sucesso');
-            
-            $this->isSearching = true;
-
-            $data = $this->form->getState();
-            Log::info('Dados do formulário de pesquisa', $data);
-            
-            // Combinar data e hora para criar os timestamps de início e fim
-            // Usar 01/01/1900 como data padrão quando data inicial estiver vazia
-            $startDate = !empty($data['start_date']) ? $data['start_date'] : '1900-01-01';
-            // Usar data atual quando data final estiver vazia
-            $endDate = !empty($data['end_date']) ? $data['end_date'] : now()->format('Y-m-d');
-            
-            $startDateTime = $startDate . ' ' . $data['start_time'] . ':00';
-            $endDateTime = $endDate . ' ' . $data['end_time'] . ':59';
-            
-            Log::info('Período de pesquisa', [
-                'startDateTime' => $startDateTime,
-                'endDateTime' => $endDateTime,
-                'start_date_original' => $data['start_date'] ?? 'vazio',
-                'end_date_original' => $data['end_date'] ?? 'vazio'
-            ]);
-
-            // Query base para buscar logs de visitantes
-            $query = VisitorLog::query()
-                ->with(['visitor', 'visitor.docType', 'destination', 'operator'])
-                ->where(function ($query) use ($startDateTime, $endDateTime) {
-                    // Visitas cujas entradas estão no período
-                    $query->whereBetween('in_date', [$startDateTime, $endDateTime])
-                       // OU saídas no período
-                       ->orWhere(function ($q) use ($startDateTime, $endDateTime) {
-                           $q->whereNotNull('out_date')
-                               ->whereBetween('out_date', [$startDateTime, $endDateTime]);
-                       })
-                       // OU visitas que começaram antes e terminaram depois do período (visitas que abrangem todo o período)
-                       ->orWhere(function ($q) use ($startDateTime, $endDateTime) {
-                           $q->where('in_date', '<', $startDateTime)
-                               ->where(function($sq) use ($endDateTime) {
-                                   $sq->where('out_date', '>', $endDateTime)
-                                       ->orWhereNull('out_date');
-                               });
-                       });
-                });
-
-            // Filtrar por visitante (nome)
-            if (!empty($data['visitor_name'])) {
-                Log::info('Filtrando por nome de visitante', ['visitor_name' => $data['visitor_name']]);
-                $query->whereHas('visitor', function ($q) use ($data) {
-                    // Nome já será enviado em maiúsculas devido ao afterStateUpdated
-                    // Usar COLLATE para diferenciar acentos (sensível a acentos)
-                    $q->whereRaw('name COLLATE utf8mb4_bin LIKE ?', ['%' . $data['visitor_name'] . '%']);
-                });
-            }
-
-            // Filtrar por tipo de documento
-            if (!empty($data['doc_type_id'])) {
-                Log::info('Filtrando por tipo de documento', ['doc_type_id' => $data['doc_type_id']]);
-                $query->whereHas('visitor', function ($q) use ($data) {
-                    $q->where('doc_type_id', $data['doc_type_id']);
-                });
-            }
-
-            // Filtrar por número de documento
-            if (!empty($data['doc'])) {
-                Log::info('Filtrando por número de documento', ['doc' => $data['doc']]);
-                $query->whereHas('visitor', function ($q) use ($data) {
-                    // Usar COLLATE para diferenciar caracteres especiais e letras
-                    $q->whereRaw('doc COLLATE utf8mb4_bin LIKE ?', ['%' . $data['doc'] . '%']);
-                });
-            }
-
-            // Filtrar por destino
-            if (!empty($data['destination_id'])) {
-                Log::info('Filtrando por destino', ['destination_id' => $data['destination_id']]);
-                $query->where('destination_id', $data['destination_id']);
-            }
-
-            // Log da query SQL para debug
-            $sqlWithBindings = $query->toSql();
-            $bindings = $query->getBindings();
-            Log::info('SQL da consulta', [
-                'sql' => $sqlWithBindings,
-                'bindings' => $bindings
-            ]);
-
-            // Obter resultados ordenados por data de entrada (mais recentes primeiro)
-            $this->results = $query->orderBy('in_date', 'desc')->get();
-            
-            Log::info('Resultados encontrados', [
-                'count' => count($this->results)
-            ]);
-
-            // Aplicar ordenação personalizada, se aplicável
-            if ($this->sortField !== 'in_date' || $this->sortDirection !== 'desc') {
-                $this->applySort();
-                Log::info('Aplicando ordenação personalizada', [
-                    'sortField' => $this->sortField,
-                    'sortDirection' => $this->sortDirection
-                ]);
-            }
-
-            // Buscar ocorrências se a opção estiver marcada
-            $this->occurrencesResults = [];
-            if (!empty($data['include_occurrences'])) {
-                $this->searchOccurrences($startDateTime, $endDateTime, $data);
-            }
-
-            // Notificar o usuário sobre os resultados
-            $count = count($this->results);
-            $occurrencesCount = count($this->occurrencesResults);
-            
-            $message = '';
-            if ($count > 0) {
-                $message .= "Foram encontrados {$count} registros de visitas que correspondem aos critérios de busca.";
-            } else {
-                $message .= "Nenhum registro de visita encontrado para os critérios selecionados.";
-            }
-            
-            if (!empty($data['include_occurrences'])) {
-                if ($occurrencesCount > 0) {
-                    $message .= " Também foram encontradas {$occurrencesCount} ocorrências.";
-                } else {
-                    $message .= " Nenhuma ocorrência encontrada para os critérios selecionados.";
-                }
-            }
-            
-            $status = ($count > 0 || $occurrencesCount > 0) ? 'success' : 'warning';
-
-            Log::info('Notificação de pesquisa', [
-                'message' => $message,
-                'status' => $status,
-                'visitas_count' => $count,
-                'ocorrencias_count' => $occurrencesCount
-            ]);
-
+        $data = $this->form->getState();
+        
+        // Resetar os resultados
+        $this->results = [];
+        $this->occurrencesResults = [];
+        
+        // Montar as datas de início e fim com os horários especificados
+        $startDateTime = $data['start_date'] . ' ' . $data['start_time'] . ':00';
+        $endDateTime = $data['end_date'] . ' ' . $data['end_time'] . ':59';
+        
+        // Validar que a data de início é anterior à data de fim
+        if (strtotime($startDateTime) > strtotime($endDateTime)) {
             Notification::make()
-                ->title('Pesquisa Concluída')
-                ->body($message)
-                ->status($status)
-                ->send();
-                
-            // Forçar atualização da visualização
-            $this->dispatch('refreshView');
-                
-        } catch (\Exception $e) {
-            Log::error('Erro na pesquisa de relatório', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            
-            Notification::make()
-                ->title('Erro na pesquisa')
-                ->body('Ocorreu um erro ao processar a pesquisa: ' . $e->getMessage())
                 ->danger()
+                ->title('Erro na seleção de datas')
+                ->body('A data/hora de início deve ser anterior à data/hora de fim.')
                 ->send();
+                
+            return;
+        }
+        
+        // Construir a consulta base
+        $query = VisitorLog::with(['visitor', 'visitor.docType', 'destination', 'operator'])
+            ->whereBetween(DB::raw('CONCAT(DATE(in_date), " ", TIME(in_date))'), [$startDateTime, $endDateTime]);
+        
+        // Aplicar filtros adicionais se fornecidos
+        if (!empty($data['visitor_name'])) {
+            $query->whereHas('visitor', function($q) use ($data) {
+                $q->whereRaw('name COLLATE utf8mb4_bin LIKE ?', ['%' . $data['visitor_name'] . '%']);
+            });
+        }
+        
+        if (!empty($data['doc_type_id'])) {
+            $query->whereHas('visitor', function($q) use ($data) {
+                $q->where('doc_type_id', $data['doc_type_id']);
+            });
+        }
+        
+        if (!empty($data['doc'])) {
+            $query->whereHas('visitor', function($q) use ($data) {
+                $q->whereRaw('doc COLLATE utf8mb4_bin LIKE ?', ['%' . $data['doc'] . '%']);
+            });
+        }
+        
+        if (!empty($data['destination_id'])) {
+            $query->where('destination_id', $data['destination_id']);
+        }
+        
+        // Executar a consulta
+        $this->results = $query->get();
+        
+        // Inicializar a variável de ocorrências
+        $this->occurrencesResults = [];
+        
+        // Buscar ocorrências se solicitado
+        if (!empty($data['include_occurrences'])) { 
+            $this->searchOccurrences($startDateTime, $endDateTime, $data);
+        }
+        
+        // Log para depuração
+        Log::info('Pesquisa realizada', [
+            'filters' => $data,
+            'startDateTime' => $startDateTime,
+            'endDateTime' => $endDateTime,
+            'visitas_count' => count($this->results),
+            'ocorrencias_count' => count($this->occurrencesResults)
+        ]);
+        
+        // Configurar flag de pesquisa
+        $this->isSearching = true;
+        
+        // Resetar a paginação para a primeira página
+        $this->currentPage = 1;
+        
+        // Exibir notificação de resultados
+        $occurrencesCountMsg = !empty($data['include_occurrences']) ? 
+            " e " . count($this->occurrencesResults) . " ocorrências" : "";
+            
+        $message = count($this->results) . " visitas" . $occurrencesCountMsg . " encontradas";
+        
+        if (count($this->results) > 0 || count($this->occurrencesResults) > 0) {
+            Notification::make()
+                ->success()
+                ->title('Pesquisa concluída')
+                ->body($message)
+                ->send();
+        } else {
+            Notification::make()
+                ->warning()
+                ->title('Nenhum resultado encontrado')
+                ->body('Tente ajustar os filtros de pesquisa.')
+                ->send();
+        }
+        
+        // Se estiver em uma aba que não existe mais resultados, voltar para a aba visitors
+        if ($this->activeTab === 'occurrences' && count($this->occurrencesResults) === 0) {
+            $this->activeTab = 'visitors';
         }
     }
 
@@ -881,7 +744,7 @@ class SecurityReports extends Page implements HasForms
         $occurrencesResults = [];
         
         if (!empty($formData['include_occurrences']) && count($this->occurrencesResults) > 0) {
-            $occurrencesHeaders = ['Título', 'Descrição', 'Visitante', 'Destino', 'Data/Hora', 'Criado por'];
+            $occurrencesHeaders = ['ID', 'Descrição', 'Visitante', 'Destino', 'Data/Hora', 'Criado por'];
             $occurrencesResults = $this->formatOccurrencesForReport();
         }
         
@@ -896,6 +759,10 @@ class SecurityReports extends Page implements HasForms
                 
             return;
         }
+        
+        // Calcular estatísticas
+        $visitorStats = $this->calculateVisitorStats();
+        $occurrenceStats = $this->calculateOccurrenceStats();
         
         // Nome do arquivo de saída
         $filename = 'relatorio_visitas_' . date('YmdHis') . '.pdf';
@@ -915,10 +782,13 @@ class SecurityReports extends Page implements HasForms
                 'filters' => $filters,
                 'headers' => $headers,
                 'results' => $visitorsResults,
-                'hasOccurrences' => !empty($formData['include_occurrences']) && count($this->occurrencesResults) > 0,
-                'occurrencesHeaders' => $occurrencesHeaders,
-                'occurrencesResults' => $occurrencesResults,
-                'date' => date('d/m/Y H:i:s')
+                'hasOccurrences' => !empty($formData['include_occurrences']),
+                'occurrencesHeaders' => $occurrencesHeaders ?? [],
+                'occurrencesResults' => $occurrencesResults ?? [],
+                'date' => date('d/m/Y H:i:s'),
+                'visitorStats' => $visitorStats,
+                'occurrenceStats' => $occurrenceStats,
+                'showStats' => true,
             ])->render();
             
             // Usa o Browsershot para gerar o PDF com configurações detalhadas
@@ -985,19 +855,27 @@ class SecurityReports extends Page implements HasForms
         $formattedResults = [];
         
         foreach ($this->occurrencesResults as $occurrence) {
-            $visitors = $occurrence->visitors->map(function ($visitor) {
-                return $visitor->name;
-            })->join(', ');
+            // Processar visitantes associados ou usar N/A
+            $visitors = 'N/A';
+            if ($occurrence->visitors && $occurrence->visitors->count() > 0) {
+                $visitors = $occurrence->visitors->map(function ($visitor) {
+                    return $visitor->name;
+                })->join(', ');
+            }
             
-            $destinations = $occurrence->destinations->map(function ($destination) {
-                return $destination->name;
-            })->join(', ');
+            // Processar destinos associados ou usar N/A
+            $destinations = 'N/A';
+            if ($occurrence->destinations && $occurrence->destinations->count() > 0) {
+                $destinations = $occurrence->destinations->map(function ($destination) {
+                    return $destination->name;
+                })->join(', ');
+            }
             
             $formattedResults[] = [
-                'title' => $occurrence->title,
+                'id' => $occurrence->id,
                 'description' => strip_tags($occurrence->description), // Remove HTML tags for PDF
-                'visitor' => $visitors ?: 'N/A',
-                'destination' => $destinations ?: 'N/A',
+                'visitor' => $visitors,
+                'destination' => $destinations,
                 'datetime' => date('d/m/Y H:i:s', strtotime($occurrence->occurrence_datetime)),
                 'creator' => $occurrence->creator->name ?? 'N/A'
             ];
@@ -1176,5 +1054,94 @@ class SecurityReports extends Page implements HasForms
         return [];
     }
 
+    /**
+     * Calcula estatísticas de visitantes para o relatório
+     */
+    protected function calculateVisitorStats()
+    {
+        $stats = [
+            'total_visitors' => 0,
+            'visitors_by_destination' => [],
+            'unique_visitors' => 0,
+        ];
+        
+        // Se não houver resultados, retornar estatísticas vazias
+        if (empty($this->results)) {
+            return $stats;
+        }
+        
+        // Conjunto de IDs de visitantes únicos
+        $uniqueVisitorIds = [];
+        $destinationCounts = [];
+        
+        foreach ($this->results as $log) {
+            if (isset($log->visitor) && isset($log->visitor->id)) {
+                // Adicionar ID ao conjunto de visitantes únicos
+                $uniqueVisitorIds[$log->visitor->id] = true;
+                
+                // Contar por destino
+                $destinationName = $log->destination->name ?? 'Não informado';
+                if (!isset($destinationCounts[$destinationName])) {
+                    $destinationCounts[$destinationName] = 0;
+                }
+                $destinationCounts[$destinationName]++;
+            }
+        }
+        
+        // Ordenar destinos por quantidade (decrescente)
+        arsort($destinationCounts);
+        
+        $stats['total_visitors'] = count($this->results);
+        $stats['unique_visitors'] = count($uniqueVisitorIds);
+        $stats['visitors_by_destination'] = $destinationCounts;
+        
+        return $stats;
+    }
     
+    /**
+     * Calcula estatísticas de ocorrências para o relatório
+     */
+    protected function calculateOccurrenceStats()
+    {
+        $stats = [
+            'total_occurrences' => 0,
+            'occurrences_by_severity' => [
+                'alta' => 0,
+                'média' => 0,
+                'baixa' => 0,
+                'informativa' => 0,
+            ],
+        ];
+        
+        if (empty($this->occurrencesResults)) {
+            return $stats;
+        }
+        
+        $stats['total_occurrences'] = count($this->occurrencesResults);
+        
+        foreach ($this->occurrencesResults as $occurrence) {
+            // Garantir que a severidade seja sempre uma string válida
+            $severity = strtolower((string)($occurrence->severity ?? 'gray'));
+            
+            // Log para debug
+            Log::info('Processando ocorrência', [
+                'id' => $occurrence->id,
+                'severity' => $severity,
+                'original_severity' => $occurrence->severity ?? 'null'
+            ]);
+            
+            // Mapear cores para níveis de severidade
+            $mappedSeverity = match($severity) {
+                'red', 'high', 'alta', 'grave', 'crítica', 'critical' => 'alta',
+                'yellow', 'orange', 'amber', 'medium', 'média', 'moderada' => 'média',
+                'green', 'low', 'baixa', 'leve' => 'baixa',
+                'blue', 'gray', 'grey', 'info', 'informativa', 'informative' => 'informativa',
+                default => 'informativa',
+            };
+            
+            $stats['occurrences_by_severity'][$mappedSeverity]++;
+        }
+        
+        return $stats;
+    }
 } 
