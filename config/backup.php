@@ -15,7 +15,6 @@ return [
                  * The list of directories and files that will be included in the backup.
                  */
                 'include' => [
-                    storage_path('app/private'),
                     storage_path('app/private/visitors-photos'),
                 ],
 

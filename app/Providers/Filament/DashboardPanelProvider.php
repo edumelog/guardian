@@ -57,6 +57,7 @@ class DashboardPanelProvider extends PanelProvider
             ->plugins([
                 \BezhanSalleh\FilamentShield\FilamentShieldPlugin::make(),
                 \ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackupPlugin::make()
+                    ->usingPage(\App\Filament\Pages\Backups::class)
             ])
             ->resources([
                 \App\Filament\Resources\UserResource::class,

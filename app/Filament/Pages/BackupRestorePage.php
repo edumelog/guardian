@@ -31,7 +31,7 @@ class BackupRestorePage extends Page implements HasForms
     protected static ?string $navigationLabel = 'Restaurar Backup';
     protected static ?string $title = 'Restaurar Backup';
     protected static ?string $navigationGroup = 'Backup';
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 3;
 
     protected static string $view = 'filament.pages.backup-restore-page';
 

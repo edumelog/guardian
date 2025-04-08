@@ -28,7 +28,7 @@ class BackupDownloadPage extends Page
     protected static ?string $navigationLabel = 'Download de Backups';
     protected static ?string $title = 'Download de Backups';
     protected static ?string $navigationGroup = 'Backup';
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 2;
 
     protected static string $view = 'filament.pages.backup-download-page';
 
