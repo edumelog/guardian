@@ -46,6 +46,11 @@ class CreateVisitor extends CreateRecord
     public $activeRestriction = null; // Armazena a restrição ativa principal
     public $authorization_granted = false; // Nova propriedade para controlar autorização
 
+    /**
+     * Array para armazenar IDs de ocorrências que precisam ser vinculadas ao visitante após a criação
+     */
+    protected array $pendingOccurrenceIds = [];
+
     public function mount(): void
     {
         parent::mount();
@@ -1374,6 +1379,21 @@ OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitan
                     // Vincular o visitante à ocorrência (se já existir)
                     if ($visitor) {
                         $occurrence->visitors()->attach($visitor->id);
+                        
+                        // Log para verificar se o visitante foi associado corretamente
+                        \Illuminate\Support\Facades\Log::info('[Ocorrência Automática - VisitorResource] Vinculação de visitante à ocorrência', [
+                            'occurrence_id' => $occurrence->id,
+                            'visitor_id' => $visitor->id,
+                            'visitor_name' => $visitor->name
+                        ]);
+                    } else {
+                        // Se o visitante ainda não existe, armazenar temporariamente para vincular depois da criação
+                        $this->pendingOccurrenceIds[] = $occurrence->id;
+                        
+                        \Illuminate\Support\Facades\Log::info('[Ocorrência Automática - VisitorResource] Ocorrência pendente para vinculação após criar visitante', [
+                            'occurrence_id' => $occurrence->id,
+                            'pendingOccurrenceIds' => $this->pendingOccurrenceIds
+                        ]);
                     }
                     
                     // Vincular o destino à ocorrência (se existir)
@@ -1482,6 +1502,21 @@ OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitan
                 'in_date' => now(),
                 'operator_id' => Auth::id(),
             ]);
+        }
+        
+        // Processa as ocorrências pendentes e vincula-as ao visitante recém-criado
+        if (!empty($this->pendingOccurrenceIds) && $this->record) {
+            foreach ($this->pendingOccurrenceIds as $occurrenceId) {
+                $occurrence = \App\Models\Occurrence::find($occurrenceId);
+                if ($occurrence) {
+                    $occurrence->visitors()->attach($this->record->id);
+                    \Illuminate\Support\Facades\Log::info('[Ocorrência Automática] Vinculando ocorrência pendente ao visitante', [
+                        'occurrence_id' => $occurrenceId,
+                        'visitor_id' => $this->record->id,
+                        'visitor_name' => $this->record->name
+                    ]);
+                }
+            }
         }
 
         // Redireciona para a página de edição

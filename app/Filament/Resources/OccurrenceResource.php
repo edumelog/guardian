@@ -153,11 +153,15 @@ class OccurrenceResource extends Resource
                     ->label('Registrado por')
                     ->sortable(),
                     
-                TextColumn::make('visitors.name')
+                TextColumn::make('visitors')
                     ->label('Visitantes')
-                    ->listWithLineBreaks()
-                    ->limitList(3)
-                    ->expandableLimitedList(),
+                    ->formatStateUsing(function ($state, $record) {
+                        if ($record->visitors->isEmpty()) {
+                            return 'N/A';
+                        }
+                        return $record->visitors->pluck('name')->join(', ');
+                    })
+                    ->html(),
                     
                 TextColumn::make('destinations.name')
                     ->label('Destinos')
