@@ -229,18 +229,40 @@ Restrições ativas (" . $restrictions->count() . "):";
         // Vincula o visitante à ocorrência se ele já existir
         if ($visitor && $visitor->id) {
             $occurrence->visitors()->attach($visitor->id);
+            Log::info('[Ocorrência Automática - Autorização] Visitante vinculado à ocorrência', [
+                'occurrence_id' => $occurrence->id,
+                'visitor_id' => $visitor->id,
+                'visitor_name' => $visitor->name
+            ]);
+        } else {
+            Log::warning('[Ocorrência Automática - Autorização] Visitante não foi vinculado à ocorrência (ainda não existe)', [
+                'occurrence_id' => $occurrence->id,
+                'visitor_data' => $visitorData
+            ]);
         }
         
         // Vincula o destino à ocorrência se fornecido
         if ($destination && is_object($destination) && method_exists($destination, 'getKey')) {
             $occurrence->destinations()->attach($destination->getKey());
+            Log::info('[Ocorrência Automática - Autorização] Destino vinculado à ocorrência', [
+                'occurrence_id' => $occurrence->id,
+                'destination_id' => $destination->getKey(),
+                'destination_name' => $destination->name ?? 'Desconhecido'
+            ]);
         } elseif (is_numeric($destination)) {
             $occurrence->destinations()->attach($destination);
+            $destObj = \App\Models\Destination::find($destination);
+            Log::info('[Ocorrência Automática - Autorização] Destino vinculado à ocorrência por ID', [
+                'occurrence_id' => $occurrence->id,
+                'destination_id' => $destination,
+                'destination_name' => $destObj ? $destObj->name : 'Desconhecido'
+            ]);
         }
         
         Log::info('[Ocorrência Automática - Autorização] Ocorrência registrada com sucesso', [
             'occurrence_id' => $occurrence->id,
             'visitor_id' => $visitor?->id ?? 'Em processo de criação',
+            'visitor_name' => $visitor?->name ?? ($visitorData['name'] ?? 'Desconhecido'),
             'total_restrictions' => $restrictionsWithAutoOccurrence->count(),
             'restrictions' => $restrictionsWithAutoOccurrence->map(fn($r) => [
                 'id' => $r->id ?? null,
