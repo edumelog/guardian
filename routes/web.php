@@ -73,5 +73,11 @@ Route::get('/credentials/pdf/{path}', function (string $path) {
     ]);
 })->middleware(['auth', 'verified'])->name('credentials.pdf');
 
+// Rota para download de backups
+Route::get('/backup/download/{filename}', [\App\Http\Controllers\BackupController::class, 'download'])
+    ->name('backup.download')
+    ->middleware(['auth'])
+    ->where('filename', '.*'); // Permite barras no parâmetro filename
+
 require __DIR__.'/auth.php';
 URL::forceScheme('https');

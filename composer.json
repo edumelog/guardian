@@ -17,6 +17,7 @@
         "laravel/tinker": "^2.9",
         "phpoffice/phpspreadsheet": "^4.1",
         "picqer/php-barcode-generator": "^3.2",
+        "shuvroroy/filament-spatie-laravel-backup": "^2.2",
         "spatie/browsershot": "^5.0",
         "symfony/css-selector": "^7.2"
     },

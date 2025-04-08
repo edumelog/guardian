@@ -55,7 +55,9 @@ class DashboardPanelProvider extends PanelProvider
                 \App\Filament\Widgets\ActiveVisitorsChart::class,
             ])
             ->plugins([
-                \BezhanSalleh\FilamentShield\FilamentShieldPlugin::make()
+                \BezhanSalleh\FilamentShield\FilamentShieldPlugin::make(),
+                \ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackupPlugin::make()
+                    ->usingPage(\App\Filament\Pages\Backups::class)
             ])
             ->resources([
                 \App\Filament\Resources\UserResource::class,
