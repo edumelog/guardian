@@ -342,10 +342,10 @@ class VisitorResource extends Resource
                             ->tel()
                             ->telRegex('/.*/')  // Aceita qualquer formato de telefone
                             ->mask(RawJs::make(<<<'JS'
-                                '99 (99) 99-999-9999'
+                                '(99) 99-999-9999'
                             JS))
-                            ->default('55 (21) ')
-                            ->placeholder('55 (21) 99-999-9999')
+                            ->default('')
+                            ->placeholder('(21) 99-999-9999')
                             ->disabled($hasActiveVisit),
                             
                         Grid::make(3)
