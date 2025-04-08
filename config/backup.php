@@ -16,6 +16,7 @@ return [
                  */
                 'include' => [
                     storage_path('app/private'),
+                    storage_path('app/private/visitors-photos'),
                 ],
 
                 /*

@@ -134,6 +134,29 @@ class BackupRestorePage extends Page implements HasForms
             Artisan::call('down');
             
             try {
+                // Verifica o diretório private antes da restauração
+                $privateDir = storage_path('app/private');
+                $checkPrivateCommand = "find {$privateDir} -type d | sort";
+                $privateResult = Process::run($checkPrivateCommand);
+                
+                if ($privateResult->successful()) {
+                    \Illuminate\Support\Facades\Log::info('Estrutura do diretório private ANTES da restauração:', [
+                        'diretorios' => explode("\n", trim($privateResult->output()))
+                    ]);
+                    
+                    // Verifica se existem fotos de visitantes antes da restauração
+                    $visitorsPhotosDir = storage_path('app/private/visitors-photos');
+                    if (file_exists($visitorsPhotosDir)) {
+                        $fotosCommand = "find {$visitorsPhotosDir} -type f | wc -l";
+                        $countResult = Process::run($fotosCommand);
+                        \Illuminate\Support\Facades\Log::info('Contagem de fotos ANTES da restauração:', [
+                            'numero_arquivos' => trim($countResult->output())
+                        ]);
+                    } else {
+                        \Illuminate\Support\Facades\Log::info('Diretório de fotos não existe antes da restauração');
+                    }
+                }
+                
                 // Diretório temporário para extração
                 $extractPath = storage_path('app/restore-temp');
                 if (!file_exists($extractPath)) {
@@ -143,9 +166,33 @@ class BackupRestorePage extends Page implements HasForms
                 // Extrai o arquivo ZIP
                 $zip = new ZipArchive;
                 if ($zip->open($backupFile) === TRUE) {
+                    // Listar o conteúdo do ZIP antes de extrair
+                    $zipContents = [];
+                    for ($i = 0; $i < $zip->numFiles; $i++) {
+                        $filename = $zip->getNameIndex($i);
+                        // Verificar se o arquivo parece ser uma foto de visitante
+                        if (strpos($filename, 'visitors-photos') !== false) {
+                            $zipContents[] = $filename;
+                        }
+                    }
+                    
+                    \Illuminate\Support\Facades\Log::info('Conteúdo do ZIP relacionado a fotos de visitantes:', [
+                        'total_arquivos' => $zip->numFiles,
+                        'arquivos_de_fotos' => $zipContents
+                    ]);
+                    
                     $zip->extractTo($extractPath);
                     $zip->close();
                     \Illuminate\Support\Facades\Log::info('Arquivo extraído com sucesso', ['path' => $extractPath]);
+                    
+                    // Listar diretórios após a extração
+                    $lsCommand = "find {$extractPath} -type d | sort";
+                    $lsResult = Process::run($lsCommand);
+                    if ($lsResult->successful()) {
+                        \Illuminate\Support\Facades\Log::info('Estrutura de diretórios no backup:', [
+                            'diretorios' => explode("\n", trim($lsResult->output()))
+                        ]);
+                    }
                 } else {
                     throw new \Exception('Não foi possível extrair o arquivo de backup.');
                 }
@@ -191,25 +238,91 @@ class BackupRestorePage extends Page implements HasForms
                     \Illuminate\Support\Facades\Log::warning('Nenhum arquivo de banco de dados encontrado para restauração');
                 }
     
-                // Restaura os arquivos
+                // Restaura os arquivos de acordo com a estrutura do backup
+                $filesFound = false;
+                
+                // Verifica se existe o diretório files (formato antigo)
                 if (file_exists($extractPath . '/files')) {
                     $filesPath = $extractPath . '/files';
-                    \Illuminate\Support\Facades\Log::info('Restaurando arquivos', ['path' => $filesPath]);
-                    $command = "cp -r {$filesPath}/* " . base_path();
-                    $result = Process::run($command);
-                    
-                    if (!$result->successful()) {
-                        throw new \Exception('Erro ao restaurar arquivos: ' . $result->errorOutput());
-                    }
-                    
-                    \Illuminate\Support\Facades\Log::info('Arquivos restaurados com sucesso');
+                    \Illuminate\Support\Facades\Log::info('Restaurando arquivos do diretório files/', ['path' => $filesPath]);
+                    $filesFound = true;
                 } else {
-                    \Illuminate\Support\Facades\Log::warning('Nenhum diretório de arquivos encontrado para restauração');
+                    // Verifica se existe a estrutura completa de diretórios (formato novo)
+                    $varPath = $extractPath . '/var/www/html';
+                    if (file_exists($varPath)) {
+                        \Illuminate\Support\Facades\Log::info('Estrutura completa de diretórios encontrada', ['path' => $varPath]);
+                        
+                        // Restaura diretamente as fotos dos visitantes
+                        $backupPhotosPath = $extractPath . '/var/www/html/storage/app/private/visitors-photos';
+                        $destPhotosPath = storage_path('app/private/visitors-photos');
+                        
+                        if (file_exists($backupPhotosPath)) {
+                            // Garante que o diretório de destino existe
+                            if (!file_exists($destPhotosPath)) {
+                                mkdir($destPhotosPath, 0755, true);
+                            }
+                            
+                            // Copia as fotos com opção forçada e recursiva
+                            $command = "cp -rfv {$backupPhotosPath}/* {$destPhotosPath} 2>&1";
+                            \Illuminate\Support\Facades\Log::info('Copiando fotos dos visitantes diretamente:', [
+                                'command' => $command,
+                                'source' => $backupPhotosPath,
+                                'destination' => $destPhotosPath
+                            ]);
+                            
+                            $result = Process::run($command);
+                            \Illuminate\Support\Facades\Log::info('Resultado da cópia direta:', [
+                                'output' => $result->output(),
+                                'exitCode' => $result->exitCode(),
+                                'successful' => $result->successful()
+                            ]);
+                            
+                            // Ajusta permissões
+                            $chmodCmd = "chmod -R 755 {$destPhotosPath}";
+                            Process::run($chmodCmd);
+                            
+                            $filesFound = true;
+                        } else {
+                            \Illuminate\Support\Facades\Log::warning('Diretório de fotos não encontrado na estrutura completa', [
+                                'expected_path' => $backupPhotosPath
+                            ]);
+                        }
+                    }
+                }
+                
+                if (!$filesFound) {
+                    \Illuminate\Support\Facades\Log::warning('Nenhum diretório de arquivos reconhecível encontrado para restauração');
                 }
     
                 // Limpa o cache
                 Artisan::call('optimize:clear');
                 \Illuminate\Support\Facades\Log::info('Cache limpo com sucesso');
+                
+                // Verifica o diretório de fotos APÓS a restauração
+                $visitorsPhotosDir = storage_path('app/private/visitors-photos');
+                if (file_exists($visitorsPhotosDir)) {
+                    $fotosCommand = "find {$visitorsPhotosDir} -type f | wc -l";
+                    $countResult = Process::run($fotosCommand);
+                    \Illuminate\Support\Facades\Log::info('Contagem de fotos APÓS a restauração:', [
+                        'numero_arquivos' => trim($countResult->output())
+                    ]);
+                    
+                    // Lista alguns exemplos de fotos
+                    $listCommand = "find {$visitorsPhotosDir} -type f -name '*.jpg' -o -name '*.png' | head -n 10";
+                    $listResult = Process::run($listCommand);
+                    \Illuminate\Support\Facades\Log::info('Exemplos de fotos restauradas:', [
+                        'arquivos' => explode("\n", trim($listResult->output()))
+                    ]);
+                    
+                    // Verifica permissões
+                    $permCommand = "ls -la {$visitorsPhotosDir} | head -n 10";
+                    $permResult = Process::run($permCommand);
+                    \Illuminate\Support\Facades\Log::info('Permissões das fotos:', [
+                        'permissoes' => $permResult->output()
+                    ]);
+                } else {
+                    \Illuminate\Support\Facades\Log::error('Diretório de fotos NÃO EXISTE após a restauração!');
+                }
     
                 // Remove diretório temporário
                 Process::run("rm -rf {$extractPath}");
