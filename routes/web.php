@@ -79,5 +79,10 @@ Route::get('/backup/download/{filename}', [\App\Http\Controllers\BackupControlle
     ->middleware(['auth'])
     ->where('filename', '.*'); // Permite barras no parâmetro filename
 
+// Rota para exibir a imagem do dia da semana (requer autenticação)
+Route::get('weekday-image/{filename}', [App\Http\Controllers\WeekDayPhotoController::class, 'show'])
+    ->name('weekday.image')
+    ->middleware('auth');
+
 require __DIR__.'/auth.php';
 URL::forceScheme('https');

@@ -297,6 +297,9 @@ class CredentialPrintService
         @$dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         $xpath = new \DOMXPath($dom);
 
+        // Processa os marcadores do dia da semana
+        $this->processWeekdayElements($dom, $xpath);
+
         // Procura por elementos com classes que começam com 'tpl-'
         $elements = $xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' tpl-')]");
 
@@ -308,6 +311,12 @@ class CredentialPrintService
             // Encontra a classe que começa com 'tpl-'
             $tplClass = collect($classes)->first(fn($class) => str_starts_with($class, 'tpl-'));
             if (!$tplClass) continue;
+            
+            // Pula o processamento de elementos com classe tpl-weekday-img ou tpl-weekday-txt
+            // porque já foram processados na etapa anterior
+            if ($tplClass === 'tpl-weekday-img' || $tplClass === 'tpl-weekday-txt') {
+                continue;
+            }
 
             // Remove o prefixo 'tpl-' para obter o nome do campo
             $field = substr($tplClass, 4);
@@ -351,6 +360,167 @@ class CredentialPrintService
         }
 
         return $dom->saveHTML();
+    }
+
+    /**
+     * Processa elementos com as classes tpl-weekday-img e tpl-weekday-txt
+     * 
+     * @param \DOMDocument $dom
+     * @param \DOMXPath $xpath
+     */
+    private function processWeekdayElements(\DOMDocument $dom, \DOMXPath $xpath): void
+    {
+        // Obtém o dia da semana atual (1-7, onde 1 é segunda-feira)
+        $weekday = date('N');
+        Log::info('Processando elementos do dia da semana:', [
+            'weekday' => $weekday,
+            'dia_nome' => date('l')
+        ]);
+
+        try {
+            // Busca o registro do dia da semana no banco
+            $weekdayModel = \App\Models\WeekDay::where('day_number', $weekday)->first();
+            
+            if (!$weekdayModel) {
+                Log::warning('Dia da semana não encontrado no banco de dados:', [
+                    'weekday' => $weekday,
+                    'dia_nome' => date('l')
+                ]);
+                return;
+            }
+            
+            // Processa os elementos de texto do dia da semana
+            $this->processWeekdayTextElements($dom, $xpath, $weekdayModel);
+            
+            // Processa os elementos de imagem do dia da semana (apenas se houver imagem)
+            if ($weekdayModel->image) {
+                $this->processWeekdayImageElements($dom, $xpath, $weekdayModel);
+            } else {
+                Log::info('Dia da semana não possui imagem cadastrada:', [
+                    'weekday' => $weekday,
+                    'dia_nome' => date('l')
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Erro ao processar elementos do dia da semana:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+    
+    /**
+     * Processa elementos com a classe tpl-weekday-txt, adicionando o texto do dia da semana
+     * 
+     * @param \DOMDocument $dom
+     * @param \DOMXPath $xpath
+     * @param \App\Models\WeekDay $weekdayModel
+     */
+    private function processWeekdayTextElements(\DOMDocument $dom, \DOMXPath $xpath, \App\Models\WeekDay $weekdayModel): void
+    {
+        // Busca por elementos com a classe tpl-weekday-txt
+        $elements = $xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' tpl-weekday-txt')]");
+        
+        if ($elements->length === 0) {
+            Log::info('Nenhum elemento com classe tpl-weekday-txt encontrado');
+            return;
+        }
+        
+        // Usa texto formatado ou o nome do dia em maiúsculas
+        $dayText = $weekdayModel->formatted_text ?? strtoupper($weekdayModel->day_name);
+        
+        Log::info('Elementos com classe tpl-weekday-txt encontrados:', [
+            'total' => $elements->length,
+            'texto' => $dayText
+        ]);
+        
+        foreach ($elements as $element) {
+            if (!$element instanceof \DOMElement) continue;
+            
+            // Remove conteúdo existente
+            while ($element->firstChild) {
+                $element->removeChild($element->firstChild);
+            }
+            
+            // Adiciona o texto do dia da semana
+            $element->appendChild($dom->createTextNode($dayText));
+        }
+    }
+    
+    /**
+     * Processa elementos com a classe tpl-weekday-img, adicionando a imagem do dia da semana
+     * 
+     * @param \DOMDocument $dom
+     * @param \DOMXPath $xpath
+     * @param \App\Models\WeekDay $weekdayModel
+     */
+    private function processWeekdayImageElements(\DOMDocument $dom, \DOMXPath $xpath, \App\Models\WeekDay $weekdayModel): void
+    {
+        // Busca por elementos com a classe tpl-weekday-img
+        $elements = $xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' tpl-weekday-img')]");
+        
+        if ($elements->length === 0) {
+            Log::info('Nenhum elemento com classe tpl-weekday-img encontrado');
+            return;
+        }
+        
+        // Primeiro tenta obter a imagem como base64
+        try {
+            // Tenta usar o caminho completo do Storage
+            $path = Storage::disk('public')->path($weekdayModel->image);
+            if (!file_exists($path)) {
+                // Tenta usar o caminho relativo ao storage/public
+                $path = public_path('storage/' . $weekdayModel->image);
+                if (!file_exists($path)) {
+                    Log::warning('Imagem do dia da semana não encontrada:', [
+                        'caminho_storage' => Storage::disk('public')->path($weekdayModel->image),
+                        'caminho_public' => public_path('storage/' . $weekdayModel->image),
+                        'imagem_atributo' => $weekdayModel->image
+                    ]);
+                    return;
+                }
+            }
+            
+            // Lê o conteúdo da imagem e converte para base64
+            $mime = mime_content_type($path);
+            $imageData = file_get_contents($path);
+            $base64 = 'data:' . $mime . ';base64,' . base64_encode($imageData);
+            
+            Log::info('Imagem do dia da semana convertida para base64:', [
+                'mime' => $mime,
+                'tamanho' => strlen($imageData),
+                'base64_tamanho' => strlen($base64)
+            ]);
+            
+            // Processa cada elemento encontrado
+            foreach ($elements as $element) {
+                if (!$element instanceof \DOMElement) continue;
+                
+                // Se for elemento <img>, adiciona o src
+                if ($element->nodeName === 'img') {
+                    $element->setAttribute('src', $base64);
+                }
+                // Se for <div> ou outro elemento, adiciona background-image via style
+                else {
+                    $style = $element->getAttribute('style') ?: '';
+                    
+                    // Remove background-image existente, se houver
+                    $style = preg_replace('/background-image\s*:\s*[^;]+;?/', '', $style);
+                    
+                    // Adiciona o novo background-image
+                    $style .= (strlen($style) > 0 && substr($style, -1) !== ';') ? '; ' : '';
+                    $style .= "background-image: url('{$base64}'); background-size: contain; background-repeat: no-repeat; background-position: center;";
+                    
+                    $element->setAttribute('style', $style);
+                }
+            }
+            
+        } catch (\Exception $e) {
+            Log::error('Erro ao processar imagem do dia da semana:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
     }
 
     /**
@@ -649,5 +819,22 @@ class CredentialPrintService
         
         Log::warning('Não foi possível encontrar dimensões de altura no HTML');
         return null;
+    }
+
+    /**
+     * Substitui marcadores no template
+     *
+     * @param string $html Conteúdo do template
+     * @param array $data Dados para substituição
+     * @return string Template com marcadores substituídos
+     */
+    private function replaceMarkers(string $html, array $data): string
+    {
+        // Substitui marcadores básicos
+        foreach ($data as $key => $value) {
+            $html = str_replace("{{$key}}", $value, $html);
+        }
+        
+        return $html;
     }
 } 
