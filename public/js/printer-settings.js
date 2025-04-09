@@ -37,8 +37,6 @@ document.addEventListener('alpine:init', () => {
             colorType: 'grayscale'
         },
 
-        dpi: 96,
-
         async init() {
             this.loading = true;
             
@@ -427,7 +425,6 @@ document.addEventListener('alpine:init', () => {
                         ignoreTransparency: this.printParams.ignoreTransparency,
                         colorType: this.printParams.colorType
                     },
-                    dpi: parseInt(this.dpi) || 96,
                 };
 
                 console.log('Configuração a ser salva:', config);
