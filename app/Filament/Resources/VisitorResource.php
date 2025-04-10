@@ -43,6 +43,7 @@ use Illuminate\Support\Facades\Log;
 use Filament\Support\Facades\FilamentView;
 use Filament\Notifications\Actions\Action as NotificationAction;
 use Illuminate\Database\Eloquent\Model;
+use App\Services\OccurrenceService;
 
 class VisitorResource extends Resource
 {
@@ -276,9 +277,10 @@ class VisitorResource extends Resource
                                             
                                             // Determina a cor baseada na severidade
                                             $notificationType = match ($restriction->severity_level) {
-                                                'low' => 'success',
-                                                'medium' => 'warning',
-                                                'high' => 'danger',
+                                                'none' => 'info',
+                                                'baixa' => 'success',
+                                                'média' => 'warning',
+                                                'alta' => 'danger',
                                                 default => 'warning',
                                             };
                                             
@@ -340,10 +342,10 @@ class VisitorResource extends Resource
                             ->tel()
                             ->telRegex('/.*/')  // Aceita qualquer formato de telefone
                             ->mask(RawJs::make(<<<'JS'
-                                '99 (99) 99-999-9999'
+                                '(99) 99-999-9999'
                             JS))
-                            ->default('55 (21) ')
-                            ->placeholder('55 (21) 99-999-9999')
+                            ->default('')
+                            ->placeholder('(21) 99-999-9999')
                             ->disabled($hasActiveVisit),
                             
                         Grid::make(3)
@@ -626,6 +628,7 @@ class VisitorResource extends Resource
                         ->modalSubmitActionLabel('Sim, registrar saída')
                         ->action(function (Collection $records) {
                             $count = 0;
+                            $occurrenceService = new \App\Services\OccurrenceService();
                             
                             foreach ($records as $visitor) {
                                 $lastLog = $visitor->visitorLogs()
@@ -635,6 +638,10 @@ class VisitorResource extends Resource
 
                                 if ($lastLog) {
                                     $lastLog->update(['out_date' => now()]);
+                                    
+                                    // Registra ocorrência se necessário
+                                    $occurrenceService->registerExitOccurrence($visitor, $lastLog);
+                                    
                                     $count++;
                                 }
                             }

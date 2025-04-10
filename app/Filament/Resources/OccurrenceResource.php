@@ -69,11 +69,18 @@ class OccurrenceResource extends Resource
                             ])
                             ->required()
                             ->default('gray')
+                            ->disabled(fn (Get $get, $record) => $record && !$record->is_editable)
+                            ->helperText(fn (Get $get, $record) => 
+                                $record && !$record->is_editable 
+                                    ? 'A severidade não pode ser alterada nesta ocorrência.'
+                                    : null
+                            )
                             ->reactive(),
                             
                         Textarea::make('description')
                             ->label('Descrição da Ocorrência')
                             ->required()
+                            ->disabled(fn (Get $get, $record) => $record && !$record->is_editable)
                             ->columnSpan(2)
                             ->rows(5),
                     ])
@@ -81,6 +88,7 @@ class OccurrenceResource extends Resource
                     
                 Section::make('Vínculos (Opcional)')
                     ->description('Vincule visitantes e/ou destinos relacionados a esta ocorrência')
+                    ->disabled(fn (Get $get, $record) => $record && !$record->is_editable)
                     ->schema([
                         Select::make('visitors')
                             ->label('Visitantes Relacionados')
@@ -130,24 +138,30 @@ class OccurrenceResource extends Resource
                     ->tooltip(fn (Occurrence $record): string => $record->description)
                     ->searchable(),
                     
-                Tables\Columns\BadgeColumn::make('severity')
+                Tables\Columns\TextColumn::make('severity')
                     ->label('Severidade')
                     ->formatStateUsing(fn (string $state): string => Occurrence::SEVERITY_LEVELS[$state] ?? $state)
-                    ->colors([
-                        'success' => 'green',
-                        'warning' => 'amber',
-                        'danger' => 'red',
-                    ]),
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'green' => 'success',
+                        'amber' => 'warning',
+                        'red' => 'danger',
+                        default => 'gray',
+                    }),
                     
                 TextColumn::make('creator.name')
                     ->label('Registrado por')
                     ->sortable(),
                     
-                TextColumn::make('visitors.name')
+                TextColumn::make('visitors')
                     ->label('Visitantes')
-                    ->listWithLineBreaks()
-                    ->limitList(3)
-                    ->expandableLimitedList(),
+                    ->formatStateUsing(function ($state, $record) {
+                        if ($record->visitors->isEmpty()) {
+                            return 'N/A';
+                        }
+                        return $record->visitors->pluck('name')->join(', ');
+                    })
+                    ->html(),
                     
                 TextColumn::make('destinations.name')
                     ->label('Destinos')

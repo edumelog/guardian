@@ -29,6 +29,11 @@ use App\Models\Destination;
 use App\Models\DocType;
 use App\Models\Occurrence;
 use App\Models\VisitorLog;
+use App\Services\PredictiveRestrictionService;
+use Filament\Forms\Components\Component;
+use Illuminate\Support\Facades\Storage;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use App\Services\OccurrenceService;
 
 class CreateVisitor extends CreateRecord
 {
@@ -40,6 +45,11 @@ class CreateVisitor extends CreateRecord
     public $visitorRestrictions = []; // Array para armazenar todas as restrições aplicáveis
     public $activeRestriction = null; // Armazena a restrição ativa principal
     public $authorization_granted = false; // Nova propriedade para controlar autorização
+
+    /**
+     * Array para armazenar IDs de ocorrências que precisam ser vinculadas ao visitante após a criação
+     */
+    protected array $pendingOccurrenceIds = [];
 
     public function mount(): void
     {
@@ -102,11 +112,11 @@ class CreateVisitor extends CreateRecord
                                 }
                                 
                                 $severityText = match ($maxSeverity) {
-                                    'none' => 'Nenhuma',
+                                    'none' => 'Nenhuma (Apenas Informativa)',
                                     'low' => 'Baixa',
                                     'medium' => 'Média',
                                     'high' => 'Alta',
-                                    default => 'Nenhuma',
+                                    default => 'Nenhuma (Apenas Informativa)',
                                 };
                                 
                                 $colorClass = match ($maxSeverity) {
@@ -172,7 +182,7 @@ class CreateVisitor extends CreateRecord
                                         <div class='flex justify-between items-start'>
                                             <h3 class='font-bold {$severityClass}'>Restrição #" . ($index + 1) . " ({$restrictionType})</h3>
                                             <span class='font-medium {$severityClass}'>" . match ($restriction->severity_level) {
-                                                'none' => 'Severidade: Nenhuma',
+                                                'none' => 'Severidade: Nenhuma (Apenas Informativa)',
                                                 'low' => 'Severidade: Baixa',
                                                 'medium' => 'Severidade: Média',
                                                 'high' => 'Severidade: Alta',
@@ -180,7 +190,7 @@ class CreateVisitor extends CreateRecord
                                             } . "</span>
                                         </div>
                                         <p class='my-2 {$severityClass}'>{$restriction->reason}</p>
-                                        <div class='flex flex-col sm:flex-row sm:gap-4 text-sm'>
+                                        <div class='flex flex-col gap-2 text-sm'>
                                             <p>{$expirationInfo}</p>" .
                                             (isset($restriction->match_reason) && $restriction->match_reason 
                                                 ? "<p><span class='font-medium'>Correspondência:</span> {$restriction->match_reason}</p>" 
@@ -417,10 +427,10 @@ class CreateVisitor extends CreateRecord
                                     ->tel()
                                     ->telRegex('/.*/')  // Aceita qualquer formato de telefone
                                     ->mask(RawJs::make(<<<'JS'
-                                        '99 (99) 99-999-9999'
+                                        '(99) 99-999-9999'
                                     JS))
-                                    ->default('55 (21) ')
-                                    ->placeholder('55 (21) 99-999-9999')
+                                    ->default('')
+                                    ->placeholder('(21) 99-999-9999')
                                     ->visible(fn (Get $get): bool => $this->showAllFields)
                                     ->columnSpan(1),
                             ]),
@@ -607,26 +617,19 @@ class CreateVisitor extends CreateRecord
     {
         // Sempre mostra o botão de criar com impressão e o botão cancelar
         // O botão de criar com impressão só aparece habillitado se não houver restrição, se a restrição for do tipo none ou se já foi autorizada
-        
-        // Tem que dar true para que o botão seja desabilitado
-        // dd(($this->activeRestriction !== null && $this->activeRestriction->severity_level !== 'none' && !$this->authorization_granted)); // true
-        // dd($this->activeRestriction !== null); // true
-        // dd($this->activeRestriction->severity_level); // none
         return [
             $this->getCreateFormAction()
                 ->label('Salvar dados do Visitante')
                 ->color('success')
                 ->icon('heroicon-o-printer')
                 ->visible(fn () => true) // Sempre visível
-                // ->disabled(fn() => ($this->activeRestriction !== null && !$this->authorization_granted) || !$this->showAllFields)
                 ->disabled(fn() => ($this->activeRestriction !== null && $this->activeRestriction->severity_level !== 'none' && !$this->authorization_granted) || !$this->showAllFields)
                 ->action(function () {
-                    // Verifica se há visita em andamento
+                    // Verifica se há visita em andamento para visitantes existentes
                     $formData = $this->form->getState();
                     
                     $visitor = \App\Models\Visitor::where('doc', $formData['doc'] ?? null)
                         ->where('doc_type_id', $formData['doc_type_id'] ?? null)
-                        ->with(['docType', 'activeRestrictions'])
                         ->first();
 
                     if ($visitor) {
@@ -639,21 +642,14 @@ class CreateVisitor extends CreateRecord
                                 ->warning()
                                 ->title('Visita em Andamento')
                                 ->body("Este visitante já possui uma visita em andamento.")
-                                // ->persistent()
                                 ->send();
                             return;
                         }
                     }
 
-                    // Verifica restrições parciais antes de salvar
-                    $this->checkPredictiveRestrictions($formData);
-                    
-                    // Se não houver restrições parciais, ou se a restrição for de severidade 'none', ou se já foi autorizada, cria o visitante
-                    if (!$this->activeRestriction || 
-                        $this->activeRestriction->severity_level === 'none' || 
-                        $this->authorization_granted) {
-                        $this->create();
-                    }
+                    // As verificações de restrições (comuns e preditivas) serão feitas no mutateFormDataBeforeCreate
+                    // que será chamado durante a execução do método create()
+                    $this->create();
                 }),
 
             Actions\Action::make('authorize_restriction')
@@ -799,6 +795,74 @@ class CreateVisitor extends CreateRecord
                     // Se chegou até aqui, tem permissão
                     $this->authorization_granted = true;
                     
+                    // Armazena dados do autorizador para a ocorrência
+                    $authorizerData = [
+                        'authorizer_name' => $user->name,
+                        'authorizer_email' => $user->email,
+                    ];
+                    
+                    // Registra uma ocorrência se auto_occurrence estiver habilitado
+                    $occurrenceService = new \App\Services\OccurrenceService();
+                    
+                    // Acessa os dados diretamente das propriedades da classe
+                    // (o que já estiver disponível no momento da autorização)
+                    $formData = $this->form->getState();
+                    
+                    // Adiciona dados do autorizador ao formData
+                    $formData = array_merge($formData, $authorizerData);
+                    
+                    // Obtém os dados diretamente dos componentes
+                    foreach ($this->form->getFlatComponents() as $component) {
+                        if (method_exists($component, 'getName') && method_exists($component, 'getState')) {
+                            $name = $component->getName();
+                            $value = $component->getState();
+                            if ($name && $value && !isset($formData[$name])) {
+                                $formData[$name] = $value;
+                            }
+                        }
+                    }
+                    
+                    // Busca valores de todos os inputs disponíveis no $_POST
+                    foreach ($_POST as $key => $value) {
+                        if (strpos($key, 'data.') === 0) {
+                            $fieldName = str_replace('data.', '', $key);
+                            if (!isset($formData[$fieldName]) && !empty($value)) {
+                                $formData[$fieldName] = $value;
+                            }
+                        }
+                    }
+                    
+                    // Log para depuração
+                    \Illuminate\Support\Facades\Log::info('Dados completos do formulário para ocorrência', [
+                        'formData' => $formData,
+                        'rawPost' => $_POST
+                    ]);
+                    
+                    // Busca o visitante novamente se existir
+                    $visitor = null;
+                    $doc = $formData['doc'] ?? null;
+                    $docTypeId = $formData['doc_type_id'] ?? null;
+                    
+                    if (!empty($doc) && !empty($docTypeId)) {
+                        $visitor = \App\Models\Visitor::where('doc', $doc)
+                            ->where('doc_type_id', $docTypeId)
+                            ->first();
+                    }
+                    
+                    // Busca o destino se estiver definido
+                    $destination = null;
+                    $destinationId = $formData['destination_id'] ?? null;
+                    if (!empty($destinationId)) {
+                        $destination = \App\Models\Destination::find($destinationId);
+                    }
+                    
+                    $occurrenceService->registerAuthorizationOccurrence(
+                        $visitor,
+                        $formData,
+                        $this->visitorRestrictions,
+                        $destination
+                    );
+                    
                     \Filament\Notifications\Notification::make()
                         ->success()
                         ->title('Autorização Concedida')
@@ -904,146 +968,6 @@ class CreateVisitor extends CreateRecord
             return;
         }
 
-        // Verifica se o visitante possui restrições ativas
-        \Illuminate\Support\Facades\Log::info('CreateVisitor: Verificando restrições para visitante', [
-            'visitor_id' => $visitor->id,
-            'doc' => $visitor->doc,
-            'name' => $visitor->name,
-        ]);
-
-        // Verifica restrições usando o relacionamento
-        $activeRestrictions = $visitor->activeRestrictions()->get();
-
-        \Illuminate\Support\Facades\Log::info('CreateVisitor: Resultado da consulta de restrições', [
-            'visitor_id' => $visitor->id,
-            'count' => $activeRestrictions->count(),
-            'restrições' => $activeRestrictions->toArray(),
-        ]);
-        // Achou restrições ativas
-        if ($visitor->hasActiveRestrictions() || $activeRestrictions->count() > 0) {
-            // Limpa o array de restrições
-            $this->visitorRestrictions = [];
-            
-            // Adiciona todas as restrições ativas ao array
-            foreach ($activeRestrictions as $restriction) {
-                // Converte a restrição para um formato padrão de objeto
-                $restrictionArray = $restriction->toArray();
-                $restrictionArray['is_predictive'] = false;
-                $restrictionArray['restriction_type'] = 'Restrição Comum';
-                $restrictionObj = (object)$restrictionArray;
-                
-                // Adiciona ao array de restrições
-                $this->visitorRestrictions[] = $restrictionObj;
-                
-                \Illuminate\Support\Facades\Log::info('Restrição comum adicionada ao array', [
-                    'id' => $restrictionObj->id,
-                    'tipo' => 'Comum',
-                    'reason' => $restrictionObj->reason,
-                    'severity' => $restrictionObj->severity_level
-                ]);
-                
-                // Log informando que a restrição comum foi encontrada e poderá gerar uma Ocorrência Automática
-                \Illuminate\Support\Facades\Log::warning('[Ocorrência Automática - VisitorResource]', [
-                    'restriction_id' => $restriction->id,
-                    'visitor_id' => $visitor->id,
-                    'visitor_doc' => $visitor->doc,
-                    'visitor_name' => $visitor->name,
-                    'visitor_phone' => $visitor->phone ?? 'N/A',
-                    'operator_name' => Auth::user()->name,
-                    'operator_email' => Auth::user()->email,
-                    'date_time' => now()->format('d/m/Y H:i:s'),
-                    'occurrence_key' => 'common_visitor_restriction',
-                    'occurrence_title' => 'Restrição de Acesso Comum Detectada',
-                    'occurrence_description' => 'Tentativa de cadastro de visitante com Restrição de Acesso Comum',
-                    'occurrence_severity_level' => $restriction->severity_level,
-                    'occurrence_expires_at_formatted' => $restriction->expires_at ? $restriction->expires_at->format('d/m/Y') : 'Nunca',
-                    'occurrence_reason' => $restriction->reason,
-                ]);
-                
-                // Verifica se a ocorrência automática está habilitada para Restrição Comum
-                $automaticOccurrence = \App\Models\AutomaticOccurrence::where('key', 'common_visitor_restriction')->first();
-                
-                // Registra a ocorrência apenas se estiver habilitada
-                if ($automaticOccurrence && $automaticOccurrence->enabled) {
-                    // Registrar a ocorrência automática
-                    $docTypeName = \App\Models\DocType::find($visitor->doc_type_id)?->type ?? 'Desconhecido';
-                    
-                    $description = "Tentativa de cadastro de visitante com Restrição de Acesso Comum:
-
-                                    Dados do visitante:
-                                    Nome: " . $visitor->name . "
-                                    Documento: " . $visitor->doc . " (" . $docTypeName . ")
-                                    Telefone: " . ($visitor->phone ?? 'N/A') . "
-
-                                    Detalhes da restrição:
-                                    Motivo: " . $restriction->reason . "
-                                    Severidade: " . $restriction->severity_level . "
-                                    Operador: " . Auth::user()->name . " - " . Auth::user()->email . "
-                                    OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitantes.";
-
-                    $occurrence = \App\Models\Occurrence::create([
-                        'description' => $description,
-                        'severity' => match ($restriction->severity_level) {
-                            'none' => 'gray',
-                            'low' => 'green',
-                            'medium' => 'amber',
-                            'high', 'critical' => 'red',
-                            default => 'gray',
-                        },
-                        'occurrence_datetime' => now(),
-                        'created_by' => Auth::id(),
-                        'updated_by' => null,
-                    ]);
-                    
-                    // Vincular o visitante à ocorrência
-                    $occurrence->visitors()->attach($visitor->id);
-                    
-                    // Vincular o destino à ocorrência (se existir)
-                    if (!empty($formData['destination_id'])) {
-                        $occurrence->destinations()->attach($formData['destination_id']);
-                    }
-                    
-                    \Illuminate\Support\Facades\Log::info('[Ocorrência Automática - VisitorResource] Ocorrência registrada com sucesso', [
-                        'key' => 'common_visitor_restriction',
-                        'occurrence_id' => $occurrence->id,
-                        'visitor_id' => $visitor->id
-                    ]);
-                } else {
-                    \Illuminate\Support\Facades\Log::info('[Ocorrência Automática - VisitorResource] Ocorrência automática desabilitada', [
-                        'key' => 'common_visitor_restriction',
-                        'enabled' => $automaticOccurrence ? $automaticOccurrence->enabled : false
-                    ]);
-                }
-            }
-            
-            // Se encontrou restrições, define a mais crítica como principal para compatibilidade
-            if (count($this->visitorRestrictions) > 0) {
-                // Obtém a restrição mais crítica para compatibilidade
-            $restriction = $visitor->getMostCriticalRestrictionAttribute();
-            
-            if (!$restriction && $activeRestrictions->count() > 0) {
-                $restriction = $activeRestrictions->first();
-            }
-            
-            if ($restriction) {
-                    // Converte para objeto padrão
-                    $restrictionArray = $restriction->toArray();
-                    $restrictionArray['is_predictive'] = false;
-                    $restrictionArray['restriction_type'] = 'Restrição Comum';
-                    $restrictionObj = (object)$restrictionArray;
-                    
-                    // Mantém compatibilidade com código existente
-                    $this->activeRestriction = $restrictionObj;
-                    
-                    \Illuminate\Support\Facades\Log::info('Restrição principal definida para compatibilidade', [
-                        'id' => $restrictionObj->id,
-                        'count_total' => count($this->visitorRestrictions),
-                        'tipo' => 'Comum'
-                    ]);
-                }
-            }
-        }
-
         // Verifica se há uma visita em andamento
         $lastVisit = $visitor->visitorLogs()
             ->latest('in_date')
@@ -1054,7 +978,6 @@ class CreateVisitor extends CreateRecord
                 ->warning()
                 ->title('Visita em Andamento')
                 ->body("Este visitante já possui uma visita em andamento no local: {$lastVisit->destination->name}")
-                // ->persistent()
                 ->actions([
                     \Filament\Notifications\Actions\Action::make('view')
                         ->label('Ver Detalhes')
@@ -1163,26 +1086,6 @@ class CreateVisitor extends CreateRecord
             return $data;
         }
 
-        // Verifica restrições parciais (garantindo que seja verificado aqui também)
-        if (!$this->activeRestriction) {
-            \Illuminate\Support\Facades\Log::info('CreateVisitor: Verificando restrições preditivas no mutateFormDataBeforeCreate');
-            $this->checkPredictiveRestrictions($formData);
-            
-            // Se encontrou uma restrição e não está autorizada, interrompe o processo
-            if ($this->activeRestriction && !$this->authorization_granted) {
-                \Illuminate\Support\Facades\Log::warning('CreateVisitor: Restrição preditiva encontrada e não autorizada - interrompendo criação');
-                
-                Notification::make()
-                    ->warning()
-                    ->title('Restrição Detectada')
-                    ->body('Este visitante possui uma restrição que precisa ser autorizada antes de prosseguir.')
-                    ->send();
-                    
-                $this->halt();
-                return $data;
-            }
-        }
-
         // Verifica se o destino está ativo
         $destination = \App\Models\Destination::find($destinationId);
         if (!$destination || !$destination->is_active) {
@@ -1203,23 +1106,351 @@ class CreateVisitor extends CreateRecord
                     ->danger()
                     ->title('Limite de visitantes atingido')
                     ->body("O destino {$destination->name} atingiu o limite de {$destination->max_visitors} visitantes.")
-                    // ->persistent()
                     ->send();
                 $this->halt();
                 return $data;
             }
         }
 
+        // Encontra o visitante se já existir
         $visitor = \App\Models\Visitor::where('doc', $doc)
             ->where('doc_type_id', $docTypeId)
+            ->with(['docType', 'activeRestrictions'])
             ->first();
 
+        // Limpar as restrições existentes antes de verificar novamente
+        $this->visitorRestrictions = [];
+        $this->activeRestriction = null;
+        
+        // 1. VERIFICAR RESTRIÇÕES COMUNS SE O VISITANTE JÁ EXISTE
         if ($visitor) {
-            // Se o visitante existe, atualiza apenas as informações que devem ser atualizáveis
+            \Illuminate\Support\Facades\Log::info('CreateVisitor: Verificando restrições comuns para visitante existente', [
+                'visitor_id' => $visitor->id,
+                'doc' => $visitor->doc,
+                'name' => $visitor->name,
+            ]);
+
+            // Verifica restrições usando o relacionamento
+            $activeRestrictions = $visitor->activeRestrictions()->get();
+
+            \Illuminate\Support\Facades\Log::info('CreateVisitor: Resultado da consulta de restrições comuns', [
+                'visitor_id' => $visitor->id,
+                'count' => $activeRestrictions->count(),
+                'restrições' => $activeRestrictions->toArray(),
+            ]);
+            
+            // Achou restrições ativas
+            if ($visitor->hasActiveRestrictions() || $activeRestrictions->count() > 0) {
+                // Adiciona todas as restrições ativas ao array
+                foreach ($activeRestrictions as $restriction) {
+                    // Converte a restrição para um formato padrão de objeto
+                    $restrictionArray = $restriction instanceof \Illuminate\Database\Eloquent\Model 
+                        ? $restriction->toArray() 
+                        : (array)$restriction;
+                    $restrictionArray['is_predictive'] = false;
+                    $restrictionArray['restriction_type'] = 'Restrição Comum';
+                    $restrictionObj = (object)$restrictionArray;
+                    
+                    // Adiciona ao array de restrições
+                    $this->visitorRestrictions[] = $restrictionObj;
+                    
+                    \Illuminate\Support\Facades\Log::info('Restrição comum adicionada ao array durante o save', [
+                        'id' => $restrictionObj->id,
+                        'tipo' => 'Comum',
+                        'reason' => $restrictionObj->reason,
+                        'severity' => $restrictionObj->severity_level
+                    ]);
+                    
+                    // Log informando que a restrição comum foi encontrada e poderá gerar uma Ocorrência Automática
+                    \Illuminate\Support\Facades\Log::warning('[Ocorrência Automática - VisitorResource]', [
+                        'restriction_id' => $restriction->id,
+                        'visitor_id' => $visitor->id,
+                        'visitor_doc' => $visitor->doc,
+                        'visitor_name' => $visitor->name,
+                        'visitor_phone' => $visitor->phone ?? 'N/A',
+                        'operator_name' => Auth::user()->name,
+                        'operator_email' => Auth::user()->email,
+                        'date_time' => now()->format('d/m/Y H:i:s'),
+                        'occurrence_key' => 'common_visitor_restriction',
+                        'occurrence_title' => 'Restrição de Acesso Comum Detectada',
+                        'occurrence_description' => 'Cadastro de visitante com Restrição de Acesso Comum',
+                        'occurrence_severity_level' => $restriction->severity_level,
+                        'occurrence_expires_at_formatted' => $restriction->expires_at ? $restriction->expires_at->format('d/m/Y') : 'Nunca',
+                        'occurrence_reason' => $restriction->reason,
+                    ]);
+                    
+                    // Verifica se a restrição está configurada para gerar ocorrência automática
+                    // Registra a ocorrência apenas se auto_occurrence estiver habilitado na restrição
+                    if ($restriction->auto_occurrence && !$this->authorization_granted) {
+                        // Registrar a ocorrência automática
+                        $docTypeName = \App\Models\DocType::find($visitor->doc_type_id)?->type ?? 'Desconhecido';
+                        
+                        $description = "Cadastro de visitante com Restrição de Acesso Comum:
+
+Dados do visitante:
+Nome: " . $visitor->name . "
+Documento: " . $visitor->doc . " (" . $docTypeName . ")
+Telefone: " . ($visitor->phone ?? 'N/A') . "
+Destino: " . ($destination ? $destination->name : 'Não informado') . "
+
+Detalhes da restrição:
+Motivo: " . $restriction->reason . "
+Severidade: " . $restriction->severity_level . "
+Operador: " . Auth::user()->name . " - " . Auth::user()->email . "
+OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitantes.";
+
+                        $occurrence = \App\Models\Occurrence::create([
+                            'description' => $description,
+                            'severity' => match ($restriction->severity_level) {
+                                'none' => 'gray',
+                                'low' => 'green',
+                                'medium' => 'amber',
+                                'high' => 'red',
+                                default => 'gray',
+                            },
+                            'occurrence_datetime' => now(),
+                            'created_by' => Auth::id(),
+                            'updated_by' => null,
+                            'is_editable' => false,
+                        ]);
+                        
+                        // Vincular o visitante à ocorrência
+                        $occurrence->visitors()->attach($visitor->id);
+                        
+                        // Vincular o destino à ocorrência (se existir)
+                        if ($destinationId) {
+                            $occurrence->destinations()->attach($destinationId);
+                        }
+                        
+                        \Illuminate\Support\Facades\Log::info('[Ocorrência Automática - VisitorResource] Ocorrência registrada com sucesso', [
+                            'key' => 'common_visitor_restriction',
+                            'occurrence_id' => $occurrence->id,
+                            'visitor_id' => $visitor->id
+                        ]);
+                    } else {
+                        \Illuminate\Support\Facades\Log::info('[Ocorrência Automática - VisitorResource] Ocorrência automática desabilitada na restrição', [
+                            'restriction_id' => $restriction->id,
+                            'auto_occurrence' => false
+                        ]);
+                    }
+                }
+                
+                // Se encontrou restrições, define a mais crítica como principal para compatibilidade
+                if (count($this->visitorRestrictions) > 0) {
+                    // Obtém a restrição mais crítica para compatibilidade
+                    $restriction = $visitor->getMostCriticalRestrictionAttribute();
+                
+                    if (!$restriction && $activeRestrictions->count() > 0) {
+                        $restriction = $activeRestrictions->first();
+                    }
+                
+                    if ($restriction) {
+                        // Converte para objeto padrão
+                        $restrictionArray = $restriction instanceof \Illuminate\Database\Eloquent\Model 
+                            ? $restriction->toArray() 
+                            : (array)$restriction;
+                        $restrictionArray['is_predictive'] = false;
+                        $restrictionArray['restriction_type'] = 'Restrição Comum';
+                        $restrictionObj = (object)$restrictionArray;
+                        
+                        // Mantém compatibilidade com código existente
+                        $this->activeRestriction = $restrictionObj;
+                        
+                        \Illuminate\Support\Facades\Log::info('Restrição principal definida para compatibilidade', [
+                            'id' => $restrictionObj->id,
+                            'count_total' => count($this->visitorRestrictions),
+                            'tipo' => 'Comum'
+                        ]);
+                    }
+                }
+            }
+            
+            // Verifica se há uma visita em andamento
+            $lastVisit = $visitor->visitorLogs()
+                ->latest('in_date')
+                ->first();
+
+            if ($lastVisit && $lastVisit->out_date === null) {
+                \Filament\Notifications\Notification::make()
+                    ->warning()
+                    ->title('Visita em Andamento')
+                    ->body("Este visitante já possui uma visita em andamento no local: {$lastVisit->destination->name}")
+                    ->actions([
+                        \Filament\Notifications\Actions\Action::make('view')
+                            ->label('Ver Detalhes')
+                            ->url(route('filament.dashboard.resources.visitors.edit', $visitor))
+                            ->button(),
+                    ])
+                    ->send();
+                $this->halt();
+                return $data;
+            }
+        }
+        
+        // 2. VERIFICAR RESTRIÇÕES PREDITIVAS PARA TODOS OS VISITANTES
+        \Illuminate\Support\Facades\Log::info('CreateVisitor: Verificando restrições preditivas no momento do save', [
+            'name' => $formData['name'] ?? null,
+            'doc' => $doc,
+            'doc_type_id' => $docTypeId,
+            'destination_id' => $destinationId
+        ]);
+        
+        // Usa o serviço para verificar restrições preditivas
+        $predictiveService = new \App\Services\PredictiveRestrictionService();
+        $matchedRestrictions = $predictiveService->checkRestrictions($formData);
+        
+        if (!empty($matchedRestrictions)) {
+            \Illuminate\Support\Facades\Log::info('CreateVisitor: Restrições preditivas encontradas no momento do save', [
+                'total' => count($matchedRestrictions)
+            ]);
+            
+            // Adiciona cada restrição encontrada ao array
+            foreach ($matchedRestrictions as $restrictionObj) {
+                // Adiciona ao array de restrições
+                $this->visitorRestrictions[] = $restrictionObj;
+                
+                // Mantém a compatibilidade com o código existente (principal restrição)
+                if ($this->activeRestriction === null || 
+                    $this->getSeverityLevel($restrictionObj->severity_level) > $this->getSeverityLevel($this->activeRestriction->severity_level)) {
+                    $this->activeRestriction = $restrictionObj;
+                }
+                
+                \Illuminate\Support\Facades\Log::info('Restrição preditiva adicionada ao array durante o save', [
+                    'id' => $restrictionObj->id,
+                    'tipo' => 'Preditiva',
+                    'reason' => $restrictionObj->reason,
+                    'severity' => $restrictionObj->severity_level,
+                    'count_total' => count($this->visitorRestrictions)
+                ]);
+                
+                // Log informando que a restrição preditiva foi encontrada e poderá gerar uma Ocorrência Automática
+                \Illuminate\Support\Facades\Log::warning('[Ocorrência Automática - VisitorResource]', [
+                    'restriction_id' => $restrictionObj->id,
+                    'visitor_doc' => $formData['doc'] ?? 'N/A',
+                    'visitor_name' => $formData['name'] ?? 'N/A',
+                    'visitor_phone' => $formData['phone'] ?? 'N/A',
+                    'operator_name' => Auth::user()->name,
+                    'operator_email' => Auth::user()->email,
+                    'date_time' => now()->format('d/m/Y H:i:s'),
+                    'occurrence_key' => 'predictive_visitor_restriction',
+                    'occurrence_title' => 'Restrição de Acesso Preditiva Detectada',
+                    'occurrence_description' => 'Cadastro de visitante com Restrição de Acesso Preditiva',
+                    'occurrence_severity_level' => $restrictionObj->severity_level,
+                    'occurrence_reason' => $restrictionObj->reason,
+                    'occurrence_match_reason' => $restrictionObj->match_reason ?? 'N/A',
+                ]);
+                // Verifica se a restrição preditiva está configurada para gerar ocorrência automática
+                
+                // Registra a ocorrência apenas se auto_occurrence estiver habilitado
+                if ($restrictionObj->auto_occurrence && !$this->authorization_granted) {
+                    // Registrar a ocorrência automática
+                    $docTypeName = \App\Models\DocType::find($formData['doc_type_id'])?->type ?? 'Desconhecido';
+                    
+                    $description = "Cadastro de visitante com Restrição de Acesso Preditiva:
+
+Dados do visitante:
+Nome: " . ($formData['name'] ?? 'N/A') . "
+Documento: " . ($formData['doc'] ?? 'N/A') . " (" . $docTypeName . ")
+Telefone: " . ($formData['phone'] ?? 'N/A') . "
+Destino: " . ($destination ? $destination->name : 'Não informado') . "
+
+Detalhes da restrição:
+Motivo: " . $restrictionObj->reason . "
+Severidade: " . (\App\Models\PredictiveVisitorRestriction::SEVERITY_LEVELS[$restrictionObj->severity_level] ?? $restrictionObj->severity_level) . "
+Correspondência: " . ($restrictionObj->match_reason ?? 'N/A') . "
+Operador: " . Auth::user()->name . " - " . Auth::user()->email . "
+OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitantes.";
+
+                    $occurrence = \App\Models\Occurrence::create([
+                        'description' => $description,
+                        'severity' => match ($restrictionObj->severity_level) {
+                            'none' => 'gray',
+                            'low' => 'green',
+                            'medium' => 'amber',
+                            'high' => 'red',
+                            default => 'gray',
+                        },
+                        'occurrence_datetime' => now(),
+                        'created_by' => Auth::id(),
+                        'updated_by' => null,
+                        'is_editable' => false,
+                    ]);
+                    
+                    // Vincular o visitante à ocorrência (se já existir)
+                    if ($visitor) {
+                        $occurrence->visitors()->attach($visitor->id);
+                        
+                        // Log para verificar se o visitante foi associado corretamente
+                        \Illuminate\Support\Facades\Log::info('[Ocorrência Automática - VisitorResource] Vinculação de visitante à ocorrência', [
+                            'occurrence_id' => $occurrence->id,
+                            'visitor_id' => $visitor->id,
+                            'visitor_name' => $visitor->name
+                        ]);
+                    } else {
+                        // Se o visitante ainda não existe, armazenar temporariamente para vincular depois da criação
+                        $this->pendingOccurrenceIds[] = $occurrence->id;
+                        
+                        \Illuminate\Support\Facades\Log::info('[Ocorrência Automática - VisitorResource] Ocorrência pendente para vinculação após criar visitante', [
+                            'occurrence_id' => $occurrence->id,
+                            'pendingOccurrenceIds' => $this->pendingOccurrenceIds
+                        ]);
+                    }
+                    
+                    // Vincular o destino à ocorrência (se existir)
+                    if ($destinationId) {
+                        $occurrence->destinations()->attach($destinationId);
+                    }
+                    
+                    \Illuminate\Support\Facades\Log::info('[Ocorrência Automática - VisitorResource] Ocorrência preditiva registrada com sucesso', [
+                        'key' => 'predictive_visitor_restriction',
+                        'occurrence_id' => $occurrence->id,
+                        'visitor_id' => $visitor ? $visitor->id : null
+                    ]);
+                } else {
+                    \Illuminate\Support\Facades\Log::info('[Ocorrência Automática - VisitorResource] Ocorrência automática para restrição preditiva desabilitada', [
+                        'restriction_id' => $restrictionObj->id,
+                        'auto_occurrence' => false
+                    ]);
+                }
+            }
+            
+            // Notifica o usuário sobre a restrição preditiva
+            // if ($this->activeRestriction) {
+            //     \Filament\Notifications\Notification::make()
+            //         ->warning()
+            // }
+        }
+        
+        // 3. VERIFICAR AUTORIZAÇÃO E DECIDIR SE CONTINUA
+        // Se existem restrições e não foi autorizado, interrompe a criação
+        if ($this->activeRestriction && 
+            $this->activeRestriction->severity_level !== 'none' && 
+            !$this->authorization_granted) {
+            
+            \Illuminate\Support\Facades\Log::warning('CreateVisitor: Criação interrompida - restrição não autorizada', [
+                'severity' => $this->activeRestriction->severity_level,
+                'authorized' => $this->authorization_granted
+            ]);
+            
+            // Notifica o usuário que a ação foi interrompida
+            Notification::make()
+                ->warning()
+                ->title('Autorização Necessária')
+                ->body('Este visitante possui restrições que precisam ser autorizadas antes de prosseguir.')
+                ->send();
+                
+            $this->halt();
+            return $data;
+        }
+        
+        // Se chegou até aqui, as verificações foram bem-sucedidas ou as restrições foram autorizadas
+        
+        // Se o visitante já existe, atualiza apenas as informações permitidas
+        if ($visitor) {
+            // Atualiza o visitante existente
             $visitor->update([
-                'other' => $data['other'] ?? null,
                 'phone' => $data['phone'] ?? null,
-                'destination_id' => $data['destination_id']
+                'other' => $data['other'] ?? null,
             ]);
 
             $visitor->visitorLogs()->create([
@@ -1272,136 +1503,26 @@ class CreateVisitor extends CreateRecord
                 'operator_id' => Auth::id(),
             ]);
         }
+        
+        // Processa as ocorrências pendentes e vincula-as ao visitante recém-criado
+        if (!empty($this->pendingOccurrenceIds) && $this->record) {
+            foreach ($this->pendingOccurrenceIds as $occurrenceId) {
+                $occurrence = \App\Models\Occurrence::find($occurrenceId);
+                if ($occurrence) {
+                    $occurrence->visitors()->attach($this->record->id);
+                    \Illuminate\Support\Facades\Log::info('[Ocorrência Automática] Vinculando ocorrência pendente ao visitante', [
+                        'occurrence_id' => $occurrenceId,
+                        'visitor_id' => $this->record->id,
+                        'visitor_name' => $this->record->name
+                    ]);
+                }
+            }
+        }
 
         // Redireciona para a página de edição
         $this->redirect($this->getResource()::getUrl('edit', ['record' => $this->record]));
     }
 
-    /**
-     * Verifica se existem restrições comuns que se aplicam ao visitante
-     */
-    protected function checkPredictiveRestrictions(array $formData): void
-    {
-        // Se já há uma restrição específica de visitante, não precisa verificar mais
-        if ($this->activeRestriction !== null) {
-            \Illuminate\Support\Facades\Log::warning('CreateVisitor: Verificação de restrições interrompida - já existe uma restrição ativa', [
-                'current_restriction' => $this->activeRestriction
-            ]);
-            return;
-        }
-        
-        \Illuminate\Support\Facades\Log::info('CreateVisitor: Iniciando verificação de restrições comuns', [
-            'doc' => $formData['doc'] ?? null,
-            'name' => mb_strtoupper($formData['name'] ?? ''),
-            'phone' => $formData['phone'] ?? null,
-            'doc_type_id' => $formData['doc_type_id'] ?? null
-        ]);
-        
-        // Valores do visitante para comparação
-        $visitorDoc = $formData['doc'] ?? '';
-        $visitorName = mb_strtoupper($formData['name'] ?? '');
-        $visitorPhone = $formData['phone'] ?? '';
-        $visitorDocTypeId = $formData['doc_type_id'] ?? null;
-        
-        // Busca restrições comuns ativas associadas ao documento
-        $visitor = \App\Models\Visitor::where('doc', $visitorDoc)
-            ->where('doc_type_id', $visitorDocTypeId)
-            ->first();
-            
-        if (!$visitor) {
-            \Illuminate\Support\Facades\Log::info('CreateVisitor: Visitante não encontrado com este documento.');
-            return;
-        }
-            
-        $commonRestrictions = \App\Models\CommonVisitorRestriction::where('visitor_id', $visitor->id)
-            ->where('active', true)
-            ->where(function ($query) {
-                // Restrições sem data de expiração ou com data futura
-                $query->whereNull('expires_at')
-                    ->orWhere('expires_at', '>', now());
-            })
-            ->get();
-            
-        // Log da consulta
-        \Illuminate\Support\Facades\Log::info('CreateVisitor: Restrições comuns encontradas no banco', [
-            'total' => $commonRestrictions->count(),
-            'visitor_id' => $visitor->id,
-            'restricoes' => $commonRestrictions->map(function($r) {
-                return [
-                    'id' => $r->id,
-                    'reason' => $r->reason,
-                    'severity_level' => $r->severity_level,
-                    'expires_at' => $r->expires_at,
-                ];
-            })->toArray()
-        ]);
-            
-        if ($commonRestrictions->isEmpty()) {
-            \Illuminate\Support\Facades\Log::info('CreateVisitor: Nenhuma restrição comum ativa encontrada');
-            return;
-        }
-        
-        // Adiciona cada restrição encontrada ao array
-        foreach ($commonRestrictions as $restriction) {
-            // Criamos um objeto com os dados da restrição comum
-            $restrictionObj = (object) [
-                'id' => $restriction->id,
-                'reason' => $restriction->reason,
-                'severity_level' => $restriction->severity_level,
-                'expires_at' => $restriction->expires_at,
-                'restriction_type' => 'Restrição Comum',
-            ];
-            
-            // Adiciona ao array de restrições
-            $this->visitorRestrictions[] = $restrictionObj;
-            
-            // Mantém a compatibilidade com o código existente (principal restrição)
-            if ($this->activeRestriction === null || 
-                $this->getSeverityLevel($restriction->severity_level) > $this->getSeverityLevel($this->activeRestriction->severity_level)) {
-                $this->activeRestriction = $restrictionObj;
-            }
-            
-            \Illuminate\Support\Facades\Log::info('Restrição comum adicionada ao array', [
-                'id' => $restrictionObj->id,
-                'tipo' => 'Comum',
-                'reason' => $restrictionObj->reason,
-                'severity' => $restrictionObj->severity_level,
-                'count_total' => count($this->visitorRestrictions)
-            ]);
-            
-            // Log informando que a restrição comum foi encontrada
-            \Illuminate\Support\Facades\Log::warning('[Ocorrência Automática - VisitorResource]', [
-                'restriction_id' => $restriction->id,
-                'visitor_id' => $visitor->id,
-                'visitor_doc' => $visitor->doc,
-                'visitor_name' => $visitor->name,
-                'visitor_phone' => $visitor->phone ?? 'N/A',
-                'operator_name' => Auth::user()->name,
-                'operator_email' => Auth::user()->email,
-                'date_time' => now()->format('d/m/Y H:i:s'),
-                'occurrence_key' => 'common_visitor_restriction',
-                'occurrence_title' => 'Restrição de Acesso Comum Detectada',
-                'occurrence_description' => 'Registro de tentativa de cadastro de visitante que possui uma Restrição de Acesso Comum',
-                'occurrence_severity_level' => $restriction->severity_level,
-                'occurrence_expires_at_formatted' => $restriction->expires_at ? $restriction->expires_at->format('d/m/Y') : 'Nunca',
-                'occurrence_reason' => $restriction->reason,
-            ]);
-            
-            // Verifica se a ocorrência automática está habilitada
-            $automaticOccurrence = \App\Models\AutomaticOccurrence::where('key', 'common_visitor_restriction')->first();
-            
-            if ($automaticOccurrence && $automaticOccurrence->enabled) {
-                // Registra ocorrência automática - implementação mantida no método searchVisitor
-                \Illuminate\Support\Facades\Log::info('Ocorrência automática habilitada para restrições comuns');
-            } else {
-                \Illuminate\Support\Facades\Log::info('[Ocorrência Automática - VisitorResource] Ocorrência automática desabilitada', [
-                    'key' => 'common_visitor_restriction',
-                    'enabled' => $automaticOccurrence ? $automaticOccurrence->enabled : false
-                ]);
-            }
-        }
-    }
-    
     /**
      * Converte o nível de severidade para um valor numérico para comparação
      */
@@ -1411,7 +1532,6 @@ class CreateVisitor extends CreateRecord
             'low' => 1,
             'medium' => 2,
             'high' => 3,
-            'critical' => 4,
             default => 0,
         };
     }

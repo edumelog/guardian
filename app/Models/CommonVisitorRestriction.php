@@ -18,18 +18,20 @@ class CommonVisitorRestriction extends Model
         'created_by',
         'active',
         'expires_at',
+        'auto_occurrence',
     ];
 
     protected $casts = [
         'active' => 'boolean',
         'expires_at' => 'datetime',
+        'auto_occurrence' => 'boolean',
     ];
 
     /**
      * Níveis de severidade disponíveis
      */
     public const SEVERITY_LEVELS = [
-        'none' => 'Nenhuma',
+        'none' => 'Nenhuma (Apenas Informativa)',
         'low' => 'Baixa',
         'medium' => 'Média',
         'high' => 'Alta',

@@ -125,18 +125,6 @@ class CredentialPrintService
             // Processa o template substituindo os marcadores
             $html = $this->processTemplate($html, $data);
 
-            // Get the width and height of the html in pixels
-            $htmlWidth_px = $this->getHtmlWidth($html);
-            $htmlHeight_px = $this->getHtmlHeight($html);
-            Log::info('Dimensões do HTML:', [
-                'html_width_px' => $htmlWidth_px,
-                'html_height_px' => $htmlHeight_px
-            ]);
-
-            // Get all data from printerConfig stored at printerConfig['printOptions']
-            $printOptions = $printerConfig['printOptions'] ?? [];
-            $resolution = $printerConfig['dpi'] ?? 96;
-
             // Get the width and height of the paper size in mm
             $paperWidth_mm = $printerConfig['printOptions']['pageWidth'];
             $paperHeight_mm = $printerConfig['printOptions']['pageHeight'];
@@ -145,43 +133,10 @@ class CredentialPrintService
                 'paperHeight_mm' => $paperHeight_mm
             ]);
 
-            // Get the width and height of the paper size from mm to px
-            $paperWidth_px = $this->convertToPoints($paperWidth_mm, $resolution);
-            $paperHeight_px = $this->convertToPoints($paperHeight_mm, $resolution);
-
             // Obtém a orientação diretamente da raiz do printerConfig
             $orientation = $printerConfig['orientation'] ?? 'portrait';
             
-            // Obtém e converte a rotação para número, garantindo que seja 0 se não for válido
-            // $rotation = isset($printerConfig['rotation']) ? 
-            //     (is_numeric($printerConfig['rotation']) ? (float)$printerConfig['rotation'] : 0) : 
-            //     0;
-
-            Log::info('Configurações de impressão:', [
-                'orientation' => $orientation,
-                // 'rotation' => $rotation,
-                'margins' => $printOptions['margins'] ?? [
-                    'top' => 0,
-                    'right' => 0,
-                    'bottom' => 0,
-                    'left' => 0
-                ],
-                'print_options' => $printOptions,
-                'printer_config' => $printerConfig
-            ]);
             
-            // Calculate the scale factor based on the paper size and orientation.
-            $scaleFactor = 1;   
-            if ($orientation === 'portrait') {
-                $scaleFactor = $paperWidth_px / $htmlWidth_px;
-            } else {
-                $scaleFactor = $paperWidth_px / $htmlHeight_px*.98;
-            }
-            Log::info('Fator de escala:', [
-                'scale_factor' => $scaleFactor
-            ]);
-            
-
             // Obtém as configurações de impressão
             $printOptions = $printerConfig['printOptions'] ?? [];
             $margins_mm = $printOptions['margins'] ?? [
@@ -190,16 +145,11 @@ class CredentialPrintService
                 'bottom' => 0,
                 'left' => 0
             ];
-
-            $margins_px = [
-                'top' => $this->convertToPoints($margins_mm['top'], $resolution)*$scaleFactor,
-                'right' => $this->convertToPoints($margins_mm['right'], $resolution)*$scaleFactor,
-                'bottom' => $this->convertToPoints($margins_mm['bottom'], $resolution)*$scaleFactor,
-                'left' => $this->convertToPoints($margins_mm['left'], $resolution)*$scaleFactor
-            ];
-            Log::info('Margens em pixels:', [
-                'margins_px' => $margins_px,
-                'margins_mm' => $margins_mm
+            
+            Log::info('Configurações de impressão:', [
+                'orientation' => $orientation,
+                'margins' => $margins_mm,
+                'printer_config' => $printerConfig
             ]);
 
             try {
@@ -207,20 +157,16 @@ class CredentialPrintService
                 $pdf = Browsershot::html($html)
                     ->setNodeBinary('/usr/bin/node')
                     ->setChromePath('/opt/google/chrome/chrome')
-                    // ->paperSize($htmlWidth_px, $htmlHeight_px, 'px')
                     ->paperSize($paperWidth_mm, $paperHeight_mm, 'mm')
-                    ->margins($margins_px['top'], $margins_px['right'], $margins_px['bottom'], $margins_px['left'], 'px')
+                    ->margins($margins_mm['top'], $margins_mm['right'], $margins_mm['bottom'], $margins_mm['left'], 'mm')
                     ->showBackground()
-                    ->scale($scaleFactor)
-                    // ->scale(1)
+                    ->scale(1)
                     ->noSandbox()
                     ->deviceScaleFactor(3)
                     ->dismissDialogs()
                     ->waitUntilNetworkIdle()
                     // define the orientation according to orientation in printerConfig when using paperSize mm
                     ->landscape($orientation == 'landscape' || $orientation == 'reverse-landscape' ? true : false)
-                    // define the orientation according to orientation in printerConfig when using paperSize px
-                    // ->landscape($htmlWidth_px > $htmlHeight_px ? false : true)
                     ->base64pdf();
                     // save at public folder
                     // ->savePdf(public_path('teste_'.$orientation.'.pdf'));
@@ -236,9 +182,8 @@ class CredentialPrintService
                     'print_config' => [
                         'printer' => $printerConfig['printer'] ?? '',
                         'options' => [
-                            // 'margins' => $margins_mm,
+                            'margins' => $margins_mm,
                             'orientation' => $orientation,
-                            // 'rotation' => $rotation, 
                             'scaleContent' => true,
                             'rasterize' => true,
                             'interpolation' => 'bicubic',
@@ -297,6 +242,9 @@ class CredentialPrintService
         @$dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         $xpath = new \DOMXPath($dom);
 
+        // Processa os marcadores do dia da semana
+        $this->processWeekdayElements($dom, $xpath);
+
         // Procura por elementos com classes que começam com 'tpl-'
         $elements = $xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' tpl-')]");
 
@@ -308,6 +256,12 @@ class CredentialPrintService
             // Encontra a classe que começa com 'tpl-'
             $tplClass = collect($classes)->first(fn($class) => str_starts_with($class, 'tpl-'));
             if (!$tplClass) continue;
+            
+            // Pula o processamento de elementos com classe tpl-weekday-img ou tpl-weekday-txt
+            // porque já foram processados na etapa anterior
+            if ($tplClass === 'tpl-weekday-img' || $tplClass === 'tpl-weekday-txt') {
+                continue;
+            }
 
             // Remove o prefixo 'tpl-' para obter o nome do campo
             $field = substr($tplClass, 4);
@@ -351,6 +305,167 @@ class CredentialPrintService
         }
 
         return $dom->saveHTML();
+    }
+
+    /**
+     * Processa elementos com as classes tpl-weekday-img e tpl-weekday-txt
+     * 
+     * @param \DOMDocument $dom
+     * @param \DOMXPath $xpath
+     */
+    private function processWeekdayElements(\DOMDocument $dom, \DOMXPath $xpath): void
+    {
+        // Obtém o dia da semana atual (1-7, onde 1 é segunda-feira)
+        $weekday = date('N');
+        Log::info('Processando elementos do dia da semana:', [
+            'weekday' => $weekday,
+            'dia_nome' => date('l')
+        ]);
+
+        try {
+            // Busca o registro do dia da semana no banco
+            $weekdayModel = \App\Models\WeekDay::where('day_number', $weekday)->first();
+            
+            if (!$weekdayModel) {
+                Log::warning('Dia da semana não encontrado no banco de dados:', [
+                    'weekday' => $weekday,
+                    'dia_nome' => date('l')
+                ]);
+                return;
+            }
+            
+            // Processa os elementos de texto do dia da semana
+            $this->processWeekdayTextElements($dom, $xpath, $weekdayModel);
+            
+            // Processa os elementos de imagem do dia da semana (apenas se houver imagem)
+            if ($weekdayModel->image) {
+                $this->processWeekdayImageElements($dom, $xpath, $weekdayModel);
+            } else {
+                Log::info('Dia da semana não possui imagem cadastrada:', [
+                    'weekday' => $weekday,
+                    'dia_nome' => date('l')
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Erro ao processar elementos do dia da semana:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+    
+    /**
+     * Processa elementos com a classe tpl-weekday-txt, adicionando o texto do dia da semana
+     * 
+     * @param \DOMDocument $dom
+     * @param \DOMXPath $xpath
+     * @param \App\Models\WeekDay $weekdayModel
+     */
+    private function processWeekdayTextElements(\DOMDocument $dom, \DOMXPath $xpath, \App\Models\WeekDay $weekdayModel): void
+    {
+        // Busca por elementos com a classe tpl-weekday-txt
+        $elements = $xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' tpl-weekday-txt')]");
+        
+        if ($elements->length === 0) {
+            Log::info('Nenhum elemento com classe tpl-weekday-txt encontrado');
+            return;
+        }
+        
+        // Usa texto formatado ou o nome do dia em maiúsculas
+        $dayText = $weekdayModel->formatted_text ?? strtoupper($weekdayModel->day_name);
+        
+        Log::info('Elementos com classe tpl-weekday-txt encontrados:', [
+            'total' => $elements->length,
+            'texto' => $dayText
+        ]);
+        
+        foreach ($elements as $element) {
+            if (!$element instanceof \DOMElement) continue;
+            
+            // Remove conteúdo existente
+            while ($element->firstChild) {
+                $element->removeChild($element->firstChild);
+            }
+            
+            // Adiciona o texto do dia da semana
+            $element->appendChild($dom->createTextNode($dayText));
+        }
+    }
+    
+    /**
+     * Processa elementos com a classe tpl-weekday-img, adicionando a imagem do dia da semana
+     * 
+     * @param \DOMDocument $dom
+     * @param \DOMXPath $xpath
+     * @param \App\Models\WeekDay $weekdayModel
+     */
+    private function processWeekdayImageElements(\DOMDocument $dom, \DOMXPath $xpath, \App\Models\WeekDay $weekdayModel): void
+    {
+        // Busca por elementos com a classe tpl-weekday-img
+        $elements = $xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' tpl-weekday-img')]");
+        
+        if ($elements->length === 0) {
+            Log::info('Nenhum elemento com classe tpl-weekday-img encontrado');
+            return;
+        }
+        
+        // Primeiro tenta obter a imagem como base64
+        try {
+            // Tenta usar o caminho completo do Storage
+            $path = Storage::disk('public')->path($weekdayModel->image);
+            if (!file_exists($path)) {
+                // Tenta usar o caminho relativo ao storage/public
+                $path = public_path('storage/' . $weekdayModel->image);
+                if (!file_exists($path)) {
+                    Log::warning('Imagem do dia da semana não encontrada:', [
+                        'caminho_storage' => Storage::disk('public')->path($weekdayModel->image),
+                        'caminho_public' => public_path('storage/' . $weekdayModel->image),
+                        'imagem_atributo' => $weekdayModel->image
+                    ]);
+                    return;
+                }
+            }
+            
+            // Lê o conteúdo da imagem e converte para base64
+            $mime = mime_content_type($path);
+            $imageData = file_get_contents($path);
+            $base64 = 'data:' . $mime . ';base64,' . base64_encode($imageData);
+            
+            Log::info('Imagem do dia da semana convertida para base64:', [
+                'mime' => $mime,
+                'tamanho' => strlen($imageData),
+                'base64_tamanho' => strlen($base64)
+            ]);
+            
+            // Processa cada elemento encontrado
+            foreach ($elements as $element) {
+                if (!$element instanceof \DOMElement) continue;
+                
+                // Se for elemento <img>, adiciona o src
+                if ($element->nodeName === 'img') {
+                    $element->setAttribute('src', $base64);
+                }
+                // Se for <div> ou outro elemento, adiciona background-image via style
+                else {
+                    $style = $element->getAttribute('style') ?: '';
+                    
+                    // Remove background-image existente, se houver
+                    $style = preg_replace('/background-image\s*:\s*[^;]+;?/', '', $style);
+                    
+                    // Adiciona o novo background-image
+                    $style .= (strlen($style) > 0 && substr($style, -1) !== ';') ? '; ' : '';
+                    $style .= "background-image: url('{$base64}'); background-size: contain; background-repeat: no-repeat; background-position: center;";
+                    
+                    $element->setAttribute('style', $style);
+                }
+            }
+            
+        } catch (\Exception $e) {
+            Log::error('Erro ao processar imagem do dia da semana:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
     }
 
     /**
@@ -649,5 +764,22 @@ class CredentialPrintService
         
         Log::warning('Não foi possível encontrar dimensões de altura no HTML');
         return null;
+    }
+
+    /**
+     * Substitui marcadores no template
+     *
+     * @param string $html Conteúdo do template
+     * @param array $data Dados para substituição
+     * @return string Template com marcadores substituídos
+     */
+    private function replaceMarkers(string $html, array $data): string
+    {
+        // Substitui marcadores básicos
+        foreach ($data as $key => $value) {
+            $html = str_replace("{{$key}}", $value, $html);
+        }
+        
+        return $html;
     }
 } 

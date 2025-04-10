@@ -87,19 +87,50 @@ class Visitor extends Model
     }
 
     /**
+     * Retorna todas as restrições ativas do visitante (comuns e preditivas)
+     */
+    public function getAllActiveRestrictions()
+    {
+        // Obtém restrições comuns ativas
+        $commonRestrictions = $this->activeRestrictions()->get()->map(function($restriction) {
+            $restriction->is_predictive = false;
+            return $restriction;
+        });
+            
+        // Obtém restrições preditivas ativas que se aplicam ao visitante
+        $predictiveService = new \App\Services\PredictiveRestrictionService();
+        $predictiveRestrictions = collect($predictiveService->checkRestrictions([
+            'name' => $this->name,
+            'doc' => $this->doc,
+            'doc_type_id' => $this->doc_type_id,
+            'destination_id' => $this->latestLog?->destination_id,
+        ]))->map(function($restriction) {
+            if (is_object($restriction)) {
+                $restriction->is_predictive = true;
+            }
+            return $restriction;
+        });
+        
+        // Combina as restrições
+        return $commonRestrictions->concat($predictiveRestrictions);
+    }
+
+    /**
      * Verifica se o visitante possui restrições ativas
      */
     public function hasActiveRestrictions(): bool
     {
-        $hasCommonRestrictions = $this->activeRestrictions()->exists();
+        $restrictions = $this->getAllActiveRestrictions();
         
         Log::info('Visitor::hasActiveRestrictions - Resultado', [
             'visitor_id' => $this->id,
-            'has_restrictions' => $hasCommonRestrictions ? 'Sim' : 'Não',
-            'active_restrictions_count' => $this->activeRestrictions()->count(),
+            'has_restrictions' => $restrictions->isNotEmpty() ? 'Sim' : 'Não',
+            'active_restrictions_count' => $restrictions->count(),
+            'common_restrictions' => $restrictions->filter(fn($r) => !($r->is_predictive ?? false))->count(),
+            'predictive_restrictions' => $restrictions->filter(fn($r) => $r->is_predictive ?? false)->count(),
         ]);
         
-        return $hasCommonRestrictions;
+        return $restrictions->isNotEmpty();
     }
 
     /**
@@ -111,12 +142,13 @@ class Visitor extends Model
             'high' => 3,
             'medium' => 2,
             'low' => 1,
+            'none' => 0,
         ];
 
-        // Busca restrições comuns
-        $commonRestrictions = $this->activeRestrictions()->get();
+        // Busca todas as restrições ativas (comuns e preditivas)
+        $restrictions = $this->getAllActiveRestrictions();
         
-        $restriction = $commonRestrictions
+        $restriction = $restrictions
             ->sortByDesc(function ($restriction) use ($severityOrder) {
                 return $severityOrder[$restriction->severity_level] ?? 0;
             })
@@ -126,7 +158,7 @@ class Visitor extends Model
             'visitor_id' => $this->id,
             'restriction_encontrada' => $restriction ? 'Sim' : 'Não',
             'restriction_id' => $restriction?->id,
-            'restriction_type' => 'Comum',
+            'restriction_type' => $restriction?->is_predictive ? 'Preditiva' : 'Comum',
             'severity_level' => $restriction?->severity_level,
         ]);
         

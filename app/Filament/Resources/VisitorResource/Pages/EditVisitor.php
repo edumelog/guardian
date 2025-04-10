@@ -283,6 +283,10 @@ class EditVisitor extends EditRecord
 
                 $lastLog->update(['out_date' => now()]);
                 
+                // Registra ocorrência se necessário
+                $occurrenceService = new \App\Services\OccurrenceService();
+                $occurrenceService->registerExitOccurrence($this->record, $lastLog);
+                
                 Notification::make()
                     ->success()
                     ->title('Saída registrada com sucesso!')
