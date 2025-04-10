@@ -349,9 +349,37 @@ class SecurityReports extends Page implements HasForms
         // Filtrar por destino - apenas se o filtro for fornecido
         if (!empty($formData['destination_ids'])) {
             Log::info('Filtrando ocorrências por destinos', ['destination_ids' => $formData['destination_ids']]);
-            $query->whereHas('destinations', function ($q) use ($formData) {
-                $q->whereIn('destinations.id', $formData['destination_ids']);
-            });
+            
+            // Se o agrupamento hierárquico estiver ativado
+            if (!empty($formData['grouped_results'])) {
+                // Array para armazenar todos os IDs de destinos (incluindo filhos)
+                $allDestinationIds = $formData['destination_ids'];
+                
+                // Buscar todos os destinos filhos recursivamente
+                foreach ($formData['destination_ids'] as $destId) {
+                    $destination = \App\Models\Destination::find($destId);
+                    if ($destination) {
+                        $childrenIds = $destination->getAllChildrenIds();
+                        $allDestinationIds = array_merge($allDestinationIds, $childrenIds);
+                    }
+                }
+                
+                // Remover duplicatas
+                $allDestinationIds = array_unique($allDestinationIds);
+                
+                Log::info('Aplicando filtro hierárquico de destinos para ocorrências', [
+                    'total_destinations' => count($allDestinationIds)
+                ]);
+                
+                $query->whereHas('destinations', function ($q) use ($allDestinationIds) {
+                    $q->whereIn('destinations.id', $allDestinationIds);
+                });
+            } else {
+                // Filtro normal, sem hierarquia
+                $query->whereHas('destinations', function ($q) use ($formData) {
+                    $q->whereIn('destinations.id', $formData['destination_ids']);
+                });
+            }
             
             // Log da query para depuração
             Log::debug('SQL gerado para filtro de destinos em ocorrências', [
@@ -398,6 +426,7 @@ class SecurityReports extends Page implements HasForms
             'start_time' => '00:00',
             'end_time' => '23:59',
             'include_occurrences' => true,
+            'grouped_results' => false,
         ]);
         
         Log::info('Página de relatórios montada', [
@@ -595,6 +624,11 @@ class SecurityReports extends Page implements HasForms
                                     ->label('Incluir ocorrências registradas no período')
                                     ->helperText('Quando marcado, o relatório incluirá também as ocorrências registradas conforme os filtros selecionados.')
                                     ->default(true),
+                                    
+                                \Filament\Forms\Components\Checkbox::make('grouped_results')
+                                    ->label('Resultados Agrupados')
+                                    ->helperText('Quando marcado, os destinos selecionados serão usados como agrupadores e incluirão os totais de visitas em todos os seus subdestinos.')
+                                    ->default(false),
                             ]),
                     ])
                     ->columns(1),
@@ -669,12 +703,48 @@ class SecurityReports extends Page implements HasForms
         ]);
         
         if (!empty($data['destination_ids'])) {
-            $query->whereIn('destination_id', $data['destination_ids']);
-            Log::info('Aplicando filtro por destinos na consulta principal', [
-                'destination_ids' => $data['destination_ids'],
-                'sql' => $query->toSql(),
-                'bindings' => $query->getBindings()
-            ]);
+            // Se o agrupamento hierárquico estiver ativado
+            if (!empty($data['grouped_results'])) {
+                Log::info('Agrupamento hierárquico ativado', [
+                    'destination_ids' => $data['destination_ids']
+                ]);
+                
+                // Array para armazenar todos os IDs de destinos (incluindo filhos)
+                $allDestinationIds = $data['destination_ids'];
+                
+                // Buscar todos os destinos filhos recursivamente
+                foreach ($data['destination_ids'] as $destId) {
+                    $destination = \App\Models\Destination::find($destId);
+                    if ($destination) {
+                        $childrenIds = $destination->getAllChildrenIds();
+                        Log::info("Filhos encontrados para destino ID {$destId}", [
+                            'destination_name' => $destination->name,
+                            'children_count' => count($childrenIds),
+                            'children_ids' => $childrenIds
+                        ]);
+                        
+                        $allDestinationIds = array_merge($allDestinationIds, $childrenIds);
+                    }
+                }
+                
+                // Remover duplicatas
+                $allDestinationIds = array_unique($allDestinationIds);
+                
+                Log::info('Aplicando filtro hierárquico de destinos', [
+                    'total_destinations' => count($allDestinationIds),
+                    'destination_ids' => $allDestinationIds
+                ]);
+                
+                $query->whereIn('destination_id', $allDestinationIds);
+            } else {
+                // Filtro normal, sem hierarquia
+                $query->whereIn('destination_id', $data['destination_ids']);
+                Log::info('Aplicando filtro por destinos na consulta principal', [
+                    'destination_ids' => $data['destination_ids'],
+                    'sql' => $query->toSql(),
+                    'bindings' => $query->getBindings()
+                ]);
+            }
         }
         
         // Executar a consulta
@@ -799,14 +869,23 @@ class SecurityReports extends Page implements HasForms
         $visitsSheet->mergeCells('A2:B2');
         $visitsSheet->mergeCells('C2:I2');
         
+        // Adiciona nota sobre agrupamento hierárquico se estiver ativo
+        if (!empty($formData['grouped_results'])) {
+            $visitsSheet->setCellValue('A3', 'NOTA: Resultados agrupados hierarquicamente. As contagens incluem os destinos selecionados e todos os seus subdestinos.');
+            $visitsSheet->mergeCells('A3:I3');
+            $row = 4;
+        } else {
+            $row = 3;
+        }
+        
         // Obter os filtros aplicados
         $filters = $this->getAppliedFilters($formData);
         
         // Incluir filtros aplicados
-        $visitsSheet->setCellValue('A3', 'Filtros aplicados:');
-        $visitsSheet->mergeCells('A3:I3');
+        $visitsSheet->setCellValue('A' . $row, 'Filtros aplicados:');
+        $visitsSheet->mergeCells('A' . $row . ':I' . $row);
         
-        $row = 4;
+        $row++;
         foreach ($filters as $label => $value) {
             $visitsSheet->setCellValue('A' . $row, $label . ':');
             $visitsSheet->setCellValue('B' . $row, $value);
@@ -889,19 +968,19 @@ class SecurityReports extends Page implements HasForms
             $occurrencesSheet->setCellValue('A1', 'Relatório de Ocorrências - ' . now()->format('d/m/Y H:i:s'));
             $occurrencesSheet->mergeCells('A1:F1');
             
-            // Incluir filtros aplicados
-            $occurrencesSheet->setCellValue('A2', 'Filtros aplicados:');
-            $occurrencesSheet->mergeCells('A2:F2');
-            
-            $row = 3;
-            foreach ($filters as $label => $value) {
-                $occurrencesSheet->setCellValue('A' . $row, $label . ':');
-                $occurrencesSheet->setCellValue('B' . $row, $value);
-                $occurrencesSheet->mergeCells('B' . $row . ':F' . $row);
-                $row++;
+            // Adiciona nota sobre agrupamento hierárquico se estiver ativo
+            if (!empty($formData['grouped_results'])) {
+                $occurrencesSheet->setCellValue('A2', 'NOTA: Resultados agrupados hierarquicamente. As contagens incluem os destinos selecionados e todos os seus subdestinos.');
+                $occurrencesSheet->mergeCells('A2:F2');
+                $row = 3;
+            } else {
+                $row = 2;
             }
             
-            // Linha em branco
+            // Incluir filtros aplicados
+            $occurrencesSheet->setCellValue('A' . $row, 'Filtros aplicados:');
+            $occurrencesSheet->mergeCells('A' . $row . ':F' . $row);
+            
             $row++;
             
             // Cabeçalhos das colunas para ocorrências
@@ -1242,14 +1321,25 @@ class SecurityReports extends Page implements HasForms
         // Destino
         if (!empty($formData['destination_ids'])) {
             $destinations = \App\Models\Destination::whereIn('id', $formData['destination_ids'])->get();
-            $filters['Destinos'] = $destinations->map(function ($destination) {
+            $destinationNames = $destinations->map(function ($destination) {
                 return $destination->name;
             })->join(', ');
+            
+            if (!empty($formData['grouped_results'])) {
+                $filters['Destinos (Agrupados)'] = $destinationNames . ' (incluindo subdestinos)';
+            } else {
+                $filters['Destinos'] = $destinationNames;
+            }
         }
         
         // Ocorrências incluídas
         if (!empty($formData['include_occurrences'])) {
             $filters['Ocorrências'] = 'Incluídas';
+        }
+        
+        // Agrupamento hierárquico
+        if (!empty($formData['grouped_results'])) {
+            $filters['Agrupamento'] = 'Resultados incluem todos os subdestinos';
         }
         
         return $filters;
@@ -1313,6 +1403,7 @@ class SecurityReports extends Page implements HasForms
                     'doc' => null,
                     'destination_ids' => [],
                     'include_occurrences' => true,
+                    'grouped_results' => false,
                 ]);
                 
                 Notification::make()
@@ -1348,6 +1439,7 @@ class SecurityReports extends Page implements HasForms
             'visitors_by_destination' => [],
             'unique_visitors' => 0,
             'ongoing_visits' => 0,
+            'is_grouped' => !empty($this->form->getState()['grouped_results']),
         ];
         
         // Se não houver resultados, retornar estatísticas vazias
