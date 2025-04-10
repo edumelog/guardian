@@ -227,6 +227,12 @@
     <h2 style="break-before: page; page-break-before: always;">Estatísticas</h2>
     
     <div class="stats-container">
+        @if(isset($visitorStats['is_grouped']) && $visitorStats['is_grouped'])
+        <div style="background-color: #fef9c3; padding: 8px; border-radius: 4px; margin-bottom: 15px; border-left: 4px solid #eab308; font-weight: bold;">
+            Nota: Os resultados estão agrupados hierarquicamente. As contagens incluem os destinos selecionados e todos os seus subdestinos.
+        </div>
+        @endif
+        
         <div class="stats-summary">
             <div class="stats-card">
                 <div class="stats-card-title">Total de Registros</div>
