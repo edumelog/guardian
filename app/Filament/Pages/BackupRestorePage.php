@@ -2,20 +2,21 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Section;
-use Filament\Forms\Concerns\InteractsWithForms;
-use Filament\Forms\Contracts\HasForms;
+use ZipArchive;
 use Filament\Forms\Form;
-use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Support\Exceptions\Halt;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Filament\Support\Exceptions\Halt;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Contracts\HasForms;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
-use ZipArchive;
-use Illuminate\Support\Str;
+use Filament\Notifications\Notification;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Concerns\InteractsWithForms;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 /**
  * Página para restauração de backups
@@ -26,6 +27,7 @@ use Illuminate\Support\Str;
 class BackupRestorePage extends Page implements HasForms
 {
     use InteractsWithForms;
+    use HasPageShield;
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-path';
     protected static ?string $navigationLabel = 'Restaurar Backup';
