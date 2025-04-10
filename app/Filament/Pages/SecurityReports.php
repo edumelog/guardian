@@ -416,13 +416,67 @@ class SecurityReports extends Page implements HasForms
                                     ->displayFormat('d/m/Y')
                                     ->maxDate(now())
                                     ->placeholder('Pode ser deixado vazio')
-                                    ->helperText('Se vazio, usará 01/01/1900. Deve ser anterior ou igual à data final.'),
+                                    ->helperText('Se vazio, usará 01/01/1900. Deve ser anterior ou igual à data final.')
+                                    ->afterStateUpdated(function($state, $old, callable $set, callable $get) {
+                                        $endDate = $get('end_date');
+                                        
+                                        // Se state ou endDate forem nulos, não há como comparar
+                                        if ($state === null || $endDate === null) {
+                                            return;
+                                        }
+                                        
+                                        // Se a data inicial for maior que a data final, ajuste a data final
+                                        if (strtotime($state) > strtotime($endDate)) {
+                                            $set('end_date', $state);
+                                            Notification::make()
+                                                ->warning()
+                                                ->title('Data final ajustada')
+                                                ->body('A data final foi ajustada para não ser anterior à data inicial.')
+                                                ->send();
+                                                
+                                            // Se as datas são iguais, verifique também o horário
+                                            $startTime = $get('start_time');
+                                            $endTime = $get('end_time');
+                                            
+                                            if ($startTime && $endTime && strtotime($startTime) > strtotime($endTime)) {
+                                                $set('end_time', $startTime);
+                                                Notification::make()
+                                                    ->warning()
+                                                    ->title('Horário final ajustado')
+                                                    ->body('O horário final foi ajustado para não ser anterior ao horário inicial.')
+                                                    ->send();
+                                            }
+                                        }
+                                    }),
 
                                 TimePicker::make('start_time')
                                     ->label('Hora Inicial')
                                     ->seconds(false)
                                     ->default('00:00')
-                                    ->helperText('A partir de'),
+                                    ->helperText('A partir de')
+                                    ->afterStateUpdated(function($state, $old, callable $set, callable $get) {
+                                        $startDate = $get('start_date');
+                                        $endDate = $get('end_date');
+                                        $endTime = $get('end_time');
+                                        
+                                        // Se algum dos valores for nulo, não podemos comparar
+                                        if ($state === null || $startDate === null || $endDate === null || $endTime === null) {
+                                            return;
+                                        }
+                                        
+                                        // Validar horário apenas se as datas forem iguais
+                                        if ($startDate === $endDate) {
+                                            // Se o horário inicial for maior que o final na mesma data, ajustar o horário final
+                                            if (strtotime($state) > strtotime($endTime)) {
+                                                $set('end_time', $state);
+                                                Notification::make()
+                                                    ->warning()
+                                                    ->title('Horário ajustado')
+                                                    ->body('O horário final foi ajustado para não ser anterior ao horário inicial na mesma data.')
+                                                    ->send();
+                                            }
+                                        }
+                                    }),
                                     
                                 DatePicker::make('end_date')
                                     ->label('Data Final (opcional)')
@@ -430,13 +484,54 @@ class SecurityReports extends Page implements HasForms
                                     ->displayFormat('d/m/Y')
                                     ->maxDate(now())
                                     ->placeholder('Pode ser deixado vazio')
-                                    ->helperText('Se vazio, usará a data atual. Deve ser posterior ou igual à data inicial.'),
+                                    ->helperText('Se vazio, usará a data atual. Deve ser posterior ou igual à data inicial.')
+                                    ->afterStateUpdated(function($state, $old, callable $set, callable $get) {
+                                        $startDate = $get('start_date');
+                                        
+                                        // Se state ou startDate forem nulos, não há como comparar
+                                        if ($state === null || $startDate === null) {
+                                            return;
+                                        }
+                                        
+                                        // Se a data final for menor que a data inicial, redefina para a data inicial
+                                        if (strtotime($state) < strtotime($startDate)) {
+                                            $set('end_date', $startDate);
+                                            Notification::make()
+                                                ->warning()
+                                                ->title('Data ajustada')
+                                                ->body('A data final foi ajustada para não ser anterior à data inicial.')
+                                                ->send();
+                                        }
+                                    }),
 
                                 TimePicker::make('end_time')
                                     ->label('Hora Final')
                                     ->seconds(false)
                                     ->default('23:59')
-                                    ->helperText('Até. Se as datas forem iguais, este horário deve ser maior ou igual ao inicial.'),
+                                    ->helperText('Até. Se as datas forem iguais, este horário deve ser maior ou igual ao inicial.')
+                                    ->afterStateUpdated(function($state, $old, callable $set, callable $get) {
+                                        $startDate = $get('start_date');
+                                        $endDate = $get('end_date');
+                                        $startTime = $get('start_time');
+                                        
+                                        // Se algum dos valores for nulo, não podemos comparar
+                                        if ($state === null || $startDate === null || $endDate === null || $startTime === null) {
+                                            return;
+                                        }
+                                        
+                                        // Validar horário apenas se as datas forem iguais
+                                        if ($startDate === $endDate) {
+                                            // Se o horário final for menor que o inicial na mesma data, ajustar
+                                            if (strtotime($state) < strtotime($startTime)) {
+                                                $set('end_time', $startTime);
+                                                Notification::make()
+                                                    ->warning()
+                                                    ->title('Horário ajustado')
+                                                    ->body('O horário final foi ajustado para não ser anterior ao horário inicial na mesma data.')
+                                                    ->send();
+                                            }
+                                        }
+                                    }),
                             ])
                             ->columnSpanFull(),
 
@@ -512,6 +607,13 @@ class SecurityReports extends Page implements HasForms
         
         // Montar as datas de início e fim com os horários especificados
         $startDateTime = $data['start_date'] . ' ' . $data['start_time'] . ':00';
+        
+        // Verifica se a data final é a data atual e ajusta a hora final
+        if ($data['end_date'] === now()->format('Y-m-d')) {
+            // Usar a hora atual em vez de 23:59 quando a data for a atual
+            $data['end_time'] = now()->format('H:i');
+        }
+        
         $endDateTime = $data['end_date'] . ' ' . $data['end_time'] . ':59';
         
         // Validar que a data de início é anterior à data de fim
@@ -618,6 +720,12 @@ class SecurityReports extends Page implements HasForms
         // Importações necessárias para Excel
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $formData = $this->form->getState();
+        
+        // Verificar se a data final é hoje e ajustar a hora final
+        if ($formData['end_date'] === now()->format('Y-m-d')) {
+            $formData['end_time'] = now()->format('H:i');
+        }
+        
         $hasOccurrences = !empty($formData['include_occurrences']) && count($this->occurrencesResults) > 0;
         
         // Aba 1: Visitas
@@ -814,6 +922,11 @@ class SecurityReports extends Page implements HasForms
     {
         $this->validate();
         $formData = $this->form->getState();
+        
+        // Verificar se a data final é hoje e ajustar a hora final
+        if ($formData['end_date'] === now()->format('Y-m-d')) {
+            $formData['end_time'] = now()->format('H:i');
+        }
         
         // Formatar datas para exibição incluindo os horários definidos no filtro
         $formattedStartDate = date('d/m/Y', strtotime($formData['start_date'])) . ' ' . $formData['start_time'];
