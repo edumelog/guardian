@@ -28,6 +28,18 @@ class EditVisitor extends EditRecord
                 ->persistent()
                 ->send();
         }
+        
+        // Atualiza o destination_id com o destino da última visita, se existir
+        if ($lastLog && $lastLog->destination_id) {
+            $this->data['destination_id'] = $lastLog->destination_id;
+            
+            // Log para debug
+            \Illuminate\Support\Facades\Log::info('Atualizando destination_id na edição de visitante', [
+                'visitor_id' => $this->record->id,
+                'old_destination_id' => $this->record->destination_id,
+                'new_destination_id' => $lastLog->destination_id,
+            ]);
+        }
     }
 
     public function form(Form $form): Form
@@ -94,6 +106,9 @@ class EditVisitor extends EditRecord
         
         $lastLog = $visitor->visitorLogs()->latest('in_date')->first();
         
+        // Obtém o destino da última visita em vez do destino padrão do visitante
+        $currentDestination = $lastLog ? $lastLog->destination : $visitor->destination;
+        
         // Prepara a URL da foto
         $photoUrl = null;
         if ($visitor->photo) {
@@ -120,16 +135,16 @@ class EditVisitor extends EditRecord
             ]);
         }
 
-        // Prepara os dados do visitante
+        // Prepara os dados do visitante - usando o destino da última visita
         $visitorData = [
             'id' => $visitor->id,
             'name' => $visitor->name,
             'doc' => $visitor->doc,
             'docType' => $visitor->docType?->type,
-            'destination' => $visitor->destination?->name,
-            'destinationAddress' => $visitor->destination?->address,
-            'destinationPhone' => $visitor->destination?->phone,
-            'destinationAlias' => $visitor->destination?->getFirstAvailableAlias(),
+            'destination' => $currentDestination?->name,
+            'destinationAddress' => $currentDestination?->address,
+            'destinationPhone' => $currentDestination?->phone,
+            'destinationAlias' => $currentDestination?->getFirstAvailableAlias(),
             'photo' => $photoUrl,
             'inDate' => $lastLog?->in_date,
             'outDate' => $lastLog?->out_date,
@@ -138,9 +153,9 @@ class EditVisitor extends EditRecord
             // Dados adicionais
             'docTypeName' => $visitor->docType->type,
             'docTypeId' => $visitor->docType->id,
-            'destinationId' => $visitor->destination->id,
-            'destinationName' => $visitor->destination->name,
-            'destinationAddress' => $visitor->destination->address,
+            'destinationId' => $currentDestination?->id ?? $visitor->destination_id,
+            'destinationName' => $currentDestination?->name ?? $visitor->destination?->name,
+            'destinationAddress' => $currentDestination?->address ?? $visitor->destination?->address,
             'createdAt' => $visitor->created_at->format('d/m/Y H:i'),
             'updatedAt' => $visitor->updated_at->format('d/m/Y H:i'),
         ];
@@ -360,6 +375,16 @@ class EditVisitor extends EditRecord
                 ->send();
                 
             $this->halt();
+        }
+        
+        // Atualiza o modelo Visitor para usar o mesmo destination_id da última visita
+        if ($lastLog && $lastLog->destination_id) {
+            $this->data['destination_id'] = $lastLog->destination_id;
+            
+            \Illuminate\Support\Facades\Log::info('Atualizando destination_id ao salvar visitante', [
+                'visitor_id' => $this->record->id,
+                'destination_id' => $lastLog->destination_id,
+            ]);
         }
     }
 }
