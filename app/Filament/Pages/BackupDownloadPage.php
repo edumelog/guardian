@@ -2,19 +2,20 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Actions\Action;
 use Filament\Pages\Page;
-use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Storage;
+use Filament\Tables\Table;
+use Filament\Actions\Action;
+use Illuminate\Support\Collection;
 use Filament\Tables\Actions\BulkAction;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
-use Filament\Tables\Table;
-use Illuminate\Support\Collection;
-use Illuminate\Contracts\Pagination\Paginator;
+use Illuminate\Support\Facades\Storage;
+use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Filament\Tables\Concerns\InteractsWithTable;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 /**
  * Página para download de backups
@@ -24,6 +25,8 @@ use Illuminate\Pagination\LengthAwarePaginator;
  */
 class BackupDownloadPage extends Page
 {
+    use HasPageShield;
+    
     protected static ?string $navigationIcon = 'heroicon-o-arrow-down-tray';
     protected static ?string $navigationLabel = 'Download de Backups';
     protected static ?string $title = 'Download de Backups';
