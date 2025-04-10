@@ -47,6 +47,11 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+### v1.5.1
+- **Implementação do uso de template usando %/vw/vh e sem referencia fixa de dimensão da etiqueta** - principal funcionalidade desta versão
+- Criação de ícones e letras para os dias da semana
+- Implementação da funcionalidade de Backups (Full) com opçãoo de download e restore
+
 ### v1.5.0
 - **Implementação do Registro Automático de Ocorrências para Restrições Comuns de Acesso** - principal funcionalidade desta versão
 - Aprimoramento do sistema de Restrições de Acesso com múltiplos níveis de severidade (none, low, medium, high)
