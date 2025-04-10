@@ -352,6 +352,13 @@ class SecurityReports extends Page implements HasForms
             $query->whereHas('destinations', function ($q) use ($formData) {
                 $q->whereIn('destinations.id', $formData['destination_ids']);
             });
+            
+            // Log da query para depuração
+            Log::debug('SQL gerado para filtro de destinos em ocorrências', [
+                'sql' => $query->toSql(),
+                'bindings' => $query->getBindings(),
+                'count' => $query->count()
+            ]);
         }
 
         // Log da query SQL para debug
@@ -601,6 +608,11 @@ class SecurityReports extends Page implements HasForms
         
         $data = $this->form->getState();
         
+        // Log dos filtros aplicados
+        Log::info('Filtros aplicados na pesquisa', [
+            'filtros' => $data
+        ]);
+        
         // Resetar os resultados
         $this->results = [];
         $this->occurrencesResults = [];
@@ -650,12 +662,31 @@ class SecurityReports extends Page implements HasForms
             });
         }
         
+        // Log do estado antes da aplicação do filtro de destinos
+        Log::info('Estado da consulta antes de aplicar filtro de destinos', [
+            'count_sem_filtro' => (clone $query)->count(),
+            'destination_ids' => $data['destination_ids'] ?? 'Nenhum selecionado'
+        ]);
+        
         if (!empty($data['destination_ids'])) {
             $query->whereIn('destination_id', $data['destination_ids']);
+            Log::info('Aplicando filtro por destinos na consulta principal', [
+                'destination_ids' => $data['destination_ids'],
+                'sql' => $query->toSql(),
+                'bindings' => $query->getBindings()
+            ]);
         }
         
         // Executar a consulta
         $this->results = $query->get();
+        
+        // Log após a aplicação do filtro
+        Log::info('Resultados após aplicação de filtros', [
+            'total_encontrado' => count($this->results),
+            'amostra_destinos' => collect($this->results)->take(3)->map(function($log) {
+                return ['id' => $log->destination_id, 'name' => $log->destination->name ?? '?'];
+            })->toArray()
+        ]);
         
         // Inicializar a variável de ocorrências
         $this->occurrencesResults = [];
@@ -725,6 +756,18 @@ class SecurityReports extends Page implements HasForms
         if ($formData['end_date'] === now()->format('Y-m-d')) {
             $formData['end_time'] = now()->format('H:i');
         }
+        
+        // Log detalhado para depuração
+        Log::info('Iniciando exportação para Excel', [
+            'total_results' => count($this->results),
+            'destination_ids_filter' => $formData['destination_ids'] ?? [],
+            'amostra_destinos' => collect($this->results)->take(5)->map(function($log) {
+                return [
+                    'id' => $log->destination_id,
+                    'name' => $log->destination->name ?? 'N/A'
+                ];
+            })->toArray()
+        ]);
         
         $hasOccurrences = !empty($formData['include_occurrences']) && count($this->occurrencesResults) > 0;
         
@@ -928,6 +971,18 @@ class SecurityReports extends Page implements HasForms
             $formData['end_time'] = now()->format('H:i');
         }
         
+        // Log detalhado para depuração
+        Log::info('Iniciando exportação para PDF', [
+            'total_results' => count($this->results),
+            'destination_ids_filter' => $formData['destination_ids'] ?? [],
+            'amostra_destinos' => collect($this->results)->take(3)->map(function($log) {
+                return [
+                    'id' => $log->destination_id,
+                    'name' => $log->destination->name ?? 'N/A'
+                ];
+            })->toArray()
+        ]);
+        
         // Formatar datas para exibição incluindo os horários definidos no filtro
         $formattedStartDate = date('d/m/Y', strtotime($formData['start_date'])) . ' ' . $formData['start_time'];
         $formattedEndDate = date('d/m/Y', strtotime($formData['end_date'])) . ' ' . $formData['end_time'];
@@ -1109,6 +1164,12 @@ class SecurityReports extends Page implements HasForms
     protected function formatResultsForReport()
     {
         $formattedResults = [];
+        
+        Log::info('Formatando resultados para relatório', [
+            'total_results' => count($this->results),
+            'filtros_aplicados' => $this->form->getState(),
+            'primeiro_destino' => $this->results[0]->destination->name ?? 'Nenhum'
+        ]);
         
         foreach ($this->results as $log) {
             $formattedResults[] = [
