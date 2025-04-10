@@ -98,15 +98,15 @@
     >
         <div class="space-y-6">
             <!-- Status atual -->
-            <div class="p-6 bg-white rounded-xl shadow dark:bg-gray-800">
-                <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+            <div class="p-6 bg-white dark:bg-gray-900 rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
+                <h2 class="text-lg font-medium text-gray-950 dark:text-white">
                     Status das Câmeras
                 </h2>
 
                 <div class="mt-4">
                     <div x-show="loading" class="text-center p-4">
                         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-                        <p class="mt-2 text-gray-600 dark:text-gray-400">Configurando câmeras...</p>
+                        <p class="mt-2 text-gray-500 dark:text-gray-400">Configurando câmeras...</p>
                     </div>
 
                     <div x-show="error" x-cloak class="bg-red-50 dark:bg-red-900/50 p-4 rounded-lg">
@@ -126,8 +126,8 @@
                     <div x-show="!loading && !error && cameras.length > 0" x-cloak>
                         <div class="space-y-4">
                             <!-- Câmeras detectadas -->
-                            <div class="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                                <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100">Câmeras Detectadas</h3>
+                            <div class="fi-section p-4 bg-white dark:bg-gray-900 rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10">
+                                <h3 class="text-sm font-medium text-gray-950 dark:text-white">Câmeras Detectadas</h3>
                                 <div class="mt-2">
                                     <template x-if="cameras.length === 1">
                                         <div class="text-sm text-amber-600 dark:text-amber-400 mb-2">
@@ -136,7 +136,7 @@
                                     </template>
                                     <ul class="list-disc pl-5 space-y-1">
                                         <template x-for="(camera, index) in cameras" :key="camera.deviceId">
-                                            <li class="text-sm text-gray-600 dark:text-gray-400">
+                                            <li class="text-sm text-gray-500 dark:text-gray-400">
                                                 <div>
                                                     <span x-text="`Câmera ${String(index + 1).padStart(2, '0')} - ${camera.label || 'Dispositivo Desconhecido'} (${camera.deviceId.slice(-11)})`"></span>
                                                     <div class="inline-flex gap-2">
@@ -159,16 +159,16 @@
                             </div>
 
                             <!-- Configuração atual -->
-                            <div class="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                                <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100">Configuração Atual</h3>
+                            <div class="fi-section p-4 bg-white dark:bg-gray-900 rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10">
+                                <h3 class="text-sm font-medium text-gray-950 dark:text-white">Configuração Atual</h3>
                                 <div class="mt-2 grid grid-cols-2 gap-4">
                                     <div>
                                         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Câmera para Fotos de Visitantes</label>
                                         <select 
                                             x-model="visitorCamera"
                                             @change="saveConfig()"
-                                            class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
-                                        >
+                                            class="fi-select-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 text-gray-950 dark:text-gray-200 dark:focus:ring-primary-500 bg-white"
+                                        > 
                                             <template x-for="(camera, index) in cameras" :key="camera.deviceId">
                                                 <option 
                                                     :value="camera.deviceId"
@@ -183,8 +183,8 @@
                                         <select 
                                             x-model="documentCamera"
                                             @change="saveConfig()"
-                                            class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
-                                        >
+                                            class="fi-select-input block w-full border-gray-300 rounded-lg text-gray-900 shadow-sm outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 text-gray-950 dark:text-gray-200 dark:focus:ring-primary-500 bg-white"
+                                        > 
                                             <template x-for="(camera, index) in cameras" :key="camera.deviceId">
                                                 <option 
                                                     :value="camera.deviceId"
@@ -197,8 +197,8 @@
                             </div>
 
                             <!-- Debug Info -->
-                            <div class="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                                <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100">Prévia das Câmeras</h3>
+                            <div class="fi-section p-4 bg-white dark:bg-gray-900 rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10">
+                                <h3 class="text-sm font-medium text-gray-950 dark:text-white">Prévia das Câmeras</h3>
                                 <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <!-- Câmera de Visitantes -->
                                     <div 
@@ -232,9 +232,9 @@
                                         @camera-changed.window="startPreview"
                                         @disconnect.window="stopPreview"
                                     >
-                                        <div class="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
-                                            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Câmera de Visitantes</h4>
-                                            <div class="relative aspect-video bg-gray-100 dark:bg-gray-900 rounded overflow-hidden">
+                                        <div class="p-3 bg-white dark:bg-gray-900 rounded-lg shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
+                                            <h4 class="text-sm font-medium text-gray-950 dark:text-white mb-2">Câmera de Visitantes</h4>
+                                            <div class="relative aspect-video bg-gray-100 dark:bg-gray-800 rounded overflow-hidden">
                                                 <video 
                                                     x-ref="visitorPreview"
                                                     autoplay 
@@ -277,9 +277,9 @@
                                         @camera-changed.window="startPreview"
                                         @disconnect.window="stopPreview"
                                     >
-                                        <div class="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
-                                            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Câmera de Documentos</h4>
-                                            <div class="relative aspect-video bg-gray-100 dark:bg-gray-900 rounded overflow-hidden">
+                                        <div class="p-3 bg-white dark:bg-gray-900 rounded-lg shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
+                                            <h4 class="text-sm font-medium text-gray-950 dark:text-white mb-2">Câmera de Documentos</h4>
+                                            <div class="relative aspect-video bg-gray-100 dark:bg-gray-800 rounded overflow-hidden">
                                                 <video 
                                                     x-ref="documentPreview"
                                                     autoplay 
@@ -301,7 +301,7 @@
                 <button
                     type="button"
                     @click="detectCameras()"
-                    class="fi-btn fi-btn-size-md inline-flex items-center justify-center gap-1 font-medium rounded-lg bg-primary-600 px-4 py-2 text-white shadow-sm hover:bg-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-70 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus:ring-offset-gray-800"
+                    class="fi-btn fi-btn-size-md inline-flex items-center justify-center gap-1 font-medium rounded-lg bg-primary-600 px-4 py-2 text-white shadow-sm hover:bg-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 disabled:opacity-70 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus:ring-primary-400"
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
