@@ -27,6 +27,11 @@ class EditDestination extends EditRecord
                 ->requiresConfirmation()
                 ->modalHeading('Deletar Destino')
                 ->modalDescription(function (Destination $record): string {
+                    // Verifica se tem ocorrências associadas
+                    if ($record->hasOccurrences()) {
+                        return "Não é possível excluir o destino \"{$record->name}\" pois existem ocorrências associadas a ele.";
+                    }
+                    
                     // Verifica se tem visitas na hierarquia
                     if ($record->hasVisitsInHierarchy()) {
                         $message = "Não é possível excluir o destino \"{$record->name}\"";
@@ -51,8 +56,19 @@ class EditDestination extends EditRecord
                 })
                 ->modalSubmitActionLabel('Sim, deletar')
                 // Esconde o botão de confirmação quando não for possível excluir
-                ->hidden(fn (Destination $record) => $record->hasVisitsInHierarchy())
+                ->hidden(fn (Destination $record) => $record->hasVisitsInHierarchy() || $record->hasOccurrences())
                 ->action(function (Destination $record) {
+                    // Verifica se o destino possui ocorrências associadas
+                    if ($record->hasOccurrences()) {
+                        Notification::make()
+                            ->danger()
+                            ->title('Exclusão não permitida')
+                            ->body("Não é possível excluir o destino \"{$record->name}\" pois existem ocorrências associadas a ele.")
+                            ->persistent()
+                            ->send();
+                        return;
+                    }
+                    
                     // Verifica se o destino ou seus filhos têm visitas
                     if ($record->hasVisitsInHierarchy()) {
                         $message = 'Não é possível excluir um destino que ';
