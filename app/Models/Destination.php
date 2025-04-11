@@ -134,4 +134,21 @@ class Destination extends Model
     {
         return $query->where('is_active', true);
     }
+
+    /**
+     * Relacionamento many-to-many com ocorrências
+     */
+    public function occurrences()
+    {
+        return $this->belongsToMany(Occurrence::class, 'occurrence_destination')
+            ->withTimestamps();
+    }
+    
+    /**
+     * Verifica se este destino possui ocorrências associadas
+     */
+    public function hasOccurrences(): bool
+    {
+        return $this->occurrences()->exists();
+    }
 }

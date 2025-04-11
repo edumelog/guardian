@@ -167,6 +167,11 @@ class DestinationResource extends Resource
                     ->requiresConfirmation()
                     ->modalHeading('Deletar Destino')
                     ->modalDescription(function (Destination $record): string {
+                        // Verifica se tem ocorrências associadas
+                        if ($record->hasOccurrences()) {
+                            return "Não é possível excluir o destino \"{$record->name}\" pois existem ocorrências associadas a ele.";
+                        }
+                        
                         // Verifica se tem visitas na hierarquia
                         if ($record->hasVisitsInHierarchy()) {
                             $message = "Não é possível excluir o destino \"{$record->name}\"";
@@ -191,15 +196,26 @@ class DestinationResource extends Resource
                     })
                     ->modalSubmitActionLabel('Sim, deletar')
                     // Esconde o botão de confirmação quando não for possível excluir
-                    ->hidden(fn (Destination $record) => $record->hasVisitsInHierarchy())
+                    ->hidden(fn (Destination $record) => $record->hasVisitsInHierarchy() || $record->hasOccurrences())
                     ->action(function (Destination $record) {
+                        // Verifica se o destino possui ocorrências associadas
+                        if ($record->hasOccurrences()) {
+                            Notification::make()
+                                ->danger()
+                                ->title('Exclusão não permitida')
+                                ->body("Não é possível excluir o destino \"{$record->name}\" pois existem ocorrências associadas a ele.")
+                                ->persistent()
+                                ->send();
+                            return;
+                        }
+                        
                         // Verifica se o destino ou seus filhos têm visitas
                         if ($record->hasVisitsInHierarchy()) {
                             $message = 'Não é possível excluir um destino que ';
                             if ($record->visitorLogs()->exists()) {
-                                $message .= 'possui visitas registradas.';
+                                $message .= 'possui visitas registradas';
                             } else {
-                                $message .= 'possui subdestinos com visitas registradas.';
+                                $message .= 'possui subdestinos com visitas registradas';
                             }
 
                             Notification::make()
@@ -228,6 +244,7 @@ class DestinationResource extends Resource
                             $destinationsWithChildren = [];
                             $destinationsWithVisits = [];
                             $destinationsWithChildVisits = [];
+                            $destinationsWithOccurrences = [];
                             $canDeleteAny = false;
 
                             $records = $action->getRecords();
@@ -236,7 +253,9 @@ class DestinationResource extends Resource
                             }
 
                             foreach ($records as $record) {
-                                if ($record->visitorLogs()->exists()) {
+                                if ($record->hasOccurrences()) {
+                                    $destinationsWithOccurrences[] = $record->name;
+                                } else if ($record->visitorLogs()->exists()) {
                                     $destinationsWithVisits[] = $record->name;
                                 } else if ($record->hasVisitsInHierarchy()) {
                                     $destinationsWithChildVisits[] = $record->name;
@@ -248,28 +267,38 @@ class DestinationResource extends Resource
                                 }
                             }
 
-                            $message = '';
+                            $modalDescription = '';
 
+                            // Primeiro, mostrar destinos com ocorrências
+                            if (!empty($destinationsWithOccurrences)) {
+                                $modalDescription .= '<div class="mb-3 text-red-600"><strong>Não será possível excluir os seguintes destinos pois possuem ocorrências associadas:</strong><ul class="list-disc pl-5 mt-1">';
+                                foreach ($destinationsWithOccurrences as $name) {
+                                    $modalDescription .= '<li>' . e($name) . '</li>';
+                                }
+                                $modalDescription .= '</ul></div>';
+                            }
+
+                            // Depois, mostrar destinos com visitas
                             if (!empty($destinationsWithVisits)) {
                                 $visitsList = implode('", "', $destinationsWithVisits);
-                                $message .= "ATENÇÃO: Os seguintes destinos não podem ser excluídos pois possuem visitas registradas:\n\n\"{$visitsList}\"\n\n";
+                                $modalDescription .= "ATENÇÃO: Os seguintes destinos não podem ser excluídos pois possuem visitas registradas:\n\n\"{$visitsList}\"\n\n";
                             }
 
                             if (!empty($destinationsWithChildVisits)) {
                                 $childVisitsList = implode('", "', $destinationsWithChildVisits);
-                                $message .= "ATENÇÃO: Os seguintes destinos não podem ser excluídos pois possuem subdestinos com visitas registradas:\n\n\"{$childVisitsList}\"\n\n";
+                                $modalDescription .= "ATENÇÃO: Os seguintes destinos não podem ser excluídos pois possuem subdestinos com visitas registradas:\n\n\"{$childVisitsList}\"\n\n";
                             }
                             
                             if (!empty($destinationsWithChildren)) {
                                 $childrenList = implode('", "', $destinationsWithChildren);
-                                $message .= "ATENÇÃO: Os seguintes destinos possuem subdestinos associados:\n\n\"{$childrenList}\"\n\nAo deletar estes destinos, todos os seus subdestinos também serão removidos.";
+                                $modalDescription .= "ATENÇÃO: Os seguintes destinos possuem subdestinos associados:\n\n\"{$childrenList}\"\n\nAo deletar estes destinos, todos os seus subdestinos também serão removidos.";
                             }
 
-                            if ($message) {
+                            if ($modalDescription) {
                                 if (!$canDeleteAny) {
-                                    return $message . "\n\nNenhum dos destinos selecionados pode ser excluído.";
+                                    return $modalDescription . "\n\nNenhum dos destinos selecionados pode ser excluído.";
                                 }
-                                return $message . "\n\nDeseja continuar com a exclusão dos destinos permitidos?";
+                                return $modalDescription . "\n\nDeseja continuar com a exclusão dos destinos permitidos?";
                             }
 
                             return 'Tem certeza que deseja deletar os destinos selecionados?';
@@ -287,6 +316,53 @@ class DestinationResource extends Resource
                                 }
                             }
                             return true; // Desabilita o botão se nenhum destino puder ser excluído
+                        })
+                        ->before(function (Tables\Actions\DeleteBulkAction $action, Collection $records) {
+                            $destinationsToKeep = [];
+
+                            foreach ($records as $index => $record) {
+                                // Impede a exclusão de destinos com ocorrências
+                                if ($record->hasOccurrences()) {
+                                    $destinationsToKeep[] = $record->name;
+                                    $records->forget($index);
+                                    continue;
+                                }
+                                
+                                // Impede a exclusão de destinos com visitas
+                                if ($record->hasVisitsInHierarchy()) {
+                                    $destinationsToKeep[] = $record->name;
+                                    $records->forget($index);
+                                }
+                            }
+
+                            // Se nenhum destino pode ser excluído, cancela a ação
+                            if ($records->isEmpty()) {
+                                $action->cancel();
+                                
+                                Notification::make()
+                                    ->danger()
+                                    ->title('Exclusão não permitida')
+                                    ->body('Nenhum dos destinos selecionados pode ser excluído, pois todos possuem ocorrências ou visitas associadas.')
+                                    ->persistent()
+                                    ->send();
+                            } elseif (!empty($destinationsToKeep)) {
+                                // Se alguns destinos não podem ser excluídos, notifica o usuário
+                                $action->cancel();
+
+                                // Formatação mais clara da mensagem
+                                $destinationsToKeepList = collect($destinationsToKeep)
+                                    ->map(fn ($name) => "- {$name}")
+                                    ->join('<br>');
+
+                                Notification::make()
+                                    ->warning()
+                                    ->title('Atenção: Exclusão parcial')
+                                    ->body(new \Illuminate\Support\HtmlString(
+                                        "Os seguintes destinos não podem ser excluídos pois possuem ocorrências ou visitas associadas:<br>{$destinationsToKeepList}<br><br>Por favor, selecione apenas destinos que possam ser excluídos."
+                                    ))
+                                    ->persistent()
+                                    ->send();
+                            }
                         })
                         ->action(function (Collection $records) {
                             $hasVisits = false;
