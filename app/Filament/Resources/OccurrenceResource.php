@@ -153,6 +153,28 @@ class OccurrenceResource extends Resource
                     ->label('Registrado por')
                     ->sortable(),
                     
+                TextColumn::make('updater.name')
+                    ->label('Modificado por')
+                    ->sortable()
+                    ->formatStateUsing(function ($state, $record) {
+                        // Se não houver atualizador ou se o criador for o mesmo atualizador e as datas forem próximas
+                        if (
+                            !$record->updated_by || 
+                            ($record->created_by === $record->updated_by && 
+                             $record->created_at->diffInMinutes($record->updated_at) < 1)
+                        ) {
+                            return 'Não modificado';
+                        }
+                        
+                        return $state;
+                    })
+                    ->description(fn ($record) => $record->updated_at?->diffForHumans() ?? '')
+                    ->tooltip(fn ($record) => 
+                        $record->updated_by && $record->created_by !== $record->updated_by
+                            ? "Última modificação por {$record->updater->name} em " . $record->updated_at->format('d/m/Y H:i')
+                            : "Ocorrência sem modificações desde a criação"
+                    ),
+                    
                 TextColumn::make('visitors')
                     ->label('Visitantes')
                     ->formatStateUsing(function ($state, $record) {
@@ -262,6 +284,9 @@ class OccurrenceResource extends Resource
     {
         // Por padrão, mostrar apenas as ocorrências do dia atual
         $query = parent::getEloquentQuery();
+        
+        // Carrega antecipadamente os relacionamentos para melhorar o desempenho
+        $query->with(['creator', 'updater']);
         
         // Filtro default pode ser removido pelo usuário na interface se necessário
         return $query;

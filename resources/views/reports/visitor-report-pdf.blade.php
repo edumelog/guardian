@@ -377,10 +377,14 @@
         @if(count($occurrencesResults) > 0)
             <table>
                 <thead>
-                    <tr>
-                        @foreach($occurrencesHeaders as $header)
-                            <th>{{ $header }}</th>
-                        @endforeach
+                    <tr style="text-align: left; border-bottom: 1px solid #111827">
+                        <th style="padding: 8px;">ID</th>
+                        <th style="padding: 8px;">Descrição</th>
+                        <th style="padding: 8px;">Visitante</th>
+                        <th style="padding: 8px;">Destino</th>
+                        <th style="padding: 8px;">Data/Hora</th>
+                        <th style="padding: 8px;">Criado por</th>
+                        <th style="padding: 8px;">Modificado por</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -392,6 +396,7 @@
                             <td>{{ $occurrence['destination'] }}</td>
                             <td>{{ $occurrence['datetime'] }}</td>
                             <td>{{ $occurrence['creator'] }}</td>
+                            <td>{{ $occurrence['updater'] }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -403,7 +408,7 @@
     
     <div class="footer">
         <div>Sistema Guardian - Relatório de Visitas e Ocorrências</div>
-        <div>DTI - Diretoria de Tecnologia da Informação</div>
+        <div>DSL - Diretoria de Segurança do Legislativo</div>
     </div>
 </body>
 </html> 
