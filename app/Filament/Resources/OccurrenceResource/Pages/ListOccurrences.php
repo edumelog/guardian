@@ -8,6 +8,7 @@ use Filament\Support\Enums\MaxWidth;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 use App\Filament\Resources\OccurrenceResource;
+use Filament\Tables\Columns\TextColumn;
 
 class ListOccurrences extends ListRecords
 {
@@ -24,6 +25,11 @@ class ListOccurrences extends ListRecords
             Actions\CreateAction::make()
                 ->label('Nova Ocorrência')
                 ->icon('heroicon-o-plus-circle'),
+                
+            Actions\ExportAction::make()
+                ->label('Exportar')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('success'),
         ];
     }
     

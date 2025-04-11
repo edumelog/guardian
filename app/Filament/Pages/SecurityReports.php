@@ -990,7 +990,8 @@ class SecurityReports extends Page implements HasForms
                 'Visitante',
                 'Destino',
                 'Data/Hora',
-                'Criado por'
+                'Criado por',
+                'Modificado por'
             ];
             
             $col = 'A';
@@ -1006,17 +1007,26 @@ class SecurityReports extends Page implements HasForms
             // Dados das ocorrências
             foreach ($occurrencesResults as $occurrence) {
                 $occurrencesSheet->setCellValue('A' . $row, $occurrence['id']);
-                $occurrencesSheet->setCellValue('B' . $row, $occurrence['description']);
+                $occurrencesSheet->setCellValue('B' . $row, strip_tags($occurrence['description']));
                 $occurrencesSheet->setCellValue('C' . $row, $occurrence['visitor']);
                 $occurrencesSheet->setCellValue('D' . $row, $occurrence['destination']);
                 $occurrencesSheet->setCellValue('E' . $row, $occurrence['datetime']);
                 $occurrencesSheet->setCellValue('F' . $row, $occurrence['creator']);
                 
+                // Updated by
+                $updatedBy = '-';
+                if (isset($occurrence['updated_by']) && isset($occurrence['created_by']) && 
+                    $occurrence['updated_by'] && $occurrence['created_by'] !== $occurrence['updated_by']) {
+                    $updatedBy = ($occurrence['updater'] ?? 'N/A') . ' (' . 
+                        ($occurrence['updated_at'] ? $occurrence['updated_at']->format('d/m/Y H:i:s') : '') . ')';
+                }
+                $occurrencesSheet->setCellValue('G' . $row, $updatedBy);
+                
                 $row++;
             }
             
             // Auto-dimensionar colunas
-            foreach (range('A', 'F') as $col) {
+            foreach (range('A', 'G') as $col) {
                 $occurrencesSheet->getColumnDimension($col)->setAutoSize(true);
             }
         }
@@ -1095,7 +1105,7 @@ class SecurityReports extends Page implements HasForms
         $occurrencesResults = [];
         
         if (!empty($formData['include_occurrences']) && count($this->occurrencesResults) > 0) {
-            $occurrencesHeaders = ['ID', 'Descrição', 'Visitante', 'Destino', 'Data/Hora', 'Criado por'];
+            $occurrencesHeaders = ['ID', 'Descrição', 'Visitante', 'Destino', 'Data/Hora', 'Criado por', 'Modificado por'];
             $occurrencesResults = $this->formatOccurrencesForReport();
         }
         
@@ -1230,7 +1240,11 @@ class SecurityReports extends Page implements HasForms
                 'visitor' => $visitors,
                 'destination' => $destinations,
                 'datetime' => date('d/m/Y H:i:s', strtotime($occurrence->occurrence_datetime)),
-                'creator' => $occurrence->creator->name ?? 'N/A'
+                'creator' => $occurrence->creator->name ?? 'N/A',
+                'created_by' => $occurrence->created_by ?? null,
+                'updater' => $occurrence->updater->name ?? 'N/A',
+                'updated_by' => $occurrence->updated_by ?? null,
+                'updated_at' => $occurrence->updated_at
             ];
         }
         
