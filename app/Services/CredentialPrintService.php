@@ -33,6 +33,22 @@ class CredentialPrintService
         ]);
 
         try {
+            // Garante que temos o relacionamento latestLog carregado
+            if (!$visitor->relationLoaded('latestLog')) {
+                $visitor->load('latestLog.destination');
+            }
+            
+            // Obtém o destino da última visita ou usa o destino padrão do visitante se não houver visita
+            $currentDestination = $visitor->latestLog?->destination ?? $visitor->destination;
+            
+            // Registra no log para debug
+            Log::info('Destino usado para impressão da credencial', [
+                'visitor_id' => $visitor->id,
+                'latestLog_id' => $visitor->latestLog?->id,
+                'destination_id' => $currentDestination?->id,
+                'destination_name' => $currentDestination?->name,
+            ]);
+            
             // Carrega o template
             $templateName = $printerConfig['template'] ?? 'default';
             // Remove a extensão .zip se existir
@@ -71,10 +87,10 @@ class CredentialPrintService
                 'visitor-doc' => $visitor->docType->type === 'CPF' 
                     ? preg_replace('/(\d{3})(\d{3})(\d{3})(\d{2})/', '$1.$2.$3-$4', $visitor->doc)
                     : $visitor->doc,
-                'visitor-destination' => $visitor->destination->name,
-                'visitor-destination-alias' => $visitor->destination->getFirstAvailableAlias(),
-                'visitor-destination-address' => $visitor->destination->address,
-                'visitor-destination-phone' => $visitor->destination->phone,
+                'visitor-destination' => $currentDestination->name,
+                'visitor-destination-alias' => $currentDestination->getFirstAvailableAlias(),
+                'visitor-destination-address' => $currentDestination->address,
+                'visitor-destination-phone' => $currentDestination->phone,
                 'visitor-in-datetime' => $visitor->latestLog?->in_date?->format('d/m/Y H:i') ?? '',
                 'visitor-out-datetime' => $visitor->latestLog?->out_date?->format('d/m/Y H:i') ?? '',
                 'visitor-other' => $visitor->other ?? '',

@@ -81,16 +81,21 @@ class DocTypeResource extends Resource
                         "Tem certeza que deseja deletar o tipo de documento \"{$record->type}\"?"
                     )
                     ->modalSubmitActionLabel('Sim, deletar')
-                    ->before(function (DocType $record) {
-                        if ($record->visitors()->count() > 0) {
+                    ->visible(fn (DocType $record): bool => $record->visitors()->count() === 0)
+                    ->before(function (Tables\Actions\DeleteAction $action, DocType $record) {
+                        if ($visitorsCount = $record->visitors()->count()) {
                             // Impede a exclusão se houver visitantes associados
-                            return false;
+                            $action->cancel();
+                            
+                            // Notificação detalhada com o número de visitantes
+                            \Filament\Notifications\Notification::make()
+                                ->danger()
+                                ->title('Exclusão não permitida')
+                                ->body("Não é possível excluir o tipo de documento \"{$record->type}\" pois existem {$visitorsCount} visitante(s) associado(s) a ele.")
+                                ->persistent()
+                                ->send();
                         }
-                    })
-                    ->failureNotification(
-                        notification: fn (DocType $record) => 
-                            "Não é possível excluir o tipo de documento \"{$record->type}\" pois existem visitantes associados a ele."
-                    ),
+                    }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -99,17 +104,40 @@ class DocTypeResource extends Resource
                         ->modalHeading('Deletar Tipos de Documentos')
                         ->modalDescription('Tem certeza que deseja deletar os tipos de documentos selecionados?')
                         ->modalSubmitActionLabel('Sim, deletar')
-                        ->before(function ($records) {
+                        ->visible(function (): bool {
+                            // Verifica se existem tipos de documentos que podem ser excluídos
+                            return DocType::whereDoesntHave('visitors')->exists();
+                        })
+                        ->before(function (Tables\Actions\DeleteBulkAction $action, \Illuminate\Database\Eloquent\Collection $records) {
+                            $blockedRecords = [];
+                            
                             foreach ($records as $record) {
-                                if ($record->visitors()->count() > 0) {
-                                    // Impede a exclusão em massa se houver visitantes associados
-                                    return false;
+                                if ($visitorsCount = $record->visitors()->count()) {
+                                    $blockedRecords[] = [
+                                        'name' => $record->type,
+                                        'count' => $visitorsCount
+                                    ];
                                 }
                             }
-                        })
-                        ->failureNotification(fn () => 
-                            'Não é possível excluir tipos de documentos que possuem visitantes associados.'
-                        ),
+                            
+                            if (!empty($blockedRecords)) {
+                                $action->cancel();
+                                
+                                // Mensagem detalhada indicando quais tipos não podem ser excluídos
+                                $blockedDetails = collect($blockedRecords)
+                                    ->map(fn ($item) => "- {$item['name']} ({$item['count']} visitante(s))")
+                                    ->join('<br>');
+                                
+                                \Filament\Notifications\Notification::make()
+                                    ->danger()
+                                    ->title('Exclusão não permitida')
+                                    ->body(new \Illuminate\Support\HtmlString(
+                                        "Não é possível excluir os seguintes tipos de documentos pois possuem visitantes associados:<br>{$blockedDetails}"
+                                    ))
+                                    ->persistent()
+                                    ->send();
+                            }
+                        }),
                 ]),
             ]);
     }

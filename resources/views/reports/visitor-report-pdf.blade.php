@@ -227,6 +227,12 @@
     <h2 style="break-before: page; page-break-before: always;">Estatísticas</h2>
     
     <div class="stats-container">
+        @if(isset($visitorStats['is_grouped']) && $visitorStats['is_grouped'])
+        <div style="background-color: #fef9c3; padding: 8px; border-radius: 4px; margin-bottom: 15px; border-left: 4px solid #eab308; font-weight: bold;">
+            Nota: Os resultados estão agrupados hierarquicamente. As contagens incluem os destinos selecionados e todos os seus subdestinos.
+        </div>
+        @endif
+        
         <div class="stats-summary">
             <div class="stats-card">
                 <div class="stats-card-title">Total de Registros</div>
@@ -371,10 +377,14 @@
         @if(count($occurrencesResults) > 0)
             <table>
                 <thead>
-                    <tr>
-                        @foreach($occurrencesHeaders as $header)
-                            <th>{{ $header }}</th>
-                        @endforeach
+                    <tr style="text-align: left; border-bottom: 1px solid #111827">
+                        <th style="padding: 8px;">ID</th>
+                        <th style="padding: 8px;">Descrição</th>
+                        <th style="padding: 8px;">Visitante</th>
+                        <th style="padding: 8px;">Destino</th>
+                        <th style="padding: 8px;">Data/Hora</th>
+                        <th style="padding: 8px;">Criado por</th>
+                        <th style="padding: 8px;">Modificado por</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -386,6 +396,7 @@
                             <td>{{ $occurrence['destination'] }}</td>
                             <td>{{ $occurrence['datetime'] }}</td>
                             <td>{{ $occurrence['creator'] }}</td>
+                            <td>{{ $occurrence['updater'] }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -397,7 +408,7 @@
     
     <div class="footer">
         <div>Sistema Guardian - Relatório de Visitas e Ocorrências</div>
-        <div>DTI - Diretoria de Tecnologia da Informação</div>
+        <div>DSL - Diretoria de Segurança do Legislativo</div>
     </div>
 </body>
 </html> 

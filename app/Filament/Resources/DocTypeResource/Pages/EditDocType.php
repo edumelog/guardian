@@ -25,15 +25,21 @@ class EditDocType extends EditRecord
                     "Tem certeza que deseja deletar o tipo de documento \"{$record->type}\"?"
                 )
                 ->modalSubmitActionLabel('Sim, deletar')
-                ->before(function ($record) {
-                    if ($record->visitors()->count() > 0) {
-                        return false;
+                ->visible(fn ($record): bool => $record->visitors()->count() === 0)
+                ->before(function (Actions\DeleteAction $action, $record) {
+                    if ($visitorsCount = $record->visitors()->count()) {
+                        // Impede a exclusão se houver visitantes associados
+                        $action->cancel();
+                        
+                        // Notificação detalhada com o número de visitantes
+                        \Filament\Notifications\Notification::make()
+                            ->danger()
+                            ->title('Exclusão não permitida')
+                            ->body("Não é possível excluir o tipo de documento \"{$record->type}\" pois existem {$visitorsCount} visitante(s) associado(s) a ele.")
+                            ->persistent()
+                            ->send();
                     }
-                })
-                ->failureNotification(
-                    notification: fn ($record) => 
-                        "Não é possível excluir o tipo de documento \"{$record->type}\" pois existem visitantes associados a ele."
-                ),
+                }),
         ];
     }
 } 

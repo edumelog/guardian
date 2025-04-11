@@ -349,7 +349,8 @@
                         <th class="px-4 py-3 font-bold text-white text-left">Visitante</th>
                         <th class="px-4 py-3 font-bold text-white text-left">Destino</th>
                         <th class="px-4 py-3 font-bold text-white text-left">Data/Hora</th>
-                        <th class="px-4 py-3 font-bold text-white text-left">Operador</th>
+                        <th class="px-4 py-3 font-bold text-white text-left">Criado por</th>
+                        <th class="px-4 py-3 font-bold text-white text-left">Modificado por</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
@@ -384,6 +385,14 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap text-gray-900">{{ $occurrence->creator->name ?? 'N/A' }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-gray-900">
+                                @if($occurrence->updated_by && $occurrence->created_by !== $occurrence->updated_by)
+                                    {{ $occurrence->updater->name ?? 'N/A' }}
+                                    <div class="text-xs text-gray-500">{{ $occurrence->updated_at?->diffForHumans() ?? '' }}</div>
+                                @else
+                                    <span class="text-gray-500">-</span>
+                                @endif
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>

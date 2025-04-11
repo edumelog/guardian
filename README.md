@@ -47,6 +47,10 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+### v1.5.2
+- Implementação da coluna "Modificado-por" nos relatórios
+- Restrição de deleção de destinos e tipos de documentos com visitantes associados
+
 ### v1.5.1
 - **Implementação do uso de template usando %/vw/vh e sem referencia fixa de dimensão da etiqueta** - principal funcionalidade desta versão
 - Criação de ícones e letras para os dias da semana

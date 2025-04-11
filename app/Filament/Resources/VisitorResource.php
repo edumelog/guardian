@@ -473,11 +473,11 @@ class VisitorResource extends Resource
                             ->content(function ($record) {
                                 if (!$record) return 'Nenhuma visita registrada';
 
+                                // Busca todas as visitas do visitante, incluindo visitas repetidas ao mesmo destino
                                 $logs = $record->visitorLogs()
                                     ->with('destination')
                                     ->orderBy('in_date', 'desc')
                                     ->get()
-                                    ->unique('destination_id')
                                     ->values();
 
                                 if ($logs->isEmpty()) return 'Nenhuma visita registrada';

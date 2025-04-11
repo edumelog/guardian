@@ -349,9 +349,44 @@ class SecurityReports extends Page implements HasForms
         // Filtrar por destino - apenas se o filtro for fornecido
         if (!empty($formData['destination_ids'])) {
             Log::info('Filtrando ocorrências por destinos', ['destination_ids' => $formData['destination_ids']]);
-            $query->whereHas('destinations', function ($q) use ($formData) {
-                $q->whereIn('destinations.id', $formData['destination_ids']);
-            });
+            
+            // Se o agrupamento hierárquico estiver ativado
+            if (!empty($formData['grouped_results'])) {
+                // Array para armazenar todos os IDs de destinos (incluindo filhos)
+                $allDestinationIds = $formData['destination_ids'];
+                
+                // Buscar todos os destinos filhos recursivamente
+                foreach ($formData['destination_ids'] as $destId) {
+                    $destination = \App\Models\Destination::find($destId);
+                    if ($destination) {
+                        $childrenIds = $destination->getAllChildrenIds();
+                        $allDestinationIds = array_merge($allDestinationIds, $childrenIds);
+                    }
+                }
+                
+                // Remover duplicatas
+                $allDestinationIds = array_unique($allDestinationIds);
+                
+                Log::info('Aplicando filtro hierárquico de destinos para ocorrências', [
+                    'total_destinations' => count($allDestinationIds)
+                ]);
+                
+                $query->whereHas('destinations', function ($q) use ($allDestinationIds) {
+                    $q->whereIn('destinations.id', $allDestinationIds);
+                });
+            } else {
+                // Filtro normal, sem hierarquia
+                $query->whereHas('destinations', function ($q) use ($formData) {
+                    $q->whereIn('destinations.id', $formData['destination_ids']);
+                });
+            }
+            
+            // Log da query para depuração
+            Log::debug('SQL gerado para filtro de destinos em ocorrências', [
+                'sql' => $query->toSql(),
+                'bindings' => $query->getBindings(),
+                'count' => $query->count()
+            ]);
         }
 
         // Log da query SQL para debug
@@ -391,6 +426,7 @@ class SecurityReports extends Page implements HasForms
             'start_time' => '00:00',
             'end_time' => '23:59',
             'include_occurrences' => true,
+            'grouped_results' => false,
         ]);
         
         Log::info('Página de relatórios montada', [
@@ -416,13 +452,67 @@ class SecurityReports extends Page implements HasForms
                                     ->displayFormat('d/m/Y')
                                     ->maxDate(now())
                                     ->placeholder('Pode ser deixado vazio')
-                                    ->helperText('Se vazio, usará 01/01/1900. Deve ser anterior ou igual à data final.'),
+                                    ->helperText('Se vazio, usará 01/01/1900. Deve ser anterior ou igual à data final.')
+                                    ->afterStateUpdated(function($state, $old, callable $set, callable $get) {
+                                        $endDate = $get('end_date');
+                                        
+                                        // Se state ou endDate forem nulos, não há como comparar
+                                        if ($state === null || $endDate === null) {
+                                            return;
+                                        }
+                                        
+                                        // Se a data inicial for maior que a data final, ajuste a data final
+                                        if (strtotime($state) > strtotime($endDate)) {
+                                            $set('end_date', $state);
+                                            Notification::make()
+                                                ->warning()
+                                                ->title('Data final ajustada')
+                                                ->body('A data final foi ajustada para não ser anterior à data inicial.')
+                                                ->send();
+                                                
+                                            // Se as datas são iguais, verifique também o horário
+                                            $startTime = $get('start_time');
+                                            $endTime = $get('end_time');
+                                            
+                                            if ($startTime && $endTime && strtotime($startTime) > strtotime($endTime)) {
+                                                $set('end_time', $startTime);
+                                                Notification::make()
+                                                    ->warning()
+                                                    ->title('Horário final ajustado')
+                                                    ->body('O horário final foi ajustado para não ser anterior ao horário inicial.')
+                                                    ->send();
+                                            }
+                                        }
+                                    }),
 
                                 TimePicker::make('start_time')
                                     ->label('Hora Inicial')
                                     ->seconds(false)
                                     ->default('00:00')
-                                    ->helperText('A partir de'),
+                                    ->helperText('A partir de')
+                                    ->afterStateUpdated(function($state, $old, callable $set, callable $get) {
+                                        $startDate = $get('start_date');
+                                        $endDate = $get('end_date');
+                                        $endTime = $get('end_time');
+                                        
+                                        // Se algum dos valores for nulo, não podemos comparar
+                                        if ($state === null || $startDate === null || $endDate === null || $endTime === null) {
+                                            return;
+                                        }
+                                        
+                                        // Validar horário apenas se as datas forem iguais
+                                        if ($startDate === $endDate) {
+                                            // Se o horário inicial for maior que o final na mesma data, ajustar o horário final
+                                            if (strtotime($state) > strtotime($endTime)) {
+                                                $set('end_time', $state);
+                                                Notification::make()
+                                                    ->warning()
+                                                    ->title('Horário ajustado')
+                                                    ->body('O horário final foi ajustado para não ser anterior ao horário inicial na mesma data.')
+                                                    ->send();
+                                            }
+                                        }
+                                    }),
                                     
                                 DatePicker::make('end_date')
                                     ->label('Data Final (opcional)')
@@ -430,13 +520,54 @@ class SecurityReports extends Page implements HasForms
                                     ->displayFormat('d/m/Y')
                                     ->maxDate(now())
                                     ->placeholder('Pode ser deixado vazio')
-                                    ->helperText('Se vazio, usará a data atual. Deve ser posterior ou igual à data inicial.'),
+                                    ->helperText('Se vazio, usará a data atual. Deve ser posterior ou igual à data inicial.')
+                                    ->afterStateUpdated(function($state, $old, callable $set, callable $get) {
+                                        $startDate = $get('start_date');
+                                        
+                                        // Se state ou startDate forem nulos, não há como comparar
+                                        if ($state === null || $startDate === null) {
+                                            return;
+                                        }
+                                        
+                                        // Se a data final for menor que a data inicial, redefina para a data inicial
+                                        if (strtotime($state) < strtotime($startDate)) {
+                                            $set('end_date', $startDate);
+                                            Notification::make()
+                                                ->warning()
+                                                ->title('Data ajustada')
+                                                ->body('A data final foi ajustada para não ser anterior à data inicial.')
+                                                ->send();
+                                        }
+                                    }),
 
                                 TimePicker::make('end_time')
                                     ->label('Hora Final')
                                     ->seconds(false)
                                     ->default('23:59')
-                                    ->helperText('Até. Se as datas forem iguais, este horário deve ser maior ou igual ao inicial.'),
+                                    ->helperText('Até. Se as datas forem iguais, este horário deve ser maior ou igual ao inicial.')
+                                    ->afterStateUpdated(function($state, $old, callable $set, callable $get) {
+                                        $startDate = $get('start_date');
+                                        $endDate = $get('end_date');
+                                        $startTime = $get('start_time');
+                                        
+                                        // Se algum dos valores for nulo, não podemos comparar
+                                        if ($state === null || $startDate === null || $endDate === null || $startTime === null) {
+                                            return;
+                                        }
+                                        
+                                        // Validar horário apenas se as datas forem iguais
+                                        if ($startDate === $endDate) {
+                                            // Se o horário final for menor que o inicial na mesma data, ajustar
+                                            if (strtotime($state) < strtotime($startTime)) {
+                                                $set('end_time', $startTime);
+                                                Notification::make()
+                                                    ->warning()
+                                                    ->title('Horário ajustado')
+                                                    ->body('O horário final foi ajustado para não ser anterior ao horário inicial na mesma data.')
+                                                    ->send();
+                                            }
+                                        }
+                                    }),
                             ])
                             ->columnSpanFull(),
 
@@ -493,6 +624,11 @@ class SecurityReports extends Page implements HasForms
                                     ->label('Incluir ocorrências registradas no período')
                                     ->helperText('Quando marcado, o relatório incluirá também as ocorrências registradas conforme os filtros selecionados.')
                                     ->default(true),
+                                    
+                                \Filament\Forms\Components\Checkbox::make('grouped_results')
+                                    ->label('Resultados Agrupados')
+                                    ->helperText('Quando marcado, os destinos selecionados serão usados como agrupadores e incluirão os totais de visitas em todos os seus subdestinos.')
+                                    ->default(false),
                             ]),
                     ])
                     ->columns(1),
@@ -506,12 +642,24 @@ class SecurityReports extends Page implements HasForms
         
         $data = $this->form->getState();
         
+        // Log dos filtros aplicados
+        Log::info('Filtros aplicados na pesquisa', [
+            'filtros' => $data
+        ]);
+        
         // Resetar os resultados
         $this->results = [];
         $this->occurrencesResults = [];
         
         // Montar as datas de início e fim com os horários especificados
         $startDateTime = $data['start_date'] . ' ' . $data['start_time'] . ':00';
+        
+        // Verifica se a data final é a data atual e ajusta a hora final
+        if ($data['end_date'] === now()->format('Y-m-d')) {
+            // Usar a hora atual em vez de 23:59 quando a data for a atual
+            $data['end_time'] = now()->format('H:i');
+        }
+        
         $endDateTime = $data['end_date'] . ' ' . $data['end_time'] . ':59';
         
         // Validar que a data de início é anterior à data de fim
@@ -548,12 +696,67 @@ class SecurityReports extends Page implements HasForms
             });
         }
         
+        // Log do estado antes da aplicação do filtro de destinos
+        Log::info('Estado da consulta antes de aplicar filtro de destinos', [
+            'count_sem_filtro' => (clone $query)->count(),
+            'destination_ids' => $data['destination_ids'] ?? 'Nenhum selecionado'
+        ]);
+        
         if (!empty($data['destination_ids'])) {
-            $query->whereIn('destination_id', $data['destination_ids']);
+            // Se o agrupamento hierárquico estiver ativado
+            if (!empty($data['grouped_results'])) {
+                Log::info('Agrupamento hierárquico ativado', [
+                    'destination_ids' => $data['destination_ids']
+                ]);
+                
+                // Array para armazenar todos os IDs de destinos (incluindo filhos)
+                $allDestinationIds = $data['destination_ids'];
+                
+                // Buscar todos os destinos filhos recursivamente
+                foreach ($data['destination_ids'] as $destId) {
+                    $destination = \App\Models\Destination::find($destId);
+                    if ($destination) {
+                        $childrenIds = $destination->getAllChildrenIds();
+                        Log::info("Filhos encontrados para destino ID {$destId}", [
+                            'destination_name' => $destination->name,
+                            'children_count' => count($childrenIds),
+                            'children_ids' => $childrenIds
+                        ]);
+                        
+                        $allDestinationIds = array_merge($allDestinationIds, $childrenIds);
+                    }
+                }
+                
+                // Remover duplicatas
+                $allDestinationIds = array_unique($allDestinationIds);
+                
+                Log::info('Aplicando filtro hierárquico de destinos', [
+                    'total_destinations' => count($allDestinationIds),
+                    'destination_ids' => $allDestinationIds
+                ]);
+                
+                $query->whereIn('destination_id', $allDestinationIds);
+            } else {
+                // Filtro normal, sem hierarquia
+                $query->whereIn('destination_id', $data['destination_ids']);
+                Log::info('Aplicando filtro por destinos na consulta principal', [
+                    'destination_ids' => $data['destination_ids'],
+                    'sql' => $query->toSql(),
+                    'bindings' => $query->getBindings()
+                ]);
+            }
         }
         
         // Executar a consulta
         $this->results = $query->get();
+        
+        // Log após a aplicação do filtro
+        Log::info('Resultados após aplicação de filtros', [
+            'total_encontrado' => count($this->results),
+            'amostra_destinos' => collect($this->results)->take(3)->map(function($log) {
+                return ['id' => $log->destination_id, 'name' => $log->destination->name ?? '?'];
+            })->toArray()
+        ]);
         
         // Inicializar a variável de ocorrências
         $this->occurrencesResults = [];
@@ -618,6 +821,24 @@ class SecurityReports extends Page implements HasForms
         // Importações necessárias para Excel
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $formData = $this->form->getState();
+        
+        // Verificar se a data final é hoje e ajustar a hora final
+        if ($formData['end_date'] === now()->format('Y-m-d')) {
+            $formData['end_time'] = now()->format('H:i');
+        }
+        
+        // Log detalhado para depuração
+        Log::info('Iniciando exportação para Excel', [
+            'total_results' => count($this->results),
+            'destination_ids_filter' => $formData['destination_ids'] ?? [],
+            'amostra_destinos' => collect($this->results)->take(5)->map(function($log) {
+                return [
+                    'id' => $log->destination_id,
+                    'name' => $log->destination->name ?? 'N/A'
+                ];
+            })->toArray()
+        ]);
+        
         $hasOccurrences = !empty($formData['include_occurrences']) && count($this->occurrencesResults) > 0;
         
         // Aba 1: Visitas
@@ -648,14 +869,23 @@ class SecurityReports extends Page implements HasForms
         $visitsSheet->mergeCells('A2:B2');
         $visitsSheet->mergeCells('C2:I2');
         
+        // Adiciona nota sobre agrupamento hierárquico se estiver ativo
+        if (!empty($formData['grouped_results'])) {
+            $visitsSheet->setCellValue('A3', 'NOTA: Resultados agrupados hierarquicamente. As contagens incluem os destinos selecionados e todos os seus subdestinos.');
+            $visitsSheet->mergeCells('A3:I3');
+            $row = 4;
+        } else {
+            $row = 3;
+        }
+        
         // Obter os filtros aplicados
         $filters = $this->getAppliedFilters($formData);
         
         // Incluir filtros aplicados
-        $visitsSheet->setCellValue('A3', 'Filtros aplicados:');
-        $visitsSheet->mergeCells('A3:I3');
+        $visitsSheet->setCellValue('A' . $row, 'Filtros aplicados:');
+        $visitsSheet->mergeCells('A' . $row . ':I' . $row);
         
-        $row = 4;
+        $row++;
         foreach ($filters as $label => $value) {
             $visitsSheet->setCellValue('A' . $row, $label . ':');
             $visitsSheet->setCellValue('B' . $row, $value);
@@ -738,19 +968,19 @@ class SecurityReports extends Page implements HasForms
             $occurrencesSheet->setCellValue('A1', 'Relatório de Ocorrências - ' . now()->format('d/m/Y H:i:s'));
             $occurrencesSheet->mergeCells('A1:F1');
             
-            // Incluir filtros aplicados
-            $occurrencesSheet->setCellValue('A2', 'Filtros aplicados:');
-            $occurrencesSheet->mergeCells('A2:F2');
-            
-            $row = 3;
-            foreach ($filters as $label => $value) {
-                $occurrencesSheet->setCellValue('A' . $row, $label . ':');
-                $occurrencesSheet->setCellValue('B' . $row, $value);
-                $occurrencesSheet->mergeCells('B' . $row . ':F' . $row);
-                $row++;
+            // Adiciona nota sobre agrupamento hierárquico se estiver ativo
+            if (!empty($formData['grouped_results'])) {
+                $occurrencesSheet->setCellValue('A2', 'NOTA: Resultados agrupados hierarquicamente. As contagens incluem os destinos selecionados e todos os seus subdestinos.');
+                $occurrencesSheet->mergeCells('A2:F2');
+                $row = 3;
+            } else {
+                $row = 2;
             }
             
-            // Linha em branco
+            // Incluir filtros aplicados
+            $occurrencesSheet->setCellValue('A' . $row, 'Filtros aplicados:');
+            $occurrencesSheet->mergeCells('A' . $row . ':F' . $row);
+            
             $row++;
             
             // Cabeçalhos das colunas para ocorrências
@@ -760,7 +990,8 @@ class SecurityReports extends Page implements HasForms
                 'Visitante',
                 'Destino',
                 'Data/Hora',
-                'Criado por'
+                'Criado por',
+                'Modificado por'
             ];
             
             $col = 'A';
@@ -776,17 +1007,26 @@ class SecurityReports extends Page implements HasForms
             // Dados das ocorrências
             foreach ($occurrencesResults as $occurrence) {
                 $occurrencesSheet->setCellValue('A' . $row, $occurrence['id']);
-                $occurrencesSheet->setCellValue('B' . $row, $occurrence['description']);
+                $occurrencesSheet->setCellValue('B' . $row, strip_tags($occurrence['description']));
                 $occurrencesSheet->setCellValue('C' . $row, $occurrence['visitor']);
                 $occurrencesSheet->setCellValue('D' . $row, $occurrence['destination']);
                 $occurrencesSheet->setCellValue('E' . $row, $occurrence['datetime']);
                 $occurrencesSheet->setCellValue('F' . $row, $occurrence['creator']);
                 
+                // Updated by
+                $updatedBy = '-';
+                if (isset($occurrence['updated_by']) && isset($occurrence['created_by']) && 
+                    $occurrence['updated_by'] && $occurrence['created_by'] !== $occurrence['updated_by']) {
+                    $updatedBy = ($occurrence['updater'] ?? 'N/A') . ' (' . 
+                        ($occurrence['updated_at'] ? $occurrence['updated_at']->format('d/m/Y H:i:s') : '') . ')';
+                }
+                $occurrencesSheet->setCellValue('G' . $row, $updatedBy);
+                
                 $row++;
             }
             
             // Auto-dimensionar colunas
-            foreach (range('A', 'F') as $col) {
+            foreach (range('A', 'G') as $col) {
                 $occurrencesSheet->getColumnDimension($col)->setAutoSize(true);
             }
         }
@@ -814,6 +1054,23 @@ class SecurityReports extends Page implements HasForms
     {
         $this->validate();
         $formData = $this->form->getState();
+        
+        // Verificar se a data final é hoje e ajustar a hora final
+        if ($formData['end_date'] === now()->format('Y-m-d')) {
+            $formData['end_time'] = now()->format('H:i');
+        }
+        
+        // Log detalhado para depuração
+        Log::info('Iniciando exportação para PDF', [
+            'total_results' => count($this->results),
+            'destination_ids_filter' => $formData['destination_ids'] ?? [],
+            'amostra_destinos' => collect($this->results)->take(3)->map(function($log) {
+                return [
+                    'id' => $log->destination_id,
+                    'name' => $log->destination->name ?? 'N/A'
+                ];
+            })->toArray()
+        ]);
         
         // Formatar datas para exibição incluindo os horários definidos no filtro
         $formattedStartDate = date('d/m/Y', strtotime($formData['start_date'])) . ' ' . $formData['start_time'];
@@ -848,7 +1105,7 @@ class SecurityReports extends Page implements HasForms
         $occurrencesResults = [];
         
         if (!empty($formData['include_occurrences']) && count($this->occurrencesResults) > 0) {
-            $occurrencesHeaders = ['ID', 'Descrição', 'Visitante', 'Destino', 'Data/Hora', 'Criado por'];
+            $occurrencesHeaders = ['ID', 'Descrição', 'Visitante', 'Destino', 'Data/Hora', 'Criado por', 'Modificado por'];
             $occurrencesResults = $this->formatOccurrencesForReport();
         }
         
@@ -983,7 +1240,11 @@ class SecurityReports extends Page implements HasForms
                 'visitor' => $visitors,
                 'destination' => $destinations,
                 'datetime' => date('d/m/Y H:i:s', strtotime($occurrence->occurrence_datetime)),
-                'creator' => $occurrence->creator->name ?? 'N/A'
+                'creator' => $occurrence->creator->name ?? 'N/A',
+                'created_by' => $occurrence->created_by ?? null,
+                'updater' => $occurrence->updater->name ?? 'N/A',
+                'updated_by' => $occurrence->updated_by ?? null,
+                'updated_at' => $occurrence->updated_at
             ];
         }
         
@@ -996,6 +1257,12 @@ class SecurityReports extends Page implements HasForms
     protected function formatResultsForReport()
     {
         $formattedResults = [];
+        
+        Log::info('Formatando resultados para relatório', [
+            'total_results' => count($this->results),
+            'filtros_aplicados' => $this->form->getState(),
+            'primeiro_destino' => $this->results[0]->destination->name ?? 'Nenhum'
+        ]);
         
         foreach ($this->results as $log) {
             $formattedResults[] = [
@@ -1068,14 +1335,25 @@ class SecurityReports extends Page implements HasForms
         // Destino
         if (!empty($formData['destination_ids'])) {
             $destinations = \App\Models\Destination::whereIn('id', $formData['destination_ids'])->get();
-            $filters['Destinos'] = $destinations->map(function ($destination) {
+            $destinationNames = $destinations->map(function ($destination) {
                 return $destination->name;
             })->join(', ');
+            
+            if (!empty($formData['grouped_results'])) {
+                $filters['Destinos (Agrupados)'] = $destinationNames . ' (incluindo subdestinos)';
+            } else {
+                $filters['Destinos'] = $destinationNames;
+            }
         }
         
         // Ocorrências incluídas
         if (!empty($formData['include_occurrences'])) {
             $filters['Ocorrências'] = 'Incluídas';
+        }
+        
+        // Agrupamento hierárquico
+        if (!empty($formData['grouped_results'])) {
+            $filters['Agrupamento'] = 'Resultados incluem todos os subdestinos';
         }
         
         return $filters;
@@ -1139,6 +1417,7 @@ class SecurityReports extends Page implements HasForms
                     'doc' => null,
                     'destination_ids' => [],
                     'include_occurrences' => true,
+                    'grouped_results' => false,
                 ]);
                 
                 Notification::make()
@@ -1174,6 +1453,7 @@ class SecurityReports extends Page implements HasForms
             'visitors_by_destination' => [],
             'unique_visitors' => 0,
             'ongoing_visits' => 0,
+            'is_grouped' => !empty($this->form->getState()['grouped_results']),
         ];
         
         // Se não houver resultados, retornar estatísticas vazias
