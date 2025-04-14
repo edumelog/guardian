@@ -47,6 +47,10 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+### v1.5.3
+- Restrição de deleção de usuários que tenham ocorrências em seu nome ou editadas por ele
+- Possibilidade de desabilitar um usuário do sistema impedindo o login
+
 ### v1.5.2
 - Implementação da coluna "Modificado-por" nos relatórios
 - Restrição de deleção de destinos e tipos de documentos com visitantes associados
