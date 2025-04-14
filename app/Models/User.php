@@ -23,6 +23,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'is_active',
     ];
 
     /**
@@ -45,8 +46,16 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
+
+    /**
+     * Define o valor padrão para is_active
+     */
+    protected $attributes = [
+        'is_active' => true,
+    ];
 
     public function printers(): BelongsToMany
     {
@@ -57,5 +66,29 @@ class User extends Authenticatable
     public function visitorLogs()
     {
         return $this->hasMany(VisitorLog::class, 'operator_id');
+    }
+
+    /**
+     * Ocorrências criadas pelo usuário
+     */
+    public function createdOccurrences()
+    {
+        return $this->hasMany(Occurrence::class, 'created_by');
+    }
+    
+    /**
+     * Ocorrências modificadas pelo usuário
+     */
+    public function updatedOccurrences()
+    {
+        return $this->hasMany(Occurrence::class, 'updated_by');
+    }
+    
+    /**
+     * Verifica se o usuário possui ocorrências associadas
+     */
+    public function hasRelatedOccurrences(): bool
+    {
+        return $this->createdOccurrences()->exists() || $this->updatedOccurrences()->exists();
     }
 }
