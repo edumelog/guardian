@@ -184,7 +184,7 @@ class CredentialPrintService
                     // ->setChromePath('/opt/google/chrome/chrome')
                     ->setChromePath('/usr/bin/google-chrome')
                     ->userDataDir($tempDir) // Define o diretório de dados do usuário
-                    ->setEnvironmentVariable('HOME', '/tmp') // Define o diretório home temporário
+                    ->setEnvironmentOptions(['HOME' => '/tmp']) // Define o diretório home temporário
                     ->paperSize($paperWidth_mm, $paperHeight_mm, 'mm')
                     ->margins($margins_mm['top'], $margins_mm['right'], $margins_mm['bottom'], $margins_mm['left'], 'mm')
                     ->showBackground()
