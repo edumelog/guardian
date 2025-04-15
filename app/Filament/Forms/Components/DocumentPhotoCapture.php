@@ -79,14 +79,11 @@ class DocumentPhotoCapture extends Field
                 // Remove caracteres especiais do número do documento
                 $safeDocNumber = preg_replace('/[^a-zA-Z0-9]/', '', $docNumber);
                 
-                // Cria o nome do arquivo: doc_tipo_numero_lado.jpg
-                $filename = 'doc_' . strtolower($docType->type) . '_' . $safeDocNumber . '_' . $this->side . '.jpg';
+                // Adiciona um timestamp ao nome do arquivo para garantir que é único
+                $timestamp = date('YmdHis');
                 
-                // Verifica se o arquivo já existe
-                if (Storage::disk('private')->exists('visitors-photos/' . $filename)) {
-                    Log::info("DocumentPhotoCapture: Arquivo {$filename} já existe, usando o existente");
-                    return $filename;
-                }
+                // Cria o nome do arquivo: doc_tipo_numero_lado_timestamp.jpg
+                $filename = 'doc_' . strtolower($docType->type) . '_' . $safeDocNumber . '_' . $this->side . '_' . $timestamp . '.jpg';
                 
                 // Converte base64 para arquivo
                 $image = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $state));
