@@ -169,16 +169,29 @@ class CredentialPrintService
             ]);
 
             try {
+                // Cria um diretório temporário para o Chrome
+                $tempDir = '/tmp/chrome-' . uniqid();
+                if (!file_exists($tempDir)) {
+                    mkdir($tempDir, 0755, true);
+                }
+                
+                Log::info('Usando diretório temporário para o Chrome', [
+                    'temp_dir' => $tempDir
+                ]);
                 
                 $pdf = Browsershot::html($html)
                     ->setNodeBinary('/usr/bin/node')
                     // ->setChromePath('/opt/google/chrome/chrome')
                     ->setChromePath('/usr/bin/google-chrome')
+                    ->userDataDir($tempDir) // Define o diretório de dados do usuário
+                    ->setEnvironmentVariable('HOME', '/tmp') // Define o diretório home temporário
                     ->paperSize($paperWidth_mm, $paperHeight_mm, 'mm')
                     ->margins($margins_mm['top'], $margins_mm['right'], $margins_mm['bottom'], $margins_mm['left'], 'mm')
                     ->showBackground()
                     ->scale(1)
-                    ->noSandbox()
+                    ->noSandbox() // Desativa o sandbox
+                    ->ignoreCertificateErrors() // Ignora erros de certificado
+                    ->disableGpu() // Desativa a GPU
                     ->deviceScaleFactor(3)
                     ->dismissDialogs()
                     ->waitUntilNetworkIdle()
@@ -188,6 +201,23 @@ class CredentialPrintService
                     // save at public folder
                     // ->savePdf(public_path('teste_'.$orientation.'.pdf'));
                     // dd("parei aqui");
+
+                // Limpa o diretório temporário
+                if (file_exists($tempDir)) {
+                    try {
+                        // Remover arquivos
+                        array_map('unlink', glob("$tempDir/*.*"));
+                        rmdir($tempDir);
+                        Log::info('Diretório temporário limpo com sucesso', [
+                            'temp_dir' => $tempDir
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::warning('Não foi possível limpar o diretório temporário', [
+                            'temp_dir' => $tempDir,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
 
                 Log::info('PDF gerado com sucesso', [
                     'pdf_size' => strlen($pdf)

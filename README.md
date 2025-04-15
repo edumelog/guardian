@@ -47,6 +47,9 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+### v1.5.5
+- Novo path para o doretorio tmp
+
 ### v1.5.4
 - Substituição do path do Node e Chrome para valores default para uso pelo Browsershot
 
