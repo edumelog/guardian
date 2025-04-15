@@ -169,38 +169,62 @@ class CredentialPrintService
             ]);
 
             try {
-                // Cria um diretório temporário para o Chrome
+                // Cria um diretório temporário para o Chrome com permissões universais
                 $tempDir = '/tmp/chrome-' . uniqid();
                 if (!file_exists($tempDir)) {
-                    mkdir($tempDir, 0755, true);
+                    mkdir($tempDir, 0777, true);
                 }
                 
+                // Configura outras pastas temporárias necessárias
+                $crashpadDir = '/tmp/crashpad-' . uniqid();
+                if (!file_exists($crashpadDir)) {
+                    mkdir($crashpadDir, 0777, true);
+                }
+                
+                // Define argumentos adicionais para o Chrome
+                $chromiumArgs = [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--disable-software-rasterizer',
+                    '--disable-extensions',
+                    '--disable-default-apps',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--crash-dumps-dir=' . $crashpadDir,
+                ];
+                
                 Log::info('Usando diretório temporário para o Chrome', [
-                    'temp_dir' => $tempDir
+                    'temp_dir' => $tempDir,
+                    'crashpad_dir' => $crashpadDir,
+                    'chrome_args' => $chromiumArgs
                 ]);
                 
                 $pdf = Browsershot::html($html)
                     ->setNodeBinary('/usr/bin/node')
-                    // ->setChromePath('/opt/google/chrome/chrome')
                     ->setChromePath('/usr/bin/google-chrome')
-                    ->userDataDir($tempDir) // Define o diretório de dados do usuário
-                    ->setEnvironmentOptions(['HOME' => '/tmp']) // Define o diretório home temporário
+                    ->userDataDir($tempDir)
+                    ->setEnvironmentOptions([
+                        'HOME' => '/tmp',
+                        'XDG_CONFIG_HOME' => '/tmp/.config',
+                        'XDG_DATA_HOME' => '/tmp/.local/share',
+                        'XDG_CACHE_HOME' => '/tmp/.cache'
+                    ])
+                    ->addChromiumArguments($chromiumArgs)
                     ->paperSize($paperWidth_mm, $paperHeight_mm, 'mm')
                     ->margins($margins_mm['top'], $margins_mm['right'], $margins_mm['bottom'], $margins_mm['left'], 'mm')
                     ->showBackground()
                     ->scale(1)
-                    ->noSandbox() // Desativa o sandbox
-                    ->ignoreCertificateErrors() // Ignora erros de certificado
-                    ->disableGpu() // Desativa a GPU
+                    ->noSandbox()
+                    ->ignoreCertificateErrors()
+                    ->disableGpu()
                     ->deviceScaleFactor(3)
                     ->dismissDialogs()
                     ->waitUntilNetworkIdle()
-                    // define the orientation according to orientation in printerConfig when using paperSize mm
                     ->landscape($orientation == 'landscape' || $orientation == 'reverse-landscape' ? true : false)
                     ->base64pdf();
-                    // save at public folder
-                    // ->savePdf(public_path('teste_'.$orientation.'.pdf'));
-                    // dd("parei aqui");
 
                 // Limpa o diretório temporário
                 if (file_exists($tempDir)) {
