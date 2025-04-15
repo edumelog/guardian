@@ -47,6 +47,9 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+### v1.5.4
+- Substituição do path do Node e Chrome para valores default para uso pelo Browsershot
+
 ### v1.5.3
 - Restrição de deleção de usuários que tenham ocorrências em seu nome ou editadas por ele
 - Possibilidade de desabilitar um usuário do sistema impedindo o login
