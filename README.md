@@ -47,6 +47,9 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+### v1.5.6
+- Novo path para o diretorio tmp usando setEnvironmentOptions
+
 ### v1.5.5
 - Novo path para o doretorio tmp
 
