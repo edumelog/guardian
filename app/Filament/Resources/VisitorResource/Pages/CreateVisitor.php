@@ -1447,11 +1447,42 @@ OBS: Ocorrência gerada automaticamente pelo sistema de monitoramento de visitan
         
         // Se o visitante já existe, atualiza apenas as informações permitidas
         if ($visitor) {
-            // Atualiza o visitante existente
-            $visitor->update([
+            // Campos a atualizar
+            $updateData = [
                 'phone' => $data['phone'] ?? null,
                 'other' => $data['other'] ?? null,
-            ]);
+            ];
+
+            // Verifica se houve atualização nas fotos (apenas inclui no updateData se os valores forem diferentes)
+            if (isset($data['photo']) && $data['photo'] !== $visitor->photo) {
+                $updateData['photo'] = $data['photo'];
+                \Illuminate\Support\Facades\Log::info('CreateVisitor: Atualizando foto do visitante', [
+                    'visitor_id' => $visitor->id,
+                    'old_photo' => $visitor->photo,
+                    'new_photo' => $data['photo']
+                ]);
+            }
+
+            if (isset($data['doc_photo_front']) && $data['doc_photo_front'] !== $visitor->doc_photo_front) {
+                $updateData['doc_photo_front'] = $data['doc_photo_front'];
+                \Illuminate\Support\Facades\Log::info('CreateVisitor: Atualizando foto frontal do documento', [
+                    'visitor_id' => $visitor->id,
+                    'old_photo' => $visitor->doc_photo_front,
+                    'new_photo' => $data['doc_photo_front']
+                ]);
+            }
+
+            if (isset($data['doc_photo_back']) && $data['doc_photo_back'] !== $visitor->doc_photo_back) {
+                $updateData['doc_photo_back'] = $data['doc_photo_back'];
+                \Illuminate\Support\Facades\Log::info('CreateVisitor: Atualizando foto traseira do documento', [
+                    'visitor_id' => $visitor->id,
+                    'old_photo' => $visitor->doc_photo_back,
+                    'new_photo' => $data['doc_photo_back']
+                ]);
+            }
+
+            // Atualiza o visitante existente
+            $visitor->update($updateData);
 
             $visitor->visitorLogs()->create([
                 'destination_id' => $data['destination_id'],

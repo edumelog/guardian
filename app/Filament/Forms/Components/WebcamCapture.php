@@ -34,13 +34,20 @@ class WebcamCapture extends Field
                 // Remove caracteres especiais do número do documento
                 $safeDocNumber = preg_replace('/[^a-zA-Z0-9]/', '', $docNumber);
                 
-                // Cria o nome do arquivo: photo_tipo_numero.jpg
-                $filename = 'photo_' . strtolower($docType->type) . '_' . $safeDocNumber . '.jpg';
+                // Adiciona um timestamp ao nome do arquivo para garantir que é único
+                $timestamp = date('YmdHis');
                 
-                // Verifica se o arquivo já existe
-                if (Storage::disk('private')->exists('visitors-photos/' . $filename)) {
-                    \Illuminate\Support\Facades\Log::info("WebcamCapture: Arquivo {$filename} já existe, usando o existente");
-                    return $filename;
+                // Cria o nome do arquivo: photo_tipo_numero_timestamp.jpg
+                $filename = 'photo_' . strtolower($docType->type) . '_' . $safeDocNumber . '_' . $timestamp . '.jpg';
+                
+                // Remove foto anterior se existir e estiver associada ao registro atual
+                $record = $this->getRecord();
+                if ($record && isset($record->photo) && !empty($record->photo)) {
+                    $oldPhotoPath = 'visitors-photos/' . $record->photo;
+                    if (Storage::disk('private')->exists($oldPhotoPath)) {
+                        \Illuminate\Support\Facades\Log::info("WebcamCapture: Removendo foto anterior: {$record->photo}");
+                        Storage::disk('private')->delete($oldPhotoPath);
+                    }
                 }
                 
                 // Converte base64 para arquivo

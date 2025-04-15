@@ -47,7 +47,7 @@ class ActiveVisitorStats extends BaseWidget
                 ->descriptionIcon('heroicon-m-user-group')
                 ->color('primary'),
             
-            Stat::make('Visitantes de Hoje', $todayVisitors)
+            Stat::make('Visitas de Hoje', $todayVisitors)
                 ->description('Registros do dia ' . Carbon::today()->format('d/m/Y'))
                 ->descriptionIcon('heroicon-m-calendar')
                 ->color('success'),
