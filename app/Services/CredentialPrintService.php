@@ -172,7 +172,8 @@ class CredentialPrintService
                 
                 $pdf = Browsershot::html($html)
                     ->setNodeBinary('/usr/bin/node')
-                    ->setChromePath('/opt/google/chrome/chrome')
+                    // ->setChromePath('/opt/google/chrome/chrome')
+                    ->setChromePath('/usr/bin/google-chrome')
                     ->paperSize($paperWidth_mm, $paperHeight_mm, 'mm')
                     ->margins($margins_mm['top'], $margins_mm['right'], $margins_mm['bottom'], $margins_mm['left'], 'mm')
                     ->showBackground()
