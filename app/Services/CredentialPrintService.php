@@ -79,6 +79,21 @@ class CredentialPrintService
                 'has_base64' => !empty($photoBase64)
             ]);
 
+            // Encontra o destino raiz (nível mais alto na hierarquia)
+            $rootDestination = $currentDestination;
+            $parent = $currentDestination->parent;
+            while ($parent) {
+                $rootDestination = $parent;
+                $parent = $parent->parent;
+            }
+
+            Log::info('Destino raiz encontrado:', [
+                'current_destination_id' => $currentDestination->id,
+                'current_destination_name' => $currentDestination->name,
+                'root_destination_id' => $rootDestination->id,
+                'root_destination_name' => $rootDestination->name,
+            ]);
+
             $data = [
                 'visitor-id' => $visitor->id,
                 'visitor-name' => strtoupper($visitor->name),
@@ -98,7 +113,12 @@ class CredentialPrintService
                 'date' => now()->format('d/m/Y'),
                 'time' => now()->format('H:i'),
                 'visitor-qrcode' => $visitor->latestLog?->id ?? '',
-                'visitor-barcode' => $visitor->latestLog?->id ?? ''
+                'visitor-barcode' => $visitor->latestLog?->id ?? '',
+                // Novos marcadores para o destino raiz
+                'root-destination' => $rootDestination->name,
+                'root-destination-alias' => $rootDestination->alias ?? '',
+                'root-destination-address' => $rootDestination->address ?? '',
+                'root-destination-phone' => $rootDestination->phone ?? ''
             ];
 
             Log::info('Dados da foto do visitante:', [
@@ -336,6 +356,52 @@ class CredentialPrintService
 
             // Remove o prefixo 'tpl-' para obter o nome do campo
             $field = substr($tplClass, 4);
+            
+            // Mapeamento especial para os novos marcadores de destino raiz
+            $fieldMap = [
+                'root-destination' => 'root-destination',
+                'root-destination-alias' => 'root-destination-alias',
+                'root-destination-address' => 'root-destination-address',
+                'root-destination-phone' => 'root-destination-phone'
+            ];
+            
+            // Se é um dos novos marcadores, usa o campo mapeado
+            if (isset($fieldMap[$field])) {
+                $mappedField = $fieldMap[$field];
+                
+                Log::info('Processando elemento de destino raiz:', [
+                    'element' => $element->nodeName,
+                    'class' => $tplClass,
+                    'field' => $field,
+                    'mapped_field' => $mappedField,
+                    'has_value' => isset($data[$mappedField]),
+                    'value' => $data[$mappedField] ?? null
+                ]);
+                
+                if (isset($data[$mappedField])) {
+                    $value = $data[$mappedField];
+                    
+                    // Se é uma imagem, atualiza o src
+                    if ($element->nodeName === 'img') {
+                        if ($value) {
+                            $element->setAttribute('src', $value);
+                        }
+                    }
+                    // Para outros elementos, atualiza o conteúdo
+                    else {
+                        // Remove qualquer conteúdo existente
+                        while ($element->firstChild) {
+                            $element->removeChild($element->firstChild);
+                        }
+                        // Adiciona o novo conteúdo
+                        $element->appendChild($dom->createTextNode($value ?: ''));
+                    }
+                } else {
+                    Log::warning("Valor para campo do destino raiz não encontrado: {$mappedField}");
+                }
+                
+                continue;
+            }
             
             Log::info('Processando elemento do template:', [
                 'element' => $element->nodeName,
