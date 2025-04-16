@@ -26,10 +26,10 @@ class ListOccurrences extends ListRecords
                 ->label('Nova Ocorrência')
                 ->icon('heroicon-o-plus-circle'),
                 
-            Actions\ExportAction::make()
-                ->label('Exportar')
-                ->icon('heroicon-o-arrow-down-tray')
-                ->color('success'),
+            // Actions\ExportAction::make()
+            //     ->label('Exportar')
+            //     ->icon('heroicon-o-arrow-down-tray')
+            //     ->color('success'),
         ];
     }
     
