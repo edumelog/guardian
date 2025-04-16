@@ -47,8 +47,12 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+### v1.5.8
+- Correção do bakcup de banco de dados e arquivos
+- Reestabelecimento de aprovação de analise de risco
+
 ### v1.5.7
-- Correão do bug que impedia update de fotos de visitante pré-existente
+- Correção do bug que impedia update de fotos de visitante pré-existente
 
 ### v1.5.6
 - Novo path para o diretorio tmp usando setEnvironmentOptions

@@ -23,8 +23,13 @@ class ShieldSeeder extends Seeder
             'guard_name' => $guard,
         ]);
 
+        // Cria as permissões de aprovação de risco
+        Permission::create(['name' => 'low_risk_approval', 'guard_name' => $guard]);
+        Permission::create(['name' => 'medium_risk_approval', 'guard_name' => $guard]);
+        Permission::create(['name' => 'high_risk_approval', 'guard_name' => $guard]);
+
         // Super Admin
-        $superAdmin = Role::create([
+        $superAdmin = Role::firstOrCreate([
             'name' => 'super_admin',
             'guard_name' => $guard
         ]);
