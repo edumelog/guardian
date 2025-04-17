@@ -34,11 +34,9 @@ class WebcamCapture extends Field
                 // Remove caracteres especiais do número do documento
                 $safeDocNumber = preg_replace('/[^a-zA-Z0-9]/', '', $docNumber);
                 
-                // Adiciona um timestamp ao nome do arquivo para garantir que é único
-                $timestamp = date('YmdHis');
-                
-                // Cria o nome do arquivo: photo_tipo_numero_timestamp.jpg
-                $filename = 'photo_' . strtolower($docType->type) . '_' . $safeDocNumber . '_' . $timestamp . '.jpg';
+                // Cria um nome de arquivo padronizado sem timestamp para garantir que sempre sobrescreve
+                // a foto anterior do mesmo visitante em vez de criar múltiplos arquivos
+                $filename = 'photo_' . strtolower($docType->type) . '_' . $safeDocNumber . '.jpg';
                 
                 // Remove foto anterior se existir e estiver associada ao registro atual
                 $record = $this->getRecord();
