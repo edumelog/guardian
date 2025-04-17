@@ -289,6 +289,92 @@ class BackupRestorePage extends Page implements HasForms
                                 'expected_path' => $backupPhotosPath
                             ]);
                         }
+                        
+                        // Restaura os arquivos de week-days
+                        $backupWeekDaysPath = $extractPath . '/var/www/html/storage/app/public/week-days';
+                        $destWeekDaysPath = storage_path('app/public/week-days');
+                        
+                        if (file_exists($backupWeekDaysPath)) {
+                            // Garante que o diretório de destino existe
+                            if (!file_exists($destWeekDaysPath)) {
+                                mkdir($destWeekDaysPath, 0755, true);
+                            }
+                            
+                            // Copia os arquivos week-days com opção forçada e recursiva
+                            $weekDaysCommand = "cp -rfv {$backupWeekDaysPath}/* {$destWeekDaysPath} 2>&1";
+                            \Illuminate\Support\Facades\Log::info('Copiando arquivos dos dias da semana:', [
+                                'command' => $weekDaysCommand,
+                                'source' => $backupWeekDaysPath,
+                                'destination' => $destWeekDaysPath
+                            ]);
+                            
+                            $weekDaysResult = Process::run($weekDaysCommand);
+                            \Illuminate\Support\Facades\Log::info('Resultado da cópia dos arquivos de dias da semana:', [
+                                'output' => $weekDaysResult->output(),
+                                'exitCode' => $weekDaysResult->exitCode(),
+                                'successful' => $weekDaysResult->successful()
+                            ]);
+                            
+                            // Ajusta permissões
+                            $chmodWeekDaysCmd = "chmod -R 755 {$destWeekDaysPath}";
+                            Process::run($chmodWeekDaysCmd);
+                            
+                            // Verificar arquivos restaurados
+                            $countWeekDaysCmd = "find {$destWeekDaysPath} -type f | wc -l";
+                            $countWeekDaysResult = Process::run($countWeekDaysCmd);
+                            \Illuminate\Support\Facades\Log::info('Contagem de arquivos de dias da semana restaurados:', [
+                                'numero_arquivos' => trim($countWeekDaysResult->output())
+                            ]);
+                            
+                            $filesFound = true;
+                        } else {
+                            \Illuminate\Support\Facades\Log::warning('Diretório de dias da semana não encontrado na estrutura completa', [
+                                'expected_path' => $backupWeekDaysPath
+                            ]);
+                        }
+                        
+                        // Restaura os templates
+                        $backupTemplatesPath = $extractPath . '/var/www/html/storage/app/public/templates';
+                        $destTemplatesPath = storage_path('app/public/templates');
+                        
+                        if (file_exists($backupTemplatesPath)) {
+                            // Garante que o diretório de destino existe
+                            if (!file_exists($destTemplatesPath)) {
+                                mkdir($destTemplatesPath, 0755, true);
+                            }
+                            
+                            // Copia os templates com opção forçada e recursiva
+                            $templatesCommand = "cp -rfv {$backupTemplatesPath}/* {$destTemplatesPath} 2>&1";
+                            \Illuminate\Support\Facades\Log::info('Copiando templates:', [
+                                'command' => $templatesCommand,
+                                'source' => $backupTemplatesPath,
+                                'destination' => $destTemplatesPath
+                            ]);
+                            
+                            $templatesResult = Process::run($templatesCommand);
+                            \Illuminate\Support\Facades\Log::info('Resultado da cópia dos templates:', [
+                                'output' => $templatesResult->output(),
+                                'exitCode' => $templatesResult->exitCode(),
+                                'successful' => $templatesResult->successful()
+                            ]);
+                            
+                            // Ajusta permissões
+                            $chmodTemplatesCmd = "chmod -R 755 {$destTemplatesPath}";
+                            Process::run($chmodTemplatesCmd);
+                            
+                            // Verificar arquivos restaurados
+                            $countTemplatesCmd = "find {$destTemplatesPath} -type f | wc -l";
+                            $countTemplatesResult = Process::run($countTemplatesCmd);
+                            \Illuminate\Support\Facades\Log::info('Contagem de templates restaurados:', [
+                                'numero_arquivos' => trim($countTemplatesResult->output())
+                            ]);
+                            
+                            $filesFound = true;
+                        } else {
+                            \Illuminate\Support\Facades\Log::warning('Diretório de templates não encontrado na estrutura completa', [
+                                'expected_path' => $backupTemplatesPath
+                            ]);
+                        }
                     }
                 }
                 
@@ -325,7 +411,53 @@ class BackupRestorePage extends Page implements HasForms
                 } else {
                     \Illuminate\Support\Facades\Log::error('Diretório de fotos NÃO EXISTE após a restauração!');
                 }
-    
+                
+                // Verifica o diretório de week-days APÓS a restauração
+                $weekDaysDir = storage_path('app/public/week-days');
+                if (file_exists($weekDaysDir)) {
+                    $weekDaysCommand = "find {$weekDaysDir} -type f | wc -l";
+                    $weekDaysCountResult = Process::run($weekDaysCommand);
+                    \Illuminate\Support\Facades\Log::info('Contagem de arquivos de dias da semana APÓS a restauração:', [
+                        'numero_arquivos' => trim($weekDaysCountResult->output())
+                    ]);
+                    
+                    // Lista alguns exemplos de arquivos de week-days
+                    $weekDaysListCommand = "find {$weekDaysDir} -type f | head -n 10";
+                    $weekDaysListResult = Process::run($weekDaysListCommand);
+                    \Illuminate\Support\Facades\Log::info('Exemplos de arquivos de dias da semana restaurados:', [
+                        'arquivos' => explode("\n", trim($weekDaysListResult->output()))
+                    ]);
+                } else {
+                    \Illuminate\Support\Facades\Log::error('Diretório de dias da semana NÃO EXISTE após a restauração!');
+                }
+                
+                // Verifica o diretório de templates APÓS a restauração
+                $templatesDir = storage_path('app/public/templates');
+                if (file_exists($templatesDir)) {
+                    $templatesCommand = "find {$templatesDir} -type f | wc -l";
+                    $templatesCountResult = Process::run($templatesCommand);
+                    \Illuminate\Support\Facades\Log::info('Contagem de templates APÓS a restauração:', [
+                        'numero_arquivos' => trim($templatesCountResult->output())
+                    ]);
+                    
+                    // Lista alguns exemplos de templates
+                    $templatesListCommand = "find {$templatesDir} -type f | head -n 10";
+                    $templatesListResult = Process::run($templatesListCommand);
+                    \Illuminate\Support\Facades\Log::info('Exemplos de templates restaurados:', [
+                        'arquivos' => explode("\n", trim($templatesListResult->output()))
+                    ]);
+                } else {
+                    \Illuminate\Support\Facades\Log::error('Diretório de templates NÃO EXISTE após a restauração!');
+                }
+                
+                // Relatório final da restauração
+                \Illuminate\Support\Facades\Log::info('Relatório final da restauração:', [
+                    'db_restaurado' => isset($dbDumpPath) ? 'Sim' : 'Não',
+                    'visitors_photos' => file_exists($visitorsPhotosDir) ? trim($countResult->output() ?? '0') . ' arquivos' : 'Diretório não existe',
+                    'week_days' => file_exists($weekDaysDir) ? trim($weekDaysCountResult->output() ?? '0') . ' arquivos' : 'Diretório não existe',
+                    'templates' => file_exists($templatesDir) ? trim($templatesCountResult->output() ?? '0') . ' arquivos' : 'Diretório não existe',
+                ]);
+                
                 // Remove diretório temporário
                 Process::run("rm -rf {$extractPath}");
                 \Illuminate\Support\Facades\Log::info('Diretório temporário removido');

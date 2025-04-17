@@ -17,6 +17,7 @@ return [
                 'include' => [
                     storage_path('app/private/visitors-photos'),
                     storage_path('app/public/week-days'),
+                    storage_path('app/public/templates'),
                 ],
 
                 /*
