@@ -47,6 +47,9 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+### v1.5.9
+- Cada visitante agora possui somente 3 imagens associadas a ele: sua prória foto, frente e verso de seu documento de identificação.
+
 ### v1.5.8
 - Correção do bakcup de banco de dados e arquivos
 - Reestabelecimento de aprovação de analise de risco
