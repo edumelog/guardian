@@ -79,11 +79,20 @@ class DocumentPhotoCapture extends Field
                 // Remove caracteres especiais do número do documento
                 $safeDocNumber = preg_replace('/[^a-zA-Z0-9]/', '', $docNumber);
                 
-                // Adiciona um timestamp ao nome do arquivo para garantir que é único
-                $timestamp = date('YmdHis');
+                // Cria um nome de arquivo padronizado sem timestamp para garantir que sempre sobrescreve
+                // a foto anterior do mesmo documento em vez de criar múltiplos arquivos
+                $filename = 'doc_' . strtolower($docType->type) . '_' . $safeDocNumber . '_' . $this->side . '.jpg';
                 
-                // Cria o nome do arquivo: doc_tipo_numero_lado_timestamp.jpg
-                $filename = 'doc_' . strtolower($docType->type) . '_' . $safeDocNumber . '_' . $this->side . '_' . $timestamp . '.jpg';
+                // Remove foto anterior se existir e estiver associada ao registro atual
+                $record = $this->getRecord();
+                $fieldName = $this->getName();
+                if ($record && isset($record->$fieldName) && !empty($record->$fieldName)) {
+                    $oldPhotoPath = 'visitors-photos/' . $record->$fieldName;
+                    if (Storage::disk('private')->exists($oldPhotoPath)) {
+                        Log::info("DocumentPhotoCapture: Removendo foto anterior do documento {$this->side}: {$record->$fieldName}");
+                        Storage::disk('private')->delete($oldPhotoPath);
+                    }
+                }
                 
                 // Converte base64 para arquivo
                 $image = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $state));
