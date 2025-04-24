@@ -47,6 +47,13 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+## v1.6.2
+- Visitor Factory criado. Criar os destinations, doc_type CPF e executar: 
+    php artisan visitor:create-test 5
+    ou
+    php artisan db:seed --class=TestVisitorSeeder --count=5
+  Para criar 5 visitantes de teste.
+
 ## v1.6.1
 - Impressão de etiqueta demo usando o browserhot de forma análoga ao que acontece quando se imprime de forma dinâmica
 - Exibição dos certificados presentes no sistema para uso com o QZTray
