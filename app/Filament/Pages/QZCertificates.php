@@ -26,10 +26,19 @@ class QZCertificates extends Page implements HasForms
     protected static string $view = 'filament.pages.qz-certificates';
 
     public ?array $data = [];
+    
+    // Propriedades para armazenar informações dos certificados existentes
+    public $privateKeyExists = false;
+    public $privateKeyInfo = [];
+    public $digitalCertificateExists = false;
+    public $digitalCertificateInfo = [];
+    public $pfxPasswordExists = false;
+    public $pfxPasswordInfo = [];
 
     public function mount(): void
     {
         $this->form->fill();
+        $this->loadExistingCertificatesInfo();
     }
 
     public function form(Form $form): Form
@@ -107,6 +116,9 @@ class QZCertificates extends Page implements HasForms
                 $data['private_key'] ?? '',
                 $data['digital_certificate'] ?? ''
             ]);
+            
+            // Recarrega as informações dos certificados
+            $this->loadExistingCertificatesInfo();
 
             Notification::make()
                 ->title('Certificados salvos com sucesso')
@@ -121,5 +133,76 @@ class QZCertificates extends Page implements HasForms
                 ->danger()
                 ->send();
         }
+    }
+
+    /**
+     * Carrega informações dos certificados existentes
+     * 
+     * @return void
+     */
+    protected function loadExistingCertificatesInfo(): void
+    {
+        // Verificar chave privada
+        $privateKeyPath = 'private/private-key.pem';
+        $this->privateKeyExists = Storage::disk('local')->exists($privateKeyPath);
+        
+        if ($this->privateKeyExists) {
+            $this->privateKeyInfo = [
+                'name' => 'private-key.pem',
+                'size' => $this->formatFileSize(Storage::disk('local')->size($privateKeyPath)),
+                'last_modified' => $this->formatDate(Storage::disk('local')->lastModified($privateKeyPath)),
+            ];
+        }
+        
+        // Verificar certificado digital
+        $digitalCertificatePath = 'digital-certificate.txt';
+        $this->digitalCertificateExists = Storage::disk('public')->exists($digitalCertificatePath);
+        
+        if ($this->digitalCertificateExists) {
+            $this->digitalCertificateInfo = [
+                'name' => 'digital-certificate.txt',
+                'size' => $this->formatFileSize(Storage::disk('public')->size($digitalCertificatePath)),
+                'last_modified' => $this->formatDate(Storage::disk('public')->lastModified($digitalCertificatePath)),
+            ];
+        }
+        
+        // Verificar senha do PFX
+        $pfxPasswordPath = 'private/pfx-password.txt';
+        $this->pfxPasswordExists = Storage::disk('local')->exists($pfxPasswordPath);
+        
+        if ($this->pfxPasswordExists) {
+            $this->pfxPasswordInfo = [
+                'name' => 'pfx-password.txt',
+                'last_modified' => $this->formatDate(Storage::disk('local')->lastModified($pfxPasswordPath)),
+            ];
+        }
+    }
+    
+    /**
+     * Formata o tamanho do arquivo para exibição amigável
+     * 
+     * @param int $size Tamanho em bytes
+     * @return string Tamanho formatado
+     */
+    protected function formatFileSize(int $size): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        
+        for ($i = 0; $size > 1024; $i++) {
+            $size /= 1024;
+        }
+        
+        return round($size, 2) . ' ' . $units[$i];
+    }
+    
+    /**
+     * Formata a data para exibição amigável
+     * 
+     * @param int $timestamp Timestamp Unix
+     * @return string Data formatada
+     */
+    protected function formatDate(int $timestamp): string
+    {
+        return date('d/m/Y H:i:s', $timestamp);
     }
 } 
