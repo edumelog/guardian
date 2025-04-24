@@ -47,6 +47,10 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+## v1.6.1
+- Impressão de etiqueta demo usando o browserhot de forma análoga ao que acontece quando se imprime de forma dinâmica
+- Exibição dos certificados presentes no sistema para uso com o QZTray
+
 ## v1.6.0
 - Backup e Restore das imagens referentes aos dias da semana nas rotinas de backup de Files Only e DB+Files
 
