@@ -169,7 +169,7 @@ class WeekDayResource extends Resource
     {
         return [
             'index' => Pages\ListWeekDays::route('/'),
-            'create' => Pages\CreateWeekDay::route('/create'),
+            // 'create' => Pages\CreateWeekDay::route('/create'),
             'edit' => Pages\EditWeekDay::route('/{record}/edit'),
         ];
     }

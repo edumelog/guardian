@@ -319,16 +319,9 @@ class PrintTemplateController extends Controller
                 continue;
             }
 
-            // Verifica se a imagem tem alguma classe tpl-
+            // Obtém a classe para log, mas processa todas as imagens independentemente da classe
             $class = $img->getAttribute('class');
-            if ($class && preg_match('/\btpl-/', $class)) {
-                Log::info('Imagem com classe tpl-, mantendo caminho relativo:', [
-                    'src' => $src,
-                    'class' => $class
-                ]);
-                continue;
-            }
-
+            
             try {
                 // Remove parâmetros de URL se existirem
                 $src = preg_replace('/\?.*$/', '', $src);
@@ -347,6 +340,7 @@ class PrintTemplateController extends Controller
                 
                 Log::info('Convertendo imagem para base64:', [
                     'src' => $src,
+                    'class' => $class,
                     'imagePath' => $imagePath
                 ]);
                 
@@ -366,18 +360,21 @@ class PrintTemplateController extends Controller
                     
                     Log::info('Imagem convertida para base64 com sucesso', [
                         'original_src' => $src,
+                        'class' => $class,
                         'mime' => $mime,
                         'size' => strlen($base64)
                     ]);
                 } else {
                     Log::warning('Arquivo de imagem não encontrado:', [
                         'src' => $src,
+                        'class' => $class,
                         'imagePath' => $imagePath
                     ]);
                 }
             } catch (\Exception $e) {
                 Log::error('Erro ao processar imagem:', [
                     'src' => $src,
+                    'class' => $class,
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString()
                 ]);
@@ -864,5 +861,241 @@ class PrintTemplateController extends Controller
         $path = Storage::disk('public')->path("templates/{$slug}/index.html");
         Log::info('Template encontrado:', ['path' => $path]);
         return response()->file($path);
+    }
+
+    public function generateTestPdf(Request $request)
+    {
+        try {
+            Log::info('Gerando PDF de teste para impressão');
+            
+            $validated = $request->validate([
+                'printer_config' => ['required', 'array']
+            ]);
+            
+            $printerConfig = $validated['printer_config'];
+            $templateName = $printerConfig['template'] ?? null;
+            
+            if (!$templateName) {
+                throw new \Exception('Template não especificado na configuração');
+            }
+            
+            // Remove a extensão .zip se existir
+            $templateSlug = pathinfo($templateName, PATHINFO_FILENAME);
+            $templatePath = Storage::disk('public')->path("templates/{$templateSlug}/index.html");
+            
+            Log::info('Carregando template para teste', [
+                'template_name' => $templateName,
+                'template_slug' => $templateSlug,
+                'template_path' => $templatePath
+            ]);
+            
+            if (!file_exists($templatePath)) {
+                throw new \Exception("Template não encontrado: {$templatePath}");
+            }
+
+            // Carrega o HTML do template
+            $html = file_get_contents($templatePath);
+            
+            // Cria um timestamp único para o teste
+            $timestamp = now()->format('YmdHis');
+            $randomId = rand(1000, 9999);
+            
+            // Substitui os marcadores com dados de teste
+            $weekdays = ['DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO'];
+            $today = now()->dayOfWeek; // 0 = domingo, 1 = segunda, etc.
+            
+            $replacements = [
+                '{{datetime}}' => now()->format('d/m/Y H:i'),
+                '{{protocol}}' => "TESTE-{$timestamp}-{$randomId}",
+                '{{operator}}' => 'Operador de Teste',
+                '{{customer}}' => 'Cliente de Teste',
+                '{{name}}' => 'VISITANTE DE TESTE',
+                '{{doc}}' => '123.456.789-00',
+                '{{doctype}}' => 'RG/CPF',
+                '{{destination}}' => 'SETOR DE TESTE',
+                '{{reason}}' => 'TESTE DE IMPRESSÃO',
+                '{{obs}}' => 'Impressão de teste',
+                '{{weekday}}' => $weekdays[$today]
+            ];
+            
+            // Substitui os marcadores no HTML
+            foreach ($replacements as $marker => $value) {
+                $html = str_replace($marker, $value, $html);
+            }
+            
+            // Substitui o texto do dia da semana usando DOM
+            $dom = new \DOMDocument();
+            libxml_use_internal_errors(true);
+            $dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
+            libxml_clear_errors();
+            
+            $xpath = new \DOMXPath($dom);
+            $weekdayElements = $xpath->query("//*[contains(@class, 'tpl-weekday-txt')]");
+            
+            if ($weekdayElements && $weekdayElements->length > 0) {
+                foreach ($weekdayElements as $element) {
+                    $element->textContent = $weekdays[$today];
+                }
+                $html = $dom->saveHTML();
+                Log::info('Texto do dia da semana atualizado para: ' . $weekdays[$today]);
+            }
+            
+            // Get the width and height of the paper size in mm
+            $paperWidth_mm = $printerConfig['printOptions']['pageWidth'] ?? 100;
+            $paperHeight_mm = $printerConfig['printOptions']['pageHeight'] ?? 75;
+            
+            // Obtém a orientação diretamente da raiz do printerConfig
+            $orientation = $printerConfig['orientation'] ?? 'portrait';
+            
+            // Obtém as configurações de impressão
+            $printOptions = $printerConfig['printOptions'] ?? [];
+            $margins_mm = $printOptions['margins'] ?? [
+                'top' => 0,
+                'right' => 0,
+                'bottom' => 0,
+                'left' => 0
+            ];
+            
+            Log::info('Configurações de impressão para teste:', [
+                'orientation' => $orientation,
+                'margins' => $margins_mm,
+                'width' => $paperWidth_mm,
+                'height' => $paperHeight_mm
+            ]);
+            
+            try {
+                // Cria um diretório temporário para o Chrome com permissões universais
+                $tempDir = '/tmp/chrome-' . uniqid();
+                if (!file_exists($tempDir)) {
+                    mkdir($tempDir, 0777, true);
+                }
+                
+                // Configura outras pastas temporárias necessárias
+                $crashpadDir = '/tmp/crashpad-' . uniqid();
+                if (!file_exists($crashpadDir)) {
+                    mkdir($crashpadDir, 0777, true);
+                }
+                
+                // Define argumentos adicionais para o Chrome
+                $chromiumArgs = [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--disable-software-rasterizer',
+                    '--disable-extensions',
+                    '--disable-default-apps',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--crash-dumps-dir=' . $crashpadDir,
+                ];
+                
+                // Gera o PDF usando o Browsershot
+                $pdf = \Spatie\Browsershot\Browsershot::html($html)
+                    ->setNodeBinary('/usr/bin/node')
+                    ->setChromePath('/usr/bin/google-chrome')
+                    ->userDataDir($tempDir)
+                    ->setEnvironmentOptions([
+                        'HOME' => '/tmp',
+                        'XDG_CONFIG_HOME' => '/tmp/.config',
+                        'XDG_DATA_HOME' => '/tmp/.local/share',
+                        'XDG_CACHE_HOME' => '/tmp/.cache'
+                    ])
+                    ->addChromiumArguments($chromiumArgs)
+                    ->paperSize($paperWidth_mm, $paperHeight_mm, 'mm')
+                    ->margins($margins_mm['top'], $margins_mm['right'], $margins_mm['bottom'], $margins_mm['left'], 'mm')
+                    ->showBackground()
+                    ->scale(1)
+                    ->noSandbox()
+                    ->ignoreCertificateErrors()
+                    ->disableGpu()
+                    ->deviceScaleFactor(3)
+                    ->dismissDialogs()
+                    ->waitUntilNetworkIdle()
+                    ->landscape($orientation == 'landscape' || $orientation == 'reverse-landscape' ? true : false)
+                    ->base64pdf();
+                
+                // Limpa o diretório temporário
+                if (file_exists($tempDir)) {
+                    $this->removeDirectory($tempDir);
+                }
+                
+                if (file_exists($crashpadDir)) {
+                    $this->removeDirectory($crashpadDir);
+                }
+                
+                // Prepara as configurações de impressão para o cliente
+                $printConfig = [
+                    'printer' => $printerConfig['printer'],
+                    'template' => $templateName,
+                    'options' => [
+                        'orientation' => $orientation,
+                        'margins' => $margins_mm,
+                    ]
+                ];
+                
+                Log::info('PDF de teste gerado com sucesso');
+                
+                // Garante que não há nenhum output antes do JSON
+                while (ob_get_level()) ob_end_clean();
+                
+                return response()->json([
+                    'success' => true,
+                    'pdf_base64' => $pdf,
+                    'print_config' => $printConfig
+                ]);
+                
+            } catch (\Exception $e) {
+                Log::error('Erro ao gerar PDF de teste', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                throw $e;
+            }
+            
+        } catch (\Exception $e) {
+            Log::error('Erro ao gerar PDF de teste', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Remove um diretório e seu conteúdo recursivamente
+     *
+     * @param string $dir Caminho do diretório a ser removido
+     * @return bool true em caso de sucesso, false em caso de falha
+     */
+    private function removeDirectory($dir) {
+        if (!file_exists($dir)) {
+            return true;
+        }
+        
+        if (!is_dir($dir)) {
+            return unlink($dir);
+        }
+        
+        foreach (scandir($dir) as $item) {
+            if ($item == '.' || $item == '..') {
+                continue;
+            }
+            
+            $path = $dir . DIRECTORY_SEPARATOR . $item;
+            
+            if (is_dir($path)) {
+                $this->removeDirectory($path);
+            } else {
+                unlink($path);
+            }
+        }
+        
+        return rmdir($dir);
     }
 } 

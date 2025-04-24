@@ -44,8 +44,11 @@ Route::middleware('auth')->group(function () {
 });
 
 // Rotas para templates de impressão que não requerem autenticação
-Route::get('/print-templates', [PrintTemplateController::class, 'index']);
-Route::get('/print-templates/{name}', [PrintTemplateController::class, 'getTemplate']);
+Route::get('/print-templates', [PrintTemplateController::class, 'index'])->middleware(['auth', 'verified'])->name('print-templates.index');
+Route::post('/print-templates', [PrintTemplateController::class, 'upload'])->middleware(['auth', 'verified'])->name('print-templates.upload');
+Route::delete('/print-templates/{name}', [PrintTemplateController::class, 'delete'])->middleware(['auth', 'verified'])->name('print-templates.delete');
+Route::get('/print-templates/{name}', [PrintTemplateController::class, 'getTemplate'])->middleware(['auth', 'verified'])->name('print-templates.get');
+Route::post('/print-templates/generate-test-pdf', [PrintTemplateController::class, 'generateTestPdf'])->middleware(['auth', 'verified'])->name('print-templates.test-pdf');
 
 Route::prefix('qz')->group(function () {
     Route::post('sign', [App\Http\Controllers\QZSignController::class, 'sign']);
