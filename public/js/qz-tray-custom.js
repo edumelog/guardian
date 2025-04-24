@@ -149,34 +149,94 @@ document.addEventListener('alpine:init', () => {
                 }
 
                 console.log('Template configurado:', parsedConfig.template);
+                console.log('Configurações de impressão:', parsedConfig);
 
-                // Carrega o template
-                let response;
-                response = await fetch(`/print-templates/${parsedConfig.template}`);
-                
-                if (!response.ok) throw new Error('Erro ao carregar template');
-                
-                let templateHtml = await response.text();
-                
-                // Substitui variáveis no template
-                templateHtml = templateHtml.replace(/\{\{datetime\}\}/g, new Date().toLocaleString());
-                templateHtml = templateHtml.replace(/\{\{protocol\}\}/g, 'TESTE-' + Math.floor(Math.random() * 10000));
-                templateHtml = templateHtml.replace(/\{\{operator\}\}/g, 'Operador de Teste');
-                templateHtml = templateHtml.replace(/\{\{customer\}\}/g, 'Cliente de Teste');
+                // Envia a configuração para o servidor gerar o PDF de teste
+                this.$dispatch('notify', {
+                    message: 'Gerando PDF',
+                    description: 'Aguarde enquanto o PDF de teste é gerado...',
+                    status: 'info'
+                });
 
-                const data = [{
+                const response = await fetch('/print-templates/generate-test-pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        printer_config: parsedConfig
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    console.error('Erro na resposta do servidor:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        body: error
+                    });
+                    throw new Error(`Erro ao gerar PDF de teste: ${response.status} ${response.statusText}`);
+                }
+
+                // Log da resposta bruta antes do parse
+                const rawResponse = await response.text();
+                console.log('[DEBUG] Resposta bruta do servidor (primeiros 100 caracteres):', 
+                    rawResponse.substring(0, 100) + '...');
+
+                // Tenta fazer o parse do JSON
+                let data;
+                try {
+                    data = JSON.parse(rawResponse);
+                } catch (e) {
+                    console.error('Erro ao fazer parse do JSON:', e);
+                    console.error('JSON inválido:', rawResponse.substring(0, 500) + '...');
+                    throw new Error('Erro ao processar resposta do servidor: JSON inválido');
+                }
+
+                console.log('[DEBUG] Resposta do servidor (sem o PDF):', {
+                    ...data,
+                    pdf_base64: data.pdf_base64 ? 'BASE64_DATA' : null
+                });
+
+                const { pdf_base64, print_config } = data;
+                
+                if (!pdf_base64) {
+                    console.error('Erro: PDF em base64 não recebido do servidor');
+                    throw new Error('Erro ao gerar PDF de teste: PDF não gerado pelo servidor');
+                }
+                
+                if (!print_config) {
+                    console.error('Erro: Configuração de impressão não recebida do servidor');
+                    throw new Error('Erro ao gerar PDF de teste: Configurações de impressão não recebidas');
+                }
+                
+                // ---- CONFIGURAÇÃO DA IMPRESSORA ---- //
+                
+                // Cria a configuração básica da impressora
+                const qzConfig = qz.configs.create(print_config.printer, {
+                    orientation: print_config.options.orientation || 'portrait'
+                });
+                
+                // Configura os dados a serem impressos
+                const qzData = [{
                     type: 'pixel',
-                    format: 'html',
-                    flavor: 'plain',
-                    data: templateHtml,
+                    format: 'pdf',
+                    flavor: 'base64',
+                    data: pdf_base64,
                     options: {
-                        pageWidth: parsedConfig.printOptions.pageWidth + 'mm',
-                        pageHeight: parsedConfig.printOptions.pageHeight + 'mm',
-                        margins: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' }
+                        altFontRendering: true
                     }
                 }];
+                
+                console.log('[DEBUG] Enviando para impressão:', {
+                    printer: print_config.printer,
+                    orientation: print_config.options.orientation || 'portrait'
+                });
 
-                await qz.print(this.config, data);
+                // Envia para impressão
+                await qz.print(qzConfig, qzData);
                 
                 this.$dispatch('notify', {
                     message: 'Teste enviado',
