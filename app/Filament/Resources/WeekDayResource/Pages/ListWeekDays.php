@@ -13,7 +13,7 @@ class ListWeekDays extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            // Actions\CreateAction::make(), // Removido pois não faz sentido criar novos dias da semana
         ];
     }
 }
