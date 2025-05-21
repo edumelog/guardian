@@ -88,4 +88,4 @@ Route::get('weekday-image/{filename}', [App\Http\Controllers\WeekDayPhotoControl
     ->middleware('auth');
 
 require __DIR__.'/auth.php';
-URL::forceScheme('https');
+// URL::forceScheme('https');
