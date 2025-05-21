@@ -47,6 +47,9 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+## v1.6.3
+- Removido o uso forçado de SSL/HTTPS no sistema. Agora o uso de HTTPS pode ser controlado exclusivamente pelo proxy reverso (Traefik/NGINX) ou configuração do ambiente, sem forçar HTTPS no Laravel ou nos middlewares.
+
 ## v1.6.2
 - Visitor Factory criado. Criar os destinations, doc_type CPF e executar: 
     php artisan visitor:create-test 5
