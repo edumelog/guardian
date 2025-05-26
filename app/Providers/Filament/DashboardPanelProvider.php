@@ -26,6 +26,7 @@ class DashboardPanelProvider extends PanelProvider
         return $panel
             ->default()
             ->id('dashboard')
+            ->path('dashboard')
             ->brandName('Guardian')
             ->brandLogo(asset('images/logo.svg'))
             ->sidebarCollapsibleOnDesktop()
