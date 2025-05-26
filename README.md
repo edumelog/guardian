@@ -47,6 +47,9 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+## v1.6.5
+- Ajustes no AppServiceProvider para remover path incorreto do filament
+
 ## v1.6.4
 - Ajustes no arquivo de configuração do Vite (vite.config.js) para sensibilzar sobre o uso da variável VITE_USE_TRAEFIK no .env e identificar se o estamos usando o Vite com Traefik ou somente o Vite.
 

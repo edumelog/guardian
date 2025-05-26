@@ -26,7 +26,6 @@ class DashboardPanelProvider extends PanelProvider
         return $panel
             ->default()
             ->id('dashboard')
-            ->path('dashboard')
             ->brandName('Guardian')
             ->brandLogo(asset('images/logo.svg'))
             ->sidebarCollapsibleOnDesktop()
@@ -42,7 +41,7 @@ class DashboardPanelProvider extends PanelProvider
             ->userMenuItems([
                 MenuItem::make()
                     ->label('Meu Perfil')
-                    ->url('/dashboard/profile')
+                    ->url('/profile')
                     ->icon('heroicon-o-user')
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
