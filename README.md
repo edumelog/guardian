@@ -47,6 +47,9 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+## v1.6.6
+- Ajustes nos seeder para usarem variaveis de ambiente e não usar interatividade durante execução
+
 ## v1.6.5
 - Ajustes no AppServiceProvider para remover path incorreto do filament
 
