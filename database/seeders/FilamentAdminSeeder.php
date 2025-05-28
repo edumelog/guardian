@@ -23,15 +23,15 @@ class FilamentAdminSeeder extends Seeder
         
         // Execute the shield:generate command to generate all necessary permissions
         $this->command->info('Generating Shield permissions...');
-        Artisan::call('shield:generate', ['--all' => true]);
+        Artisan::call('shield:generate', ['--all' => true, '--panel' => 'dashboard']);
         $this->command->info(Artisan::output());
 
         // Create super admin user
         $user = User::updateOrCreate(
-            ['email' => 'eduardo.melo@camara.rj.gov.br'],
+            ['email' => env('SUPER_ADMIN_EMAIL')],
             [
-                'name' => 'Super Admin',
-                'password' => Hash::make('001Siena001!'),
+                'name' => env('SUPER_ADMIN_NAME'),
+                'password' => Hash::make(env('SUPER_ADMIN_PASSWORD')),
                 'email_verified_at' => now(),
             ]
         );

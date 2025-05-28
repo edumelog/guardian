@@ -24,7 +24,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             FilamentAdminSeeder::class,
             WeekDaySeeder::class,
-            // RiskApprovalPermissionsSeeder::class,
+            RiskApprovalPermissionsSeeder::class,
             // AutomaticOccurrenceSeeder::class,
         ]);
     }
