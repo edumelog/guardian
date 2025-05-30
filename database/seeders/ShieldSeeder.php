@@ -17,12 +17,6 @@ class ShieldSeeder extends Seeder
 
         $guard = 'web';
 
-        // Cria a permissão de visualizar ocorrências automáticas
-        Permission::create([
-            'name' => 'view_automatic_occurrences',
-            'guard_name' => $guard,
-        ]);
-
         // Cria as permissões de aprovação de risco
         Permission::create(['name' => 'low_risk_approval', 'guard_name' => $guard]);
         Permission::create(['name' => 'medium_risk_approval', 'guard_name' => $guard]);

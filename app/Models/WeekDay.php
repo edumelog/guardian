@@ -83,6 +83,21 @@ class WeekDay extends Model
     }
     
     /**
+     * Boot the model.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Quando o modelo for atualizado e a imagem for alterada, remove a imagem antiga
+        static::updating(function ($weekDay) {
+            if ($weekDay->isDirty('image') && $weekDay->getOriginal('image')) {
+                Storage::disk('public')->delete($weekDay->getOriginal('image'));
+            }
+        });
+    }
+    
+    /**
      * Retorna o WeekDay para uma data específica
      */
     public static function getDayByDate($date)
