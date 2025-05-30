@@ -47,6 +47,12 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+## v1.6.7
+- Limpeza e padronização das permissões customizadas: agora apenas Low, Medium e High Risk Approval são customizadas.
+- Remoção de permissões órfãs e não utilizadas do sistema.
+- Ajuste no fluxo dos seeders para garantir atribuição correta das permissões ao super_admin.
+- Melhoria na documentação e organização do controle de permissões.
+
 ## v1.6.6
 - Ajustes nos seeder para usarem variaveis de ambiente e não usar interatividade durante execução
 
