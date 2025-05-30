@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Artisan;
 use Spatie\Permission\Models\Role;
 use BezhanSalleh\FilamentShield\Support\Utils;
+use Spatie\Permission\Models\Permission;
 
 class FilamentAdminSeeder extends Seeder
 {
@@ -26,6 +27,37 @@ class FilamentAdminSeeder extends Seeder
         Artisan::call('shield:generate', ['--all' => true, '--panel' => 'dashboard']);
         $this->command->info(Artisan::output());
 
+        // Get or create super_admin role
+        $superAdminRole = Role::firstOrCreate([
+            'name' => Utils::getSuperAdminName(),
+            'guard_name' => 'web',
+        ]);
+
+        // Criar/garantir permissões customizadas após o shield:generate
+        $customPermissions = [
+            'low_risk_approval',
+            'medium_risk_approval',
+            'high_risk_approval',
+        ];
+        foreach ($customPermissions as $permission) {
+            Permission::firstOrCreate([
+                'name' => $permission,
+                'guard_name' => 'web',
+            ]);
+        }
+
+        // Limpar o cache de permissões para garantir que todas sejam reconhecidas
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
+        // Agora sim, atribuir todas as permissões ao super_admin
+        $superAdminRole->syncPermissions(Permission::all());
+
+        // Log para debug: listar permissões atribuídas
+        $this->command->info('Permissões atribuídas ao super_admin:');
+        foreach ($superAdminRole->permissions as $perm) {
+            $this->command->info('- ' . $perm->name);
+        }
+
         // Create super admin user
         $user = User::updateOrCreate(
             ['email' => env('SUPER_ADMIN_EMAIL')],
@@ -35,12 +67,6 @@ class FilamentAdminSeeder extends Seeder
                 'email_verified_at' => now(),
             ]
         );
-
-        // Get or create super_admin role
-        $superAdminRole = Role::firstOrCreate([
-            'name' => Utils::getSuperAdminName(),
-            'guard_name' => 'web',
-        ]);
 
         // Assign role to the user
         $user->assignRole($superAdminRole);

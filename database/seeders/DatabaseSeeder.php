@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
 
         // Seed the super admin user for Filament
         $this->call([
+            ShieldSeeder::class,
             FilamentAdminSeeder::class,
             WeekDaySeeder::class,
             RiskApprovalPermissionsSeeder::class,
