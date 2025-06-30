@@ -47,6 +47,11 @@ O Guardian foi desenvolvido utilizando um stack moderno de tecnologias:
 
 ## Histórico de Versões
 
+## 1.6.8
+- Correção da tag Git incorreta (vv1.6.7 → v1.6.7) para seguir o padrão de versionamento semântico.
+- Limpeza do repositório removendo tags de features e mantendo apenas tags para releases.
+- Padronização do fluxo de versionamento para evitar tags duplicadas ou incorretas.
+
 ## v1.6.7
 - Limpeza e padronização das permissões customizadas: agora apenas Low, Medium e High Risk Approval são customizadas.
 - Remoção de permissões órfãs e não utilizadas do sistema.
