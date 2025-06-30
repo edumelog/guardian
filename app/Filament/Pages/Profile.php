@@ -290,7 +290,7 @@ class Profile extends Page
         if (!$user) {
             abort(403, 'Usuário não autenticado');
         }
-        
+
         $updateData = [
             'name' => $data['name'],
             'email' => $data['email'],
