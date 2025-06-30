@@ -30,14 +30,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // If app in production, force https
-        if($this->app->environment('production')) {
+        // Force HTTPS if in production or using Traefik with SSL
+        if($this->app->environment('production') || env('VITE_USE_TRAEFIK') === 'true') {
             URL::forceScheme('https');
         }
         
-        if($this->app->environment('production')) {
+        if($this->app->environment('production') || env('VITE_USE_TRAEFIK') === 'true') {
             URL::forceRootUrl(config('app.url'));
         }
+        
         FilamentView::registerRenderHook(
             'panels::auth.login.form.before',
             fn (): View => view('filament.login_extra')
