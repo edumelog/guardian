@@ -9,6 +9,7 @@ const devHost = useTraefik ? 'v-' + process.env.APP_NAME + '.' + process.env.APP
 const clientPort = useTraefik ? 443 : 5173;
 
 export default defineConfig({
+    base: '',
     // Configuração do servidor de desenvolvimento
     server: {
         host: '0.0.0.0',
