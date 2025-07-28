@@ -5,12 +5,15 @@ namespace Database\Seeders;
 use App\Models\WeekDay;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Seeder para popular a tabela de dias da semana
  * 
  * Este seeder cria os 7 dias da semana com valores padrão para
- * utilização no sistema.
+ * utilização no sistema e cria o diretório week-days para armazenamento
+ * de imagens dos dias da semana.
  */
 class WeekDaySeeder extends Seeder
 {
@@ -19,6 +22,15 @@ class WeekDaySeeder extends Seeder
      */
     public function run(): void
     {
+        // Cria o diretório week-days se não existir
+        $weekDaysPath = storage_path('app/public/week-days');
+        if (!File::exists($weekDaysPath)) {
+            File::makeDirectory($weekDaysPath, 0755, true);
+            $this->command->info('Diretório week-days criado com sucesso!');
+        } else {
+            $this->command->info('Diretório week-days já existe.');
+        }
+        
         // Limpa registros existentes
         DB::table('week_days')->truncate();
         
