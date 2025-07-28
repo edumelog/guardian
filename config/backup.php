@@ -18,6 +18,8 @@ return [
                     storage_path('app/private/visitors-photos'),
                     storage_path('app/public/week-days'),
                     storage_path('app/public/templates'),
+                    storage_path('app/private'), // Certificados QZ (chave privada e senha PFX)
+                    storage_path('app/public'),  // Certificado digital QZ
                 ],
 
                 /*
