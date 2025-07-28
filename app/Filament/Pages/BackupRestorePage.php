@@ -375,6 +375,92 @@ class BackupRestorePage extends Page implements HasForms
                                 'expected_path' => $backupTemplatesPath
                             ]);
                         }
+                        
+                        // Restaura os certificados QZ (chave privada e senha PFX)
+                        $backupPrivatePath = $extractPath . '/var/www/html/storage/app/private';
+                        $destPrivatePath = storage_path('app/private');
+                        
+                        if (file_exists($backupPrivatePath)) {
+                            // Garante que o diretório de destino existe
+                            if (!file_exists($destPrivatePath)) {
+                                mkdir($destPrivatePath, 0755, true);
+                            }
+                            
+                            // Copia os certificados privados com opção forçada e recursiva
+                            $privateCommand = "cp -rfv {$backupPrivatePath}/* {$destPrivatePath} 2>&1";
+                            \Illuminate\Support\Facades\Log::info('Copiando certificados QZ privados:', [
+                                'command' => $privateCommand,
+                                'source' => $backupPrivatePath,
+                                'destination' => $destPrivatePath
+                            ]);
+                            
+                            $privateResult = Process::run($privateCommand);
+                            \Illuminate\Support\Facades\Log::info('Resultado da cópia dos certificados privados:', [
+                                'output' => $privateResult->output(),
+                                'exitCode' => $privateResult->exitCode(),
+                                'successful' => $privateResult->successful()
+                            ]);
+                            
+                            // Ajusta permissões para certificados privados (mais restritivas)
+                            $chmodPrivateCmd = "chmod -R 750 {$destPrivatePath}";
+                            Process::run($chmodPrivateCmd);
+                            
+                            // Verificar arquivos restaurados
+                            $countPrivateCmd = "find {$destPrivatePath} -type f | wc -l";
+                            $countPrivateResult = Process::run($countPrivateCmd);
+                            \Illuminate\Support\Facades\Log::info('Contagem de certificados privados restaurados:', [
+                                'numero_arquivos' => trim($countPrivateResult->output())
+                            ]);
+                            
+                            $filesFound = true;
+                        } else {
+                            \Illuminate\Support\Facades\Log::warning('Diretório de certificados privados não encontrado na estrutura completa', [
+                                'expected_path' => $backupPrivatePath
+                            ]);
+                        }
+                        
+                        // Restaura o certificado digital QZ (público)
+                        $backupPublicPath = $extractPath . '/var/www/html/storage/app/public';
+                        $destPublicPath = storage_path('app/public');
+                        
+                        if (file_exists($backupPublicPath)) {
+                            // Garante que o diretório de destino existe
+                            if (!file_exists($destPublicPath)) {
+                                mkdir($destPublicPath, 0755, true);
+                            }
+                            
+                            // Copia o certificado digital com opção forçada e recursiva
+                            $publicCommand = "cp -rfv {$backupPublicPath}/* {$destPublicPath} 2>&1";
+                            \Illuminate\Support\Facades\Log::info('Copiando certificado digital QZ:', [
+                                'command' => $publicCommand,
+                                'source' => $backupPublicPath,
+                                'destination' => $destPublicPath
+                            ]);
+                            
+                            $publicResult = Process::run($publicCommand);
+                            \Illuminate\Support\Facades\Log::info('Resultado da cópia do certificado digital:', [
+                                'output' => $publicResult->output(),
+                                'exitCode' => $publicResult->exitCode(),
+                                'successful' => $publicResult->successful()
+                            ]);
+                            
+                            // Ajusta permissões para certificado público
+                            $chmodPublicCmd = "chmod -R 755 {$destPublicPath}";
+                            Process::run($chmodPublicCmd);
+                            
+                            // Verificar arquivos restaurados
+                            $countPublicCmd = "find {$destPublicPath} -type f | wc -l";
+                            $countPublicResult = Process::run($countPublicCmd);
+                            \Illuminate\Support\Facades\Log::info('Contagem de certificados públicos restaurados:', [
+                                'numero_arquivos' => trim($countPublicResult->output())
+                            ]);
+                            
+                            $filesFound = true;
+                        } else {
+                            \Illuminate\Support\Facades\Log::warning('Diretório de certificados públicos não encontrado na estrutura completa', [
+                                'expected_path' => $backupPublicPath
+                            ]);
+                        }
                     }
                 }
                 
@@ -450,12 +536,44 @@ class BackupRestorePage extends Page implements HasForms
                     \Illuminate\Support\Facades\Log::error('Diretório de templates NÃO EXISTE após a restauração!');
                 }
                 
+                // Verifica os certificados QZ privados APÓS a restauração
+                $privateCertDir = storage_path('app/private');
+                if (file_exists($privateCertDir)) {
+                    $privateCertCommand = "find {$privateCertDir} -type f | wc -l";
+                    $privateCertCountResult = Process::run($privateCertCommand);
+                    \Illuminate\Support\Facades\Log::info('Contagem de certificados privados APÓS a restauração:', [
+                        'numero_arquivos' => trim($privateCertCountResult->output())
+                    ]);
+                    
+                    // Lista os certificados privados
+                    $privateCertListCommand = "find {$privateCertDir} -type f -name '*.pem' -o -name '*.txt' | head -n 10";
+                    $privateCertListResult = Process::run($privateCertListCommand);
+                    \Illuminate\Support\Facades\Log::info('Certificados privados restaurados:', [
+                        'arquivos' => explode("\n", trim($privateCertListResult->output()))
+                    ]);
+                } else {
+                    \Illuminate\Support\Facades\Log::error('Diretório de certificados privados NÃO EXISTE após a restauração!');
+                }
+                
+                // Verifica o certificado digital QZ APÓS a restauração
+                $publicCertFile = storage_path('app/public/digital-certificate.txt');
+                if (file_exists($publicCertFile)) {
+                    \Illuminate\Support\Facades\Log::info('Certificado digital QZ restaurado com sucesso:', [
+                        'arquivo' => $publicCertFile,
+                        'tamanho' => filesize($publicCertFile) . ' bytes'
+                    ]);
+                } else {
+                    \Illuminate\Support\Facades\Log::error('Certificado digital QZ NÃO EXISTE após a restauração!');
+                }
+                
                 // Relatório final da restauração
                 \Illuminate\Support\Facades\Log::info('Relatório final da restauração:', [
                     'db_restaurado' => isset($dbDumpPath) ? 'Sim' : 'Não',
                     'visitors_photos' => file_exists($visitorsPhotosDir) ? trim($countResult->output() ?? '0') . ' arquivos' : 'Diretório não existe',
                     'week_days' => file_exists($weekDaysDir) ? trim($weekDaysCountResult->output() ?? '0') . ' arquivos' : 'Diretório não existe',
                     'templates' => file_exists($templatesDir) ? trim($templatesCountResult->output() ?? '0') . ' arquivos' : 'Diretório não existe',
+                    'certificados_privados' => file_exists($privateCertDir) ? trim($privateCertCountResult->output() ?? '0') . ' arquivos' : 'Diretório não existe',
+                    'certificado_digital' => file_exists($publicCertFile) ? 'Sim' : 'Não',
                 ]);
                 
                 // Remove diretório temporário
