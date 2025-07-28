@@ -48,20 +48,21 @@ class BackupDownloadPage extends Page
         $files = [];
         $backupDisk = Storage::disk('backups');
         
-        // Verifica se o diretório existe
-        if ($backupDisk->exists('Guardian')) {
-            $backupFiles = $backupDisk->files('Guardian');
-            
-            foreach ($backupFiles as $file) {
-                if (pathinfo($file, PATHINFO_EXTENSION) === 'zip') {
-                    $files[] = [
-                        'id' => $file, // Usamos o caminho como ID
-                        'name' => basename($file),
-                        'path' => $file,
-                        'size' => $backupDisk->size($file),
-                        'date' => $backupDisk->lastModified($file),
-                    ];
-                }
+        // O nome da aplicação determina o subdiretório onde os backups são salvos
+        $appName = env('APP_NAME', 'backup');
+        
+        // Lista todos os arquivos no subdiretório da aplicação
+        $backupFiles = $backupDisk->files($appName);
+        
+        foreach ($backupFiles as $file) {
+            if (pathinfo($file, PATHINFO_EXTENSION) === 'zip') {
+                $files[] = [
+                    'id' => $file, // Usamos o caminho como ID
+                    'name' => basename($file),
+                    'path' => $file,
+                    'size' => $backupDisk->size($file),
+                    'date' => $backupDisk->lastModified($file),
+                ];
             }
         }
         

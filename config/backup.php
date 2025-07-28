@@ -7,7 +7,7 @@ return [
          * The name of this application. You can use this name to monitor
          * the backups.
          */
-        'name' => env('APP_NAME', 'Guardian'),
+        'name' => env('APP_NAME', 'backup'),
 
         'source' => [
             'files' => [
@@ -107,7 +107,7 @@ return [
          * If 'database' (default), the dumped filename will contain the database name.
          * If 'connection', the dumped filename will contain the connection name.
          */
-        'database_dump_filename_base' => 'database',
+        'database_dump_filename_base' => 'connection',
 
         /*
          * The file extension used for the database dump files.
