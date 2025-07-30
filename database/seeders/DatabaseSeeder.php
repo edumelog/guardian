@@ -26,7 +26,7 @@ class DatabaseSeeder extends Seeder
             ShieldSeeder::class,
             FilamentAdminSeeder::class,
             WeekDaySeeder::class,
-            RiskApprovalPermissionsSeeder::class,
+            // RiskApprovalPermissionsSeeder::class, // Descontinuado - permissões já criadas no ShieldSeeder
             // AutomaticOccurrenceSeeder::class,
         ]);
     }

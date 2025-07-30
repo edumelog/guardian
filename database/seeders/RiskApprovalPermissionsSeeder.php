@@ -6,43 +6,26 @@ use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * @deprecated Este seeder foi descontinuado.
+ * As permissões de aprovação de risco agora são criadas no ShieldSeeder.php
+ * e FilamentAdminSeeder.php usando firstOrCreate().
+ * 
+ * Este arquivo pode ser removido após confirmar que não há dependências.
+ */
 class RiskApprovalPermissionsSeeder extends Seeder
 {
     /**
-     * Adiciona as permissões de aprovação de risco.
+     * @deprecated Este método não faz mais nada.
+     * As permissões são criadas em outros seeders.
      */
     public function run(): void
     {
-        // Garante que as permissões não serão duplicadas
-        DB::table('permissions')->whereIn('name', [
-            // 'low_risk_approval',
-            // 'medium_risk_approval',
-            // 'high_risk_approval'
-        ])->delete();
-
-        // Cria as novas permissões
-        $permissions = [
-            // [
-            //     'name' => 'low_risk_approval',
-            //     'guard_name' => 'web',
-            //     'created_at' => now(),
-            //     'updated_at' => now(),
-            // ],
-            // [
-            //     'name' => 'medium_risk_approval',
-            //     'guard_name' => 'web',
-            //     'created_at' => now(),
-            //     'updated_at' => now(),
-            // ],
-            // [
-            //     'name' => 'high_risk_approval',
-            //     'guard_name' => 'web',
-            //     'created_at' => now(),
-            //     'updated_at' => now(),
-            // ],
-        ];
-
-        // Insere as permissões no banco
-        // Permission::insert($permissions);
+        // Este seeder foi descontinuado
+        // As permissões de aprovação de risco são criadas no ShieldSeeder.php
+        // e FilamentAdminSeeder.php usando firstOrCreate()
+        
+        $this->command->info('RiskApprovalPermissionsSeeder foi descontinuado.');
+        $this->command->info('As permissões são criadas no ShieldSeeder.php e FilamentAdminSeeder.php.');
     }
 } 
