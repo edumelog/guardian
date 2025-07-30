@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Storage;
  * Este seeder cria os 7 dias da semana com valores padrão para
  * utilização no sistema e cria o diretório week-days para armazenamento
  * de imagens dos dias da semana.
+ * 
+ * Utiliza firstOrCreate() para evitar duplicação de dados.
  */
 class WeekDaySeeder extends Seeder
 {
@@ -30,9 +32,6 @@ class WeekDaySeeder extends Seeder
         } else {
             $this->command->info('Diretório week-days já existe.');
         }
-        
-        // Limpa registros existentes
-        DB::table('week_days')->truncate();
         
         // Lista de dias da semana padrão
         $weekDays = [
@@ -73,11 +72,14 @@ class WeekDaySeeder extends Seeder
             ],
         ];
         
-        // Cria os registros
+        // Cria os registros usando firstOrCreate para evitar duplicação
         foreach ($weekDays as $day) {
-            WeekDay::create($day);
+            WeekDay::firstOrCreate(
+                ['day_number' => $day['day_number']], // Chave única para busca
+                $day // Dados para criação se não existir
+            );
         }
         
-        $this->command->info('Dias da semana cadastrados com sucesso!');
+        $this->command->info('Dias da semana verificados e cadastrados com sucesso!');
     }
 }

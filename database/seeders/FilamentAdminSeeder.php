@@ -14,18 +14,41 @@ class FilamentAdminSeeder extends Seeder
 {
     /**
      * Run the database seeds.
+     * 
+     * Este seeder cria o usuário super admin e configura as permissões do Filament Shield.
+     * Inclui tratamento de erros para problemas de permissão de arquivos.
      */
     public function run(): void
     {
         // Execute the shield:install command to ensure Shield is installed for the dashboard panel
         $this->command->info('Installing Shield for the dashboard panel...');
-        Artisan::call('shield:install', ['panel' => 'dashboard']);
-        $this->command->info(Artisan::output());
+        
+        try {
+            Artisan::call('shield:install', ['panel' => 'dashboard']);
+            $this->command->info(Artisan::output());
+        } catch (\Exception $e) {
+            $this->command->error('Erro ao executar shield:install: ' . $e->getMessage());
+            $this->command->info('Verificando se as políticas já existem...');
+            
+            // Verifica se os arquivos de política já existem
+            $policyPath = app_path('Policies/RolePolicy.php');
+            if (!file_exists($policyPath)) {
+                $this->command->error('Arquivo RolePolicy.php não encontrado. Verifique as permissões do diretório app/Policies/');
+                $this->command->info('Execute: chown -R admin:www-data app/Policies/ && chmod -R 775 app/Policies/');
+                return;
+            }
+        }
         
         // Execute the shield:generate command to generate all necessary permissions
         $this->command->info('Generating Shield permissions...');
-        Artisan::call('shield:generate', ['--all' => true, '--panel' => 'dashboard']);
-        $this->command->info(Artisan::output());
+        
+        try {
+            Artisan::call('shield:generate', ['--all' => true, '--panel' => 'dashboard']);
+            $this->command->info(Artisan::output());
+        } catch (\Exception $e) {
+            $this->command->error('Erro ao executar shield:generate: ' . $e->getMessage());
+            $this->command->info('Continuando com permissões existentes...');
+        }
 
         // Get or create super_admin role
         $superAdminRole = Role::firstOrCreate([
