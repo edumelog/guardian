@@ -10,6 +10,9 @@ class ShieldSeeder extends Seeder
 {
     /**
      * Run the database seeds.
+     * 
+     * Este seeder cria as permissões de aprovação de risco e o role super_admin.
+     * Utiliza firstOrCreate() para evitar erros de duplicação de permissões.
      */
     public function run(): void
     {
@@ -17,10 +20,10 @@ class ShieldSeeder extends Seeder
 
         $guard = 'web';
 
-        // Cria as permissões de aprovação de risco
-        Permission::create(['name' => 'low_risk_approval', 'guard_name' => $guard]);
-        Permission::create(['name' => 'medium_risk_approval', 'guard_name' => $guard]);
-        Permission::create(['name' => 'high_risk_approval', 'guard_name' => $guard]);
+        // Cria as permissões de aprovação de risco (apenas se não existirem)
+        Permission::firstOrCreate(['name' => 'low_risk_approval', 'guard_name' => $guard]);
+        Permission::firstOrCreate(['name' => 'medium_risk_approval', 'guard_name' => $guard]);
+        Permission::firstOrCreate(['name' => 'high_risk_approval', 'guard_name' => $guard]);
 
         // Super Admin
         $superAdmin = Role::firstOrCreate([
