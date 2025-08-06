@@ -8,11 +8,14 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\Permission\Traits\HasRoles;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
+use BezhanSalleh\FilamentShield\Traits\HasPanelShield;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles;
+    use HasFactory, Notifiable, HasRoles, HasPanelShield;
 
     /**
      * The attributes that are mass assignable.
@@ -90,5 +93,28 @@ class User extends Authenticatable
     public function hasRelatedOccurrences(): bool
     {
         return $this->createdOccurrences()->exists() || $this->updatedOccurrences()->exists();
+    }
+
+    /**
+     * Verifica se o usuário pode acessar o painel Filament
+     * 
+     * @param Panel $panel
+     * @return bool
+     */
+    public function canAccessPanel(Panel $panel): bool
+    {
+        // Verifica se o usuário está ativo
+        if (!$this->is_active) {
+            return false;
+        }
+
+        // Verifica se o usuário tem o papel super_admin ou permissões específicas
+        return $this->hasRole('super_admin') || 
+               $this->hasAnyPermission([
+                   'view_any_user',
+                   'view_any_visitor',
+                   'view_any_destination',
+                   'view_any_occurrence'
+               ]);
     }
 }
